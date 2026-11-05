@@ -195,11 +195,13 @@ test('meet_staff_rejection_keeps_files_and_requires_a_note', function () {
     expect(Storage::disk('local')->allFiles())->toBe($paths);
 });
 
-test('meet_staff_revision_request_is_still_held_without_mutating_any_saved_feedback', function () {
+test('meet_staff_revision_request_requires_review_of_the_remaining_documents', function () {
     $registration = ($this->makeMeetRegistration)();
-    $document = $registration->documents()->firstOrFail();
+    $document = $registration->documents()->where('document_type', 'ta_data_capture')->firstOrFail();
     ($this->reviewDocument)($registration, $document, ['status' => 'rejected', 'notes' => 'Perbaiki scan'])->assertOk();
-    ($this->decideMeet)($registration, 'needs_review')->assertUnprocessable()->assertJsonValidationErrors('action');
+    $response = ($this->decideMeet)($registration, 'needs_review')->assertUnprocessable()
+        ->assertJsonValidationErrors(['documents.online_supervision_capture', 'documents.thesis_draft']);
+    expect(array_key_exists('action', $response->json('errors')))->toBeFalse();
     expect($registration->fresh()->status)->toBe('submitted');
     expect($registration->fresh()->lock_version)->toBe(2);
     expect($document->fresh()->notes)->toBe('Perbaiki scan');
@@ -232,9 +234,8 @@ test('meet_staff_read_permission_alone_does_not_allow_document_or_decision_mutat
 
 test('meet_staff_detail_groups_uploads_into_two_columns_with_status_colors_and_disabled_verify', function () {
     $registration = ($this->makeMeetRegistration)('waiver');
-    $documents = $registration->documents()->get();
-    $verified = $documents->first();
-    $rejected = $documents->get(1);
+    $verified = $registration->documents()->where('document_type', 'ta_data_capture')->firstOrFail();
+    $rejected = $registration->documents()->where('document_type', 'online_supervision_capture')->firstOrFail();
     $verified->update(['status' => 'verified']);
     $rejected->update(['status' => 'rejected', 'notes' => 'Perbaiki']);
     $crawler = ($this->reviewPage)($registration);
@@ -254,7 +255,8 @@ test('meet_staff_detail_groups_uploads_into_two_columns_with_status_colors_and_d
     expect($green->filter('[data-doc-reject]')->getNode(0)->hasAttribute('disabled'))->toBeFalse();
     expect($yellow->filter('[data-doc-verify]')->getNode(0)->hasAttribute('disabled'))->toBeFalse();
     expect($crawler->filter('[data-ta-request-revision]')->getNode(0)->hasAttribute('disabled'))->toBeTrue();
-    expect($crawler->filter('[data-meet-revision-held]')->count())->toBe(1);
+    expect($crawler->filter('[data-ta-revision-blockers]')->count())->toBe(1);
+    expect($crawler->filter('[data-ta-revision-blockers]')->text(null, true))->toContain('Selesaikan verifikasi');
     expect($crawler->filter('[data-ta-review-window]')->text(null, true))->toContain($this->period->close_at->format('d/m/Y H:i'));
     expect($crawler->filter('[data-staff-registration-history]')->getNode(0)->hasAttribute('open'))->toBeFalse();
 });
@@ -300,15 +302,26 @@ test('meet_staff_escapes_file_names_and_document_feedback', function () {
     expect($card->filter('textarea[name="notes"]')->getNode(0)->textContent)->toBe('<script>badNote()</script>');
 });
 
-test('meet_staff_unknown_requirements_version_is_rejected_before_mutation', function () {
+test('meet_staff_unsupported_requirements_marker_is_rejected_before_mutation', function (int $marker) {
     $registration = ($this->makeMeetRegistration)();
     $document = $registration->documents()->firstOrFail();
-    $registration->update(['requirements_version' => 99]);
-    ($this->reviewDocument)($registration, $document)->assertConflict();
+    $registration->update(['requirements_version' => $marker]);
+    $before = $registration->fresh()->getAttributes();
+    $documents = $registration->documents()->orderBy('id')->get()->toArray();
+    $paths = Storage::disk('local')->allFiles();
+    ($this->reviewDocument)($registration, $document)->assertConflict()->assertJsonPath('message', 'Persyaratan pengajuan tidak sesuai. Muat ulang atau hubungi petugas.');
+    ($this->reviewDocument)($registration, $document, ['status' => 'rejected', 'notes' => 'Perbaiki PDF'])
+        ->assertConflict()->assertJsonPath('message', 'Persyaratan pengajuan tidak sesuai. Muat ulang atau hubungi petugas.');
+    foreach (['approved', 'needs_review', 'rejected'] as $action) {
+        ($this->decideMeet)($registration, $action)->assertConflict()->assertJsonPath('message', 'Persyaratan pengajuan tidak sesuai. Muat ulang atau hubungi petugas.');
+    }
+    expect($registration->fresh()->getAttributes())->toBe($before);
+    expect($registration->documents()->orderBy('id')->get()->toArray())->toBe($documents);
     expect($document->fresh()->status)->toBe('pending');
     expect($registration->fresh()->lock_version)->toBe(1);
     expect($registration->logs()->count())->toBe(0);
-});
+    expect(Storage::disk('local')->allFiles())->toBe($paths);
+})->with([1, 3, 99]);
 
 test('meet_staff_failed_form_keeps_its_old_version_without_rebasing_other_cards', function () {
     $registration = ($this->makeMeetRegistration)();

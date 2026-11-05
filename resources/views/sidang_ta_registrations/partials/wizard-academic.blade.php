@@ -59,17 +59,27 @@
             @endforeach
         </dl>
         <dl class="divide-y divide-slate-100 text-sm">
-            @foreach(['Sidang tingkat 2' => 'sidang_tingkat_2', 'Status SKPI' => 'skpi_status', 'KRS Sidang TA 2' => 'ta2_krs_label'] as $label => $key)
+            @foreach(['Sidang tingkat 2' => 'sidang_tingkat_2', 'Status SKPI' => 'skpi_status', 'KRS Sidang TA 2' => 'ta2_krs_label', 'Status BPP' => 'bpp_status'] as $label => $key)
                 <div class="grid grid-cols-2 gap-3 py-2">
                     <dt class="text-slate-500">
                         {{ $label }}
                     </dt>
-                    <dd class="break-words font-medium text-slate-800">
-                        {{ $display($academic[$key] ?? null) }}
+                    <dd data-academic-field="{{ $key }}" class="break-words font-medium text-slate-800">
+                        @if($key === 'bpp_status')
+                            {{ match (strtolower(trim((string) ($academic[$key] ?? '')))) {
+                                'paid', 'lunas' => 'Lunas',
+                                'unpaid', 'belum lunas', 'belum_lunas' => 'Belum lunas',
+                                default => 'Belum tersedia',
+                            } }}
+                        @else
+                            {{ $display($academic[$key] ?? null) }}
+                        @endif
                     </dd>
+                    @if($key === 'bpp_status')
+                        <dd class="col-span-2 text-xs text-slate-400">Periode pembayaran belum terkonfirmasi.</dd>
+                    @endif
                 </div>
             @endforeach
         </dl>
     </section>
 </aside>
-

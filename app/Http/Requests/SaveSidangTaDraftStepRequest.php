@@ -6,6 +6,7 @@ use App\Models\SidangTaRegistration;
 use App\Support\SidangTaMeetRequirements;
 use Illuminate\Contracts\Validation\ValidationRule;
 use App\Support\SidangTaDocumentRequirements as Requirements;
+use App\Support\SidangTaRevisionContract as Revision;
 use Illuminate\Foundation\Http\FormRequest;
 
 class SaveSidangTaDraftStepRequest extends FormRequest
@@ -54,15 +55,13 @@ class SaveSidangTaDraftStepRequest extends FormRequest
 
         // Tahap 4 boleh menerima scalar yang belum ada. Cabang aktual divalidasi lagi
         // dalam service setelah merge payload dan version check di bawah lock.
-        if ($draft && $draft->requirements_version === 2) {
-            $types = $step === 4
-                ? array_merge(SidangTaMeetRequirements::DIPLOMA, SidangTaMeetRequirements::PDM)
-                : Requirements::typesForDraftStep($draft, $step);
-        } else {
-            $types = $step === 4 ? array_merge(Requirements::DIPLOMA, Requirements::PDM)
-                : Requirements::typesForStep($step);
+        $types = $step === 4
+            ? array_merge(SidangTaMeetRequirements::DIPLOMA, SidangTaMeetRequirements::PDM)
+            : ($draft ? Requirements::typesForDraftStep($draft, $step) : Requirements::typesForStep($step));
+        if ($draft && Revision::isTargeted($draft)) {
+            $types = array_values(array_intersect(Requirements::typesForDraftStep($draft, $step), Revision::editableTypes($draft)));
         }
-        $rules['documents'] = ['nullable', 'array:'.implode(',', $types)];
+        $rules['documents'] = $types ? ['nullable', 'array:'.implode(',', $types)] : ['prohibited'];
         foreach ($types as $type) {
             $rules["documents.{$type}"] = $draft ? Requirements::fileRulesForDraft($draft, $type) : Requirements::fileRules($type);
         }
@@ -115,4 +114,3 @@ class SaveSidangTaDraftStepRequest extends FormRequest
         return $attributes;
     }
 }
-

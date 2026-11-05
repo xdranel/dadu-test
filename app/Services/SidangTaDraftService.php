@@ -8,6 +8,8 @@ use App\Models\SidangTaRegistrationDraft;
 use App\Models\Student;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
+use App\Support\SidangTaRevisionContract as Revision;
+use App\Support\SidangTaDocumentRequirements as Requirements;
 use Illuminate\Validation\ValidationException;
 
 class SidangTaDraftService
@@ -19,6 +21,7 @@ class SidangTaDraftService
 
     public function owned(User $user, SidangTaRegistrationDraft $draft): SidangTaRegistrationDraft
     {
+        Requirements::assertKnownVersion($draft);
         $this->access->check($user, $draft);
         return $draft;
     }
@@ -53,6 +56,7 @@ class SidangTaDraftService
                 ->whereNull('source_registration_id')->lockForUpdate()->first();
 
             if ($existing) {
+                Requirements::assertKnownVersion($existing);
                 abort_unless((string) $existing->owner_user_id === (string) $user->id, 409);
                 return $existing; // Retry start tidak menimpa draft; ubah lewat saveStep.
             }
@@ -63,7 +67,7 @@ class SidangTaDraftService
                 'owner_user_id' => $user->id,
                 'student_number' => $student->student_number,
                 'sidang_ta_period_id' => $period->id,
-                'requirements_version' => 1,
+                'requirements_version' => 2,
                 'payload' => [
                     'student_phone' => $validated['student_phone'],
                     'parent_phone' => $validated['parent_phone'],
@@ -85,8 +89,14 @@ class SidangTaDraftService
         return DB::transaction(function () use ($user, $draft, $expectedVersion, $validated, $student) {
             Student::whereKey($student->id)->lockForUpdate()->firstOrFail();
             $locked = SidangTaRegistrationDraft::whereKey($draft->id)->lockForUpdate()->firstOrFail();
+            Requirements::assertKnownVersion($locked);
             $this->access->check($user, $locked, true);
             abort_unless($locked->version === $expectedVersion, 409, 'Draft berubah. Muat ulang terlebih dahulu.');
+            if (Revision::isTargeted($locked)) {
+                Revision::assertPayloadUnchanged($locked, array_replace($locked->payload ?? [], [
+                    'student_phone' => $validated['student_phone'], 'parent_phone' => $validated['parent_phone'],
+                ]));
+            }
             if ($locked->source_registration_id !== null) {
                 if ((int) $validated['sidang_ta_period_id'] !== (int) $locked->sidang_ta_period_id) {
                     throw ValidationException::withMessages([

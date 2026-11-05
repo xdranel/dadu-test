@@ -1,0 +1,172 @@
+{
+  "source": "DUMMY SIDANG TA - bukan data resmi",
+  "data": [
+    {
+      "nim": "1202299001",
+      "nama": "Dummy TA EPRT Otomatis",
+      "sidang_tingkat": {
+        "tingkat_1": "Y",
+        "tingkat_2": "Y",
+        "tingkat_3": "N",
+        "tingkat_4": "N"
+      },
+      "ipk": 3.25,
+      "semester_aktif": 8,
+      "sks_lulus": 120,
+      "sks_belum_lulus": 0,
+      "mk_mengulang": [],
+      "mk_belum_lulus": [],
+      "tak": {
+        "total_points": 60,
+        "test_date": "2026-10-01",
+        "expiry_date": null
+      },
+      "eprt": [
+        {
+          "attempt_number": 1,
+          "total_score": 450,
+          "test_date": "2026-10-01"
+        }
+      ],
+      "skpi": {
+        "approval_status": "approved"
+      },
+      "bpp": {
+        "status": "lunas"
+      },
+      "tugas_akhir": {
+        "judul_ta_id": "Contoh Tugas Akhir Dummy",
+        "judul_ta_en": "Dummy Final Project Example"
+      }
+    },
+    {
+      "nim": "1202299002",
+      "nama": "Dummy TA Surat Permakluman",
+      "sidang_tingkat": {
+        "tingkat_1": "Y",
+        "tingkat_2": "Y",
+        "tingkat_3": "N",
+        "tingkat_4": "N"
+      },
+      "ipk": 3.25,
+      "semester_aktif": 8,
+      "sks_lulus": 120,
+      "sks_belum_lulus": 0,
+      "mk_mengulang": [],
+      "mk_belum_lulus": [],
+      "tak": {
+        "total_points": 60,
+        "test_date": "2026-10-01",
+        "expiry_date": null
+      },
+      "eprt": [
+        {
+          "attempt_number": 1,
+          "total_score": 449,
+          "test_date": "2026-10-01"
+        },
+        {
+          "attempt_number": 2,
+          "total_score": 449,
+          "test_date": "2026-10-02"
+        },
+        {
+          "attempt_number": 3,
+          "total_score": 449,
+          "test_date": "2026-10-03"
+        }
+      ],
+      "skpi": {
+        "approval_status": "approved"
+      },
+      "bpp": {
+        "status": "lunas"
+      },
+      "tugas_akhir": {
+        "judul_ta_id": "Contoh Tugas Akhir Dummy",
+        "judul_ta_en": "Dummy Final Project Example"
+      }
+    },
+    {
+      "nim": "1202299003",
+      "nama": "Dummy TA Tes EPRT Ulang",
+      "sidang_tingkat": {
+        "tingkat_1": "Y",
+        "tingkat_2": "Y",
+        "tingkat_3": "N",
+        "tingkat_4": "N"
+      },
+      "ipk": 3.25,
+      "semester_aktif": 8,
+      "sks_lulus": 120,
+      "sks_belum_lulus": 0,
+      "mk_mengulang": [],
+      "mk_belum_lulus": [],
+      "tak": {
+        "total_points": 60,
+        "test_date": "2026-10-01",
+        "expiry_date": null
+      },
+      "eprt": [
+        {
+          "attempt_number": 1,
+          "total_score": 449,
+          "test_date": "2026-10-01"
+        },
+        {
+          "attempt_number": 2,
+          "total_score": 449,
+          "test_date": "2026-10-02"
+        }
+      ],
+      "skpi": {
+        "approval_status": "approved"
+      },
+      "bpp": {
+        "status": "lunas"
+      },
+      "tugas_akhir": {
+        "judul_ta_id": "Contoh Tugas Akhir Dummy",
+        "judul_ta_en": "Dummy Final Project Example"
+      }
+    },
+    {
+      "nim": "1202299004",
+      "nama": "Dummy TA TAK Kurang",
+      "sidang_tingkat": {
+        "tingkat_1": "Y",
+        "tingkat_2": "Y",
+        "tingkat_3": "N",
+        "tingkat_4": "N"
+      },
+      "ipk": 3.25,
+      "semester_aktif": 8,
+      "sks_lulus": 120,
+      "sks_belum_lulus": 0,
+      "mk_mengulang": [],
+      "mk_belum_lulus": [],
+      "tak": {
+        "total_points": 59,
+        "test_date": "2026-10-01",
+        "expiry_date": null
+      },
+      "eprt": [
+        {
+          "attempt_number": 1,
+          "total_score": 450,
+          "test_date": "2026-10-01"
+        }
+      ],
+      "skpi": {
+        "approval_status": "approved"
+      },
+      "bpp": {
+        "status": "lunas"
+      },
+      "tugas_akhir": {
+        "judul_ta_id": "Contoh Tugas Akhir Dummy",
+        "judul_ta_en": "Dummy Final Project Example"
+      }
+    }
+  ]
+}

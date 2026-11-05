@@ -32,16 +32,20 @@ beforeEach(function () {
     $this->completeDraft = function () {
         $id = $this->postJson(route('sidang-ta-drafts.store'), $this->data)->assertCreated()->json('data.id');
         $draft = SidangTaRegistrationDraft::findOrFail($id);
-        $draft->payload = array_replace($draft->payload, [
-            'graduation_payment_date' => today()->toDateString(), 'diploma_biodata_accurate' => true,
-        ]);
-        $draft->save();
-        foreach (array_merge(Requirements::CAPTURES, Requirements::PAYMENT, Requirements::DIPLOMA) as $type) {
-            $path = "sidang_ta/drafts/{$draft->id}/{$type}.pdf";
-            Storage::disk('local')->put($path, '%PDF-test');
-            $draft->documents()->create(['document_type' => $type, 'file_name' => $type.'.pdf',
-                'file_path' => $path, 'file_size' => 10, 'file_type' => 'pdf']);
+        expect($draft->requirements_version)->toBe(2);
+        foreach ([2, 3, 4] as $step) {
+            $data = ['version' => $draft->fresh()->version];
+            if ($step === 3) $data['graduation_payment_date'] = today()->toDateString();
+            if ($step === 4) $data['diploma_biodata_accurate'] = true;
+            foreach (Requirements::typesForStep($step, true) as $type) {
+                $data['documents'][$type] = \Illuminate\Http\UploadedFile::fake()
+                    ->create($type.'.pdf', 100, 'application/pdf');
+            }
+            $this->postJson(route('sidang-ta-drafts.steps.store', ['draft' => $draft, 'step' => $step]), $data)
+                ->assertOk();
         }
+        $draft = $draft->fresh();
+        expect($draft->documents()->count())->toBe(7);
         return $draft;
     };
 });
@@ -91,24 +95,24 @@ test('incomplete_draft_cannot_be_marked_reviewed', function () {
     expect(SidangTaRegistrationDraft::findOrFail($id)->reviewed_version)->toBeNull();
 });
 
-test('review_marks_saved_version_and_renders_fifteen_documents', function () {
+test('review_marks_saved_version_and_renders_seven_documents', function () {
     $draft = ($this->completeDraft)();
-    $this->post(route('sidang-ta-drafts.review', $draft), ['version' => 1])
+    $this->post(route('sidang-ta-drafts.review', $draft), ['version' => $draft->version])
         ->assertRedirect(route('sidang-ta-drafts.preview', $draft));
     $response = $this->get(route('sidang-ta-drafts.preview', $draft))->assertOk()
         ->assertViewIs('sidang_ta_registrations.wizard-review')
-        ->assertViewHas('draft', fn ($viewDraft) => $viewDraft->documents->count() === 15);
+        ->assertViewHas('draft', fn ($viewDraft) => $viewDraft->documents->count() === 7);
     $crawler = new \Symfony\Component\DomCrawler\Crawler($response->getContent());
     expect($crawler->text(null, true))->toContain('Pendaftaran belum dikirim.');
-    expect($draft->fresh()->reviewed_version)->toBe(1);
+    expect($draft->fresh()->reviewed_version)->toBe($draft->version);
     expect(SidangTaRegistration::count())->toBe(0);
 });
 
 test('saved_change_invalidates_review', function () {
     $draft = ($this->completeDraft)();
-    $this->postJson(route('sidang-ta-drafts.review', $draft), ['version' => 1])->assertOk();
+    $this->postJson(route('sidang-ta-drafts.review', $draft), ['version' => $draft->version])->assertOk();
     $this->postJson(route('sidang-ta-drafts.steps.store', ['draft' => $draft, 'step' => 1]),
-        array_replace($this->data, ['version' => 1, 'student_phone' => '089999999999']))->assertOk();
+        array_replace($this->data, ['version' => $draft->version, 'student_phone' => '089999999999']))->assertOk();
     $this->getJson(route('sidang-ta-drafts.preview', $draft))->assertStatus(409);
     expect($draft->fresh()->reviewed_version)->toBeNull();
 });
@@ -118,8 +122,18 @@ test('index_exposes_discard_for_stale_revision', function () {
         'sidang_ta_period_id' => $this->period->id, 'student_number' => '1202200001',
         'student_name' => 'Wizard Test', 'student_phone' => '081234567890',
         'parent_phone' => '081234567891', 'graduation_payment_date' => today()->toDateString(),
-        'diploma_biodata_accurate' => true, 'status' => 'needs_review',
+        'diploma_biodata_accurate' => true, 'requirements_version' => 2, 'academic_snapshot' => ['admission' => ['eprt' => ['mode' => 'automatic']]],
+        'status' => 'needs_review',
     ])->fresh();
+    expect($source->requirements_version)->toBe(2);
+    foreach (array_merge(Requirements::CAPTURES, Requirements::PAYMENT, Requirements::DIPLOMA) as $index => $type) {
+        $path = "sidang_ta/final/{$source->id}/{$type}.pdf";
+        Storage::disk('local')->put($path, '%PDF-1.4 source');
+        $source->documents()->create(['document_type' => $type, 'file_name' => $type.'.pdf',
+            'file_path' => $path, 'file_size' => 20, 'file_type' => 'pdf',
+            'status' => $index === 0 ? 'rejected' : 'verified',
+            'notes' => $index === 0 ? 'Unggah capture yang terbaca.' : null]);
+    }
     $id = $this->postJson(route('sidang-ta-drafts.revision', $source))
         ->assertCreated()->json('data.id');
     $source->lock_version++;
@@ -142,7 +156,7 @@ test('index_exposes_discard_for_stale_revision', function () {
 
 test('missing_file_prevents_preview_even_after_review', function () {
     $draft = ($this->completeDraft)();
-    $this->postJson(route('sidang-ta-drafts.review', $draft), ['version' => 1])->assertOk();
+    $this->postJson(route('sidang-ta-drafts.review', $draft), ['version' => $draft->version])->assertOk();
     Storage::disk('local')->delete($draft->documents()->first()->file_path);
     $this->getJson(route('sidang-ta-drafts.preview', $draft))->assertStatus(409);
 });
@@ -158,29 +172,29 @@ test('other_user_cannot_open_html_wizard_or_review', function () {
 test('html_validation_preserves_stale_version_until_conflict_is_resolved', function () {
     $draft = ($this->completeDraft)();
     $this->postJson(route('sidang-ta-drafts.steps.store', ['draft' => $draft, 'step' => 1]),
-        array_replace($this->data, ['version' => 1, 'student_phone' => '089999999999']))->assertOk();
+        array_replace($this->data, ['version' => $draft->version, 'student_phone' => '089999999999']))->assertOk();
     $url = route('sidang-ta-drafts.edit', ['draft' => $draft, 'step' => 1]);
     $this->from($url)->post(route('sidang-ta-drafts.steps.store', ['draft' => $draft, 'step' => 1]),
-        array_replace($this->data, ['version' => 1, 'student_phone' => '']))
+        array_replace($this->data, ['version' => $draft->version, 'student_phone' => '']))
         ->assertRedirect($url)->assertSessionHasErrors('student_phone');
-    $this->get($url)->assertOk()->assertSee('name="version" value="1"', false);
+    $this->get($url)->assertOk()->assertSee('name="version" value="'.$draft->version.'"', false);
     $this->postJson(route('sidang-ta-drafts.steps.store', ['draft' => $draft, 'step' => 1]),
-        array_replace($this->data, ['version' => 1, 'student_phone' => '080000000000']))->assertStatus(409);
+        array_replace($this->data, ['version' => $draft->version, 'student_phone' => '080000000000']))->assertStatus(409);
     expect($draft->fresh()->payload['student_phone'])->toBe('089999999999');
 });
 
 test('preview_returns_loaded_snapshot_before_concurrent_branch_change', function () {
     $draft = ($this->completeDraft)();
-    $this->postJson(route('sidang-ta-drafts.review', $draft), ['version' => 1])->assertOk();
+    $this->postJson(route('sidang-ta-drafts.review', $draft), ['version' => $draft->version])->assertOk();
     $snapshot = app(\App\Services\SidangTaDraftReviewService::class)->preview($this->user, $draft);
     expect($snapshot->relationLoaded('documents'))->toBeTrue();
     expect($snapshot->relationLoaded('period'))->toBeTrue();
     $this->postJson(route('sidang-ta-drafts.steps.store', ['draft' => $draft, 'step' => 4]), [
-        'version' => 1, 'diploma_biodata_accurate' => false,
+        'version' => $draft->version, 'diploma_biodata_accurate' => false,
         'documents' => ['pdm_submission_proof' => \Illuminate\Http\UploadedFile::fake()->create('pdm.pdf', 100, 'application/pdf')],
     ])->assertOk();
     expect($snapshot->payload['diploma_biodata_accurate'])->toBeTrue();
-    expect($snapshot->documents->count())->toBe(15);
+    expect($snapshot->documents->count())->toBe(7);
     expect($snapshot->documents->firstWhere('document_type', 'diploma_statement'))->not->toBeNull();
 });
 

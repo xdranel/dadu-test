@@ -11,14 +11,17 @@ class SidangTaRevisionContract
 {
     public static function isTargeted(SidangTaRegistrationDraft $draft): bool
     {
-        return $draft->requirements_version === 2 && $draft->source_registration_id !== null;
+        SidangTaDocumentRequirements::assertKnownVersion($draft);
+        return $draft->source_registration_id !== null;
     }
 
     public static function source(SidangTaRegistrationDraft $draft): SidangTaRegistration
     {
         abort_unless(self::isTargeted($draft), 409, 'Draft bukan revisi terarah.');
         $source = SidangTaRegistration::whereKey($draft->source_registration_id)->firstOrFail();
-        abort_unless($source->requirements_version === 2
+        abort_unless($source->requirements_version === 2, 409,
+            'Persyaratan pengajuan tidak sesuai. Muat ulang atau hubungi petugas.');
+        abort_unless($source->requirements_version === $draft->requirements_version
             && $source->status === 'needs_review'
             && $source->student_number === $draft->student_number
             && $source->lock_version === $draft->source_version, 409,

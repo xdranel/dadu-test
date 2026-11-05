@@ -6,6 +6,7 @@ use App\Models\SidangTaRegistrationDraft;
 use App\Models\Student;
 use App\Models\User;
 use App\Support\SidangTaDocumentRequirements as Requirements;
+use App\Support\SidangTaRevisionContract as Revision;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -56,15 +57,18 @@ class SidangTaDraftDocumentService
                 $payload = array_replace($locked->payload ?? [],
                     array_intersect_key($validated, Requirements::draftScalarRules($step)));
                 Validator::make($payload, Requirements::draftScalarRules($step))->validate();
+                $targeted = Revision::isTargeted($locked);
+                if ($targeted) Revision::assertPayloadUnchanged($locked, $payload);
                 if ($step === 4 && array_key_exists('diploma_biodata_accurate', $payload)) {
                     $choice = $payload['diploma_biodata_accurate'];
                     $payload['diploma_biodata_accurate'] = $choice === null ? null : (bool) $choice;
                 }
                 $accurate = $payload['diploma_biodata_accurate'] ?? null;
                 $types = Requirements::typesForDraftStep($locked, $step, $payload);
+                $allowedTypes = $targeted ? array_values(array_intersect($types, Revision::editableTypes($locked))) : $types;
                 $files = $validated['documents'] ?? [];
-                $fileRules = ['documents' => $types ? ['array:'.implode(',', $types)] : ['prohibited']];
-                foreach ($types as $type) $fileRules["documents.{$type}"] = Requirements::fileRulesForDraft($locked, $type);
+                $fileRules = ['documents' => $allowedTypes ? ['array:'.implode(',', $allowedTypes)] : ['prohibited']];
+                foreach ($allowedTypes as $type) $fileRules["documents.{$type}"] = Requirements::fileRulesForDraft($locked, $type);
                 Validator::make(['documents' => $files], $fileRules)->validate();
 
                 foreach ($types as $type) {
@@ -84,14 +88,14 @@ class SidangTaDraftDocumentService
                     if ($old && $old->source_document_id === null) $retiredPaths[] = $old->file_path;
                 }
                 // Missing/uncertain EPRT data must not destroy a previously uploaded waiver.
-                if ($step === 3 && $locked->requirements_version === 2
+                if (!$targeted && $step === 3
                     && app(\App\Services\SidangTaAdmissionFacts::class)->forStudent($student)['eprt']['mode'] === 'automatic') {
                     foreach ($locked->documents()->where('document_type', \App\Support\SidangTaMeetRequirements::WAIVER)->get() as $old) {
                         if ($old->source_document_id === null) $retiredPaths[] = $old->file_path;
                         $old->delete();
                     }
                 }
-                if ($step === 4 && $accurate !== null) {
+                if (!$targeted && $step === 4 && $accurate !== null) {
                     $obsolete = $accurate ? Requirements::PDM : Requirements::DIPLOMA;
                     foreach ($locked->documents()->whereIn('document_type', $obsolete)->get() as $old) {
                         if ($old->source_document_id === null) $retiredPaths[] = $old->file_path;
@@ -112,4 +116,3 @@ class SidangTaDraftDocumentService
         return $result;
     }
 }
-

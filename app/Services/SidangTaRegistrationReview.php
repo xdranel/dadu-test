@@ -6,6 +6,8 @@ use App\Models\SidangTaRegistration;
 use App\Models\SidangTaRegistrationDocument;
 use App\Models\User;
 use App\Support\SidangTaReviewEligibility as Eligibility;
+use App\Support\SidangTaRevisionContract;
+use App\Support\SidangTaRevisionDeadline;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
@@ -16,8 +18,10 @@ class SidangTaRegistrationReview
     {
         $locked = SidangTaRegistration::whereKey($registration->id)->lockForUpdate()->firstOrFail();
         abort_unless($locked->lock_version === $version, 409, 'Pengajuan berubah. Muat ulang sebelum meninjau.');
-        abort_unless(in_array($locked->status, ['submitted', 'needs_review'], true), 422,
-            'Pengajuan sudah diputuskan dan tidak dapat ditinjau kembali.');
+        abort_unless($locked->requirements_version === 2, 409,
+            'Persyaratan pengajuan tidak sesuai. Muat ulang atau hubungi petugas.');
+        abort_unless($locked->status === 'submitted', 422,
+            'Peninjauan terkunci. Pengajuan sedang direvisi atau sudah diputuskan.');
         return $locked;
     }
 
@@ -40,7 +44,8 @@ class SidangTaRegistrationReview
                 throw ValidationException::withMessages(['document' => 'Berkas tidak ditemukan. Minta mahasiswa mengunggah ulang.']);
             }
             $oldRegistrationStatus = $locked->status;
-            $nextStatus = $status === 'rejected' ? 'needs_review' : $locked->status;
+            if ($status === 'verified') $notes = null;
+            $nextStatus = $locked->status;
             if ($doc->status === $status && $doc->notes === $notes && $locked->status === $nextStatus) return $locked;
             $labels = ['pending' => 'Menunggu verifikasi', 'verified' => 'Terverifikasi', 'rejected' => 'Perlu perbaikan'];
             $oldDocumentStatus = $labels[$doc->status] ?? $doc->status;
@@ -72,6 +77,10 @@ class SidangTaRegistrationReview
         }
         return DB::transaction(function () use ($user, $registration, $version, $action, $notes) {
             $locked = $this->locked($registration, $version);
+            if ($action === 'needs_review') {
+                SidangTaRevisionDeadline::ensureOpen($locked, 'action');
+                SidangTaRevisionContract::assertCanRequest($locked);
+            }
             if ($action === 'approved') {
                 $locked->setRelation('documents', $locked->documents()->lockForUpdate()->get());
                 $blockers = Eligibility::blockers($locked);

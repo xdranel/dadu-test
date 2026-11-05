@@ -7,7 +7,7 @@
                 Preview berkas
             </h2>
             <div class="flex flex-wrap items-center gap-2">
-                <a data-preview-download :href="downloadUrl" class="btn btn-secondary">
+                <a data-preview-download x-show="downloadUrl" x-cloak :href="downloadUrl" class="btn btn-secondary">
                     Unduh
                 </a>
                 <a data-preview-new-tab :href="previewUrl" target="_blank" rel="noopener" class="btn btn-secondary">
@@ -26,6 +26,8 @@
                 <img :src="previewUrl" :alt="fileName" class="mx-auto max-h-[65vh] max-w-full rounded-lg object-contain">
             </template>
         </div>
-        <p class="mt-3 text-xs leading-relaxed text-slate-500">Jika berkas tidak tampil, gunakan Buka di tab baru atau Unduh untuk memeriksanya.</p>
+        <p class="mt-3 text-xs leading-relaxed text-slate-500"
+           x-text="downloadUrl ? 'Jika berkas tidak tampil, gunakan Buka di tab baru atau Unduh untuk memeriksanya.' : 'Gambar ini merupakan contoh pengisian. Tekan Tutup untuk kembali ke form.'">
+        </p>
     </dialog>
 </div>

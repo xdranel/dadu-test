@@ -3,7 +3,7 @@
 namespace App\Services;
 
 use App\Models\SidangTaRegistration;
-use App\Support\SidangTaDocumentRequirements as Requirements;
+use App\Support\SidangTaReviewEligibility as Eligibility;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
@@ -23,23 +23,13 @@ class SidangTaReviewExport
         'IPK' => 'gpa',
         'SKS Lulus' => 'passed_credits',
         'Sidang Tingkat 2' => 'sidang_tingkat_2',
+        'KRS Sidang TA 2' => 'ta2_krs_label',
         'Judul TA Indonesia' => 'ta_title',
         'Judul TA Inggris' => 'ta_title_en',
-        'Pembimbing 1' => 'advisor_1',
-        'Pembimbing 2' => 'advisor_2',
-        'Penguji 1' => 'examiner_1',
-        'Penguji 2' => 'examiner_2',
-        'Penguji 3' => 'examiner_3',
-        'Tanggal Sidang' => 'exam_date',
-        'Waktu Sidang' => 'exam_time',
-        'Lokasi Sidang' => 'exam_location',
         'TAK' => 'tak_score',
         'EPrT' => 'eprt_score',
         'Status BPP' => 'bpp_status',
         'Status SKPI' => 'skpi_status',
-        'Status TAK' => 'skpi_tak',
-        'Sidang Tingkat 3' => 'level_3_status',
-        'Status i-Basila' => 'ibasila_status',
         'Sumber Akademik Diperbarui' => 'academic_source_updated_at',
     ];
 
@@ -72,8 +62,7 @@ class SidangTaReviewExport
             'Versi Pengajuan' => (string) $registration->lock_version,
         ];
         foreach (self::SNAPSHOT_COLUMNS as $label => $key) $row[$label] = $this->text($snapshot[$key] ?? null);
-        $required = array_merge(Requirements::CAPTURES, Requirements::PAYMENT,
-            Requirements::typesForStep(4, $registration->diploma_biodata_accurate));
+        $required = Eligibility::requiredTypes($registration);
         $labels = ['pending' => 'Menunggu verifikasi', 'verified' => 'Terverifikasi', 'rejected' => 'Perlu perbaikan'];
         foreach (SidangTaRegistration::DOCUMENT_TYPES as $type => $label) {
             $applicable = in_array($type, $required, true);

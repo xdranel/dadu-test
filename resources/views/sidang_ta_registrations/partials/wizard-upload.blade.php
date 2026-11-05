@@ -1,80 +1,127 @@
 @php
     $existing = $draft?->documents?->firstWhere('document_type', $type);
     $available = $existing && \Illuminate\Support\Facades\Storage::disk('local')->exists($existing->file_path);
+    $revisionExpired = (bool) ($meetContext['revision_expired'] ?? false);
+    $lockedUpload = $revisionExpired || ((bool) ($meetContext['targeted'] ?? false)
+        && !in_array($type, $meetContext['editable_types'] ?? [], true));
+    $replacementNeeded = (bool) ($meetContext['targeted'] ?? false) && !$lockedUpload
+        && $existing && $existing->source_document_id !== null;
     $label = \App\Models\SidangTaRegistration::DOCUMENT_TYPES[$type] ?? $type;
-    $capture = in_array($type, \App\Support\SidangTaDocumentRequirements::CAPTURES, true);
+    $capture = in_array($type, \App\Support\SidangTaMeetRequirements::CAPTURES, true);
+    $guide = match ($type) {
+        'ta_data_capture' => 'assets/images/forms/sidang-ta/ta-data.png',
+        'online_supervision_capture' => 'assets/images/forms/sidang-ta/bimbingan-online.png',
+        default => null,
+    };
+    $guideAvailable = $guide && is_file(public_path($guide));
     $conditional = $conditional ?? null;
     $errorKey = "documents.{$type}";
     $uploadInitial = ['serverError' => $errors->has($errorKey)];
 @endphp
-<div data-upload-type="{{ $type }}" class="min-w-0 rounded-xl border border-slate-200 bg-white p-4"
+<div data-upload-type="{{ $type }}" data-upload-locked="{{ $lockedUpload ? 'true' : 'false' }}"
+     class="min-w-0 rounded-xl border border-slate-200 p-4 {{ $lockedUpload ? 'bg-slate-100 text-slate-500' : 'bg-white' }}"
      x-data="sidangTaUpload(@js($uploadInitial))">
     <label class="block text-sm font-semibold leading-relaxed text-slate-800" for="file-{{ $type }}">
-        {{ $label }} <span class="text-rose-600" aria-hidden="true">*</span>
+        {{ $label }} @unless($lockedUpload)<span class="text-rose-600" aria-hidden="true">*</span>@endunless
     </label>
     <p id="help-{{ $type }}" class="mt-1.5 text-xs leading-relaxed text-slate-500">
-        {{ \App\Models\SidangTaRegistration::DOCUMENT_DESCRIPTIONS[$type] ?? '' }}
+        @unless($guideAvailable)
+            {{ \App\Models\SidangTaRegistration::DOCUMENT_DESCRIPTIONS[$type] ?? '' }}
+        @endunless
         {{ $capture ? 'PDF/JPG/JPEG/PNG' : 'PDF' }}, maksimal 10 MB per file.
     </p>
+    @if($guideAvailable)
+        <button data-upload-guide data-document-preview type="button"
+                class="mt-3 block w-full rounded-lg text-left focus:outline-none focus:ring-2 focus:ring-rose-500 focus:ring-offset-2"
+                data-preview-url="{{ asset($guide) }}" data-download-url=""
+                data-file-name="Contoh {{ $label }}" data-file-type="png"
+                aria-label="Lihat contoh {{ $label }}" aria-haspopup="dialog"
+                x-on:click="$dispatch('sidang-ta-preview', $el.dataset)">
+            <img loading="lazy" src="{{ asset($guide) }}" alt="Panduan {{ $label }}"
+                 class="w-full rounded-lg border border-slate-200 object-contain">
+            <span class="mt-1 block text-xs font-medium text-[#DA2D3B]">Lihat contoh</span>
+        </button>
+
+    @endif
+    @if($type === \App\Support\SidangTaMeetRequirements::WAIVER)
+        <p class="mt-2 text-xs leading-relaxed text-slate-600">
+            Unduh template, lengkapi, lalu unggah kembali dalam format PDF.
+            <a data-waiver-template href="https://telkomuniversityofficial-my.sharepoint.com/:w:/g/personal/akademiksby_telkomuniversity_ac_id/EYC5y40Ky_1PhVWh4_LswJoBtC8yKT6PuTEAwUTDiFY-2A?e=qRenjo"
+               target="_blank" rel="noopener" class="font-semibold text-[#DA2D3B] underline">Link Surat Permakluman</a>
+        </p>
+    @endif
     @if($available)
         <div class="mt-3 space-y-2 rounded-lg border border-emerald-200 bg-emerald-50 p-3">
             <p class="text-xs font-semibold text-emerald-800">Berkas tersimpan</p>
             <p class="break-words text-sm text-slate-800">{{ $existing->file_name }}</p>
             <p class="text-xs text-slate-500">
-                {{ number_format(($existing->file_size ?? 0) / 1024) }} KB · Pilih berkas baru hanya untuk mengganti.
+                {{ number_format(($existing->file_size ?? 0) / 1024) }} KB · {{ $lockedUpload ? 'Berkas ini tetap digunakan.' : 'Pilih berkas baru hanya untuk mengganti.' }}
             </p>
         </div>
     @elseif($existing)
         <p class="mt-3 text-sm text-rose-700">
-            Berkas tersimpan tidak ditemukan. Unggah kembali.
+            {{ $revisionExpired ? 'Berkas tersimpan tidak ditemukan. Batas waktu unggah pengganti telah berakhir.'
+                : 'Berkas tersimpan tidak ditemukan. Unggah kembali.' }}
         </p>
     @endif
-    <div
-        class="relative mt-3 rounded-xl border-2 border-dashed p-4 transition-colors focus-within:ring-2 focus-within:ring-rose-500 focus-within:ring-offset-2"
-        :class="hasError() ? 'border-rose-500 bg-rose-50' : (dragDepth > 0 ? 'border-rose-500 bg-rose-50' : 'border-slate-300 bg-slate-50 hover:border-rose-400')"
-        @dragenter.prevent.stop="enter()" @dragover.prevent.stop
-        @dragleave.prevent.stop="leaveDrop()" @drop.prevent.stop="drop($event)">
-        <input id="file-{{ $type }}" x-ref="file" type="file" name="documents[{{ $type }}]"
-               accept="{{ $capture ? '.pdf,.jpg,.jpeg,.png' : '.pdf' }}"
-               class="absolute inset-0 h-full w-full cursor-pointer opacity-0"
-               aria-describedby="help-{{ $type }} error-documents-{{ $type }}"
-               aria-invalid="{{ $errors->has($errorKey) ? 'true' : 'false' }}"
-               :aria-invalid="hasError() ? 'true' : 'false'"
-               @change="picked()"
-               @if($conditional !== null)
-                   @disabled($accurate !== $conditional)
-                   :disabled="accurate !== '{{ $conditional }}'"
-               :required="accurate === '{{ $conditional }}' && {{ $available ? 'false' : 'true' }}"
-        @else
-            @required(!$available)
-            @endif>
-        <div class="pointer-events-none py-3 text-center">
-            <svg aria-hidden="true" class="mx-auto h-7 w-7 text-slate-400" fill="none" stroke="currentColor"
-                 viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7"
-                      d="M12 16V4m0 0L7 9m5-5 5 5M4 16v3a1 1 0 001 1h14a1 1 0 001-1v-3"/>
-            </svg>
-            <p class="mt-2 text-sm font-medium text-slate-700">
-                Klik untuk memilih atau seret file ke sini
-            </p>
-            <p class="mt-1 text-xs text-slate-500">
-                {{ $capture ? 'PDF/JPG/PNG' : 'PDF' }} · Maksimal 10 MB · Satu berkas
-            </p>
-        </div>
-    </div>
-    <div x-show="fileName" x-cloak class="mt-3 space-y-2 rounded-lg border border-amber-200 bg-amber-50 p-3">
-        <p class="text-xs font-semibold text-amber-800">
-            Pilihan baru · Belum disimpan
+    @if($replacementNeeded)
+        <p data-replacement-needed class="mt-3 rounded-lg bg-amber-50 p-3 text-xs font-semibold text-amber-900">
+            Unggah berkas pengganti sesuai catatan petugas. Berkas pengajuan sebelumnya belum dihitung sebagai pengganti.
         </p>
-        <p class="break-words text-sm text-slate-800" x-text="fileName"></p>
-        <p class="text-xs text-slate-500" x-text="fileSize"></p>
-        <button type="button" class="btn btn-secondary text-xs" @click="clear()">
-            Batalkan pilihan baru
-        </button>
-    </div>
-    <p id="error-documents-{{ $type }}" role="status" aria-live="polite"
-       class="mt-1.5 text-xs leading-relaxed text-rose-700" x-show="hasError()">
-        <span x-show="localError" x-text="localError"></span>
-        <span x-show="!localError && !selectionChanged">{{ $errors->first($errorKey) }}</span>
-    </p>
+    @endif
+    @if($lockedUpload)
+        <p data-upload-preserved class="mt-3 rounded-lg bg-slate-200/60 p-3 text-xs text-slate-600">
+            {{ $revisionExpired ? 'Batas waktu revisi telah berakhir. Unggah pengganti sudah ditutup.'
+                : 'Dokumen terverifikasi tetap digunakan. Pengunggahan hanya tersedia untuk berkas yang diminta diperbaiki.' }}
+        </p>
+    @else
+        <div
+            class="relative mt-3 rounded-xl border-2 border-dashed p-4 transition-colors focus-within:ring-2 focus-within:ring-rose-500 focus-within:ring-offset-2"
+            :class="hasError() ? 'border-rose-500 bg-rose-50' : (dragDepth > 0 ? 'border-rose-500 bg-rose-50' : 'border-slate-300 bg-slate-50 hover:border-rose-400')"
+            @dragenter.prevent.stop="enter()" @dragover.prevent.stop
+            @dragleave.prevent.stop="leaveDrop()" @drop.prevent.stop="drop($event)">
+            <input id="file-{{ $type }}" x-ref="file" type="file" name="documents[{{ $type }}]"
+                   accept="{{ $capture ? '.pdf,.jpg,.jpeg,.png' : '.pdf' }}"
+                   class="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+                   aria-describedby="help-{{ $type }} error-documents-{{ $type }}"
+                   aria-invalid="{{ $errors->has($errorKey) ? 'true' : 'false' }}"
+                   :aria-invalid="hasError() ? 'true' : 'false'"
+                   @change="picked()"
+                   @if($conditional !== null)
+                       @disabled($accurate !== $conditional)
+                       :disabled="accurate !== '{{ $conditional }}'"
+                   :required="accurate === '{{ $conditional }}' && {{ $available && !$replacementNeeded ? 'false' : 'true' }}"
+            @else
+                @required(!$available || $replacementNeeded)
+                @endif>
+            <div class="pointer-events-none py-3 text-center">
+                <svg aria-hidden="true" class="mx-auto h-7 w-7 text-slate-400" fill="none" stroke="currentColor"
+                     viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7"
+                          d="M12 16V4m0 0L7 9m5-5 5 5M4 16v3a1 1 0 001 1h14a1 1 0 001-1v-3"/>
+                </svg>
+                <p class="mt-2 text-sm font-medium text-slate-700">
+                    Klik untuk memilih atau seret file ke sini
+                </p>
+                <p class="mt-1 text-xs text-slate-500">
+                    {{ $capture ? 'PDF/JPG/PNG' : 'PDF' }} · Maksimal 10 MB · Satu berkas
+                </p>
+            </div>
+        </div>
+        <div x-show="fileName" x-cloak class="mt-3 space-y-2 rounded-lg border border-amber-200 bg-amber-50 p-3">
+            <p class="text-xs font-semibold text-amber-800">
+                Pilihan baru · Belum disimpan
+            </p>
+            <p class="break-words text-sm text-slate-800" x-text="fileName"></p>
+            <p class="text-xs text-slate-500" x-text="fileSize"></p>
+            <button type="button" class="btn btn-secondary text-xs" @click="clear()">
+                Batalkan pilihan baru
+            </button>
+        </div>
+        <p id="error-documents-{{ $type }}" role="status" aria-live="polite"
+           class="mt-1.5 text-xs leading-relaxed text-rose-700" x-show="hasError()">
+            <span x-show="localError" x-text="localError"></span>
+            <span x-show="!localError && !selectionChanged">{{ $errors->first($errorKey) }}</span>
+        </p>
+    @endif
 </div>

@@ -30,6 +30,7 @@ beforeEach(function () {
         'open_at' => now()->subDay(), 'close_at' => now()->addDay(),
     ]);
     $this->snapshot = [
+        'admission' => ['eprt' => ['mode' => 'automatic']],
         'student_name' => 'Nama Saat Diajukan', 'student_number' => '1202200001',
         'study_program' => 'Informatika Historis', 'student_email' => 'historis@mahasiswa.test',
         'semester' => 8, 'gpa' => 3.25, 'passed_credits' => 140,
@@ -43,7 +44,7 @@ beforeEach(function () {
             'student_name' => 'Nama Saat Diajukan', 'study_program' => 'Informatika Historis',
             'student_phone' => '081234567890', 'parent_phone' => '081234567891',
             'graduation_payment_date' => today()->toDateString(), 'diploma_biodata_accurate' => true,
-            'status' => 'needs_review', 'submitted_at' => now(), 'academic_snapshot' => $this->snapshot,
+            'requirements_version' => 2, 'status' => 'needs_review', 'submitted_at' => now(), 'academic_snapshot' => $this->snapshot,
         ], $overrides))->fresh();
     };
     $this->actingAs($this->user);
@@ -70,9 +71,10 @@ test('detail_uses_saved_academic_snapshot_after_student_data_changes', function 
 
 test('detail_preserves_zero_null_and_extra_snapshot_values_with_escaped_output', function () {
     $registration = ($this->makeRegistration)(['academic_snapshot' => [
+        'admission' => ['eprt' => ['mode' => 'automatic']],
         'gpa' => 0, 'passed_credits' => 0, 'tak_score' => null,
         'ta_title' => '<script>alert(1)</script>',
-        'legacy_flag' => false, 'legacy_meta' => ['catatan' => '<b>Tambahan</b>'],
+        'custom_flag' => false, 'custom_meta' => ['catatan' => '<b>Tambahan</b>'],
     ]]);
     $crawler = new Crawler($this->get(route('sidang-ta-registrations.show', $registration))->assertOk()->getContent());
     $academic = $crawler->filter('[data-academic-detail]');
@@ -80,18 +82,19 @@ test('detail_preserves_zero_null_and_extra_snapshot_values_with_escaped_output',
     expect($academic->filter('[data-snapshot-field="passed_credits"]')->text(null, true))->toBe('0');
     expect($academic->filter('[data-snapshot-field="tak_score"]')->text(null, true))->toBe('Belum tersedia');
     expect($academic->filter('[data-academic-group="extra"]')->text(null, true))
-        ->toContain('Legacy flag')->toContain('Tidak')->toContain('<b>Tambahan</b>');
+        ->toContain('Custom flag')->toContain('Tidak')->toContain('<b>Tambahan</b>');
     expect($academic->filter('[data-snapshot-field="ta_title"]')->text(null, true))->toBe('<script>alert(1)</script>');
     expect($academic->filter('script, b')->count())->toBe(0);
 });
 
-test('legacy_registration_with_null_snapshot_renders_fallback_without_live_student_values', function () {
+test('current_registration_with_null_snapshot_fails_closed_without_live_student_values', function () {
+    // Assert the normal error response independently of the local .env debug setting.
+    config(['app.debug' => false]);
     $registration = ($this->makeRegistration)(['academic_snapshot' => null]);
-    $crawler = new Crawler($this->get(route('sidang-ta-registrations.show', $registration))->assertOk()->getContent());
-    $academic = $crawler->filter('[data-academic-detail]');
-    expect($academic->filter('[data-snapshot-field="student_name"]')->text(null, true))->toBe('Belum tersedia');
-    expect($academic->filter('[data-snapshot-field="gpa"]')->text(null, true))->toBe('Belum tersedia');
-    expect($academic->filter('[data-academic-group="extra"]')->count())->toBe(0);
+    $response = $this->get(route('sidang-ta-registrations.show', $registration))->assertStatus(409)
+        ->assertDontSee('Nama Saat Diajukan')->assertDontSee('3,25');
+    expect((new Crawler($response->getContent()))->filter('[data-academic-detail]')->count())->toBe(0);
+    expect($registration->fresh()->requirements_version)->toBe(2);
     expect($registration->fresh()->academic_snapshot)->toBeNull();
 });
 
@@ -202,7 +205,7 @@ test('meet_detail_uses_saved_krs_label_and_hides_retired_snapshot_fields_for_stu
     expect($registration->fresh()->academic_snapshot)->toEqual($snapshot);
 });
 
-test('meet_legacy_snapshot_without_krs_label_does_not_derive_one_from_live_data_or_raw_status', function () {
+test('current_snapshot_without_krs_label_does_not_derive_one_from_live_data_or_raw_status', function () {
     $snapshot = array_replace($this->snapshot, ['ta2_krs_status' => 'eligible']);
     unset($snapshot['ta2_krs_label']);
     $registration = ($this->makeRegistration)(['academic_snapshot' => $snapshot]);

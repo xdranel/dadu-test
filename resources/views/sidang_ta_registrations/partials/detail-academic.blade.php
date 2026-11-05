@@ -18,12 +18,12 @@
     $statuses = ['Sidang tingkat 2' => 'sidang_tingkat_2', 'Status SKPI' => 'skpi_status',
         'KRS Sidang TA 2' => 'ta2_krs_label'];
     $titles = ['Bahasa Indonesia' => 'ta_title', 'Bahasa Inggris' => 'ta_title_en'];
-    // Legacy values stay in the snapshot but are retired from this presentation.
-    $retired = ['level_3_status', 'bpp_status', 'ibasila_status', 'skpi_tak',
+    // Fields outside the academic summary remain stored without appearing in the detail panel.
+    $omitted = ['level_3_status', 'bpp_status', 'ibasila_status', 'skpi_tak',
         'advisor_1', 'advisor_2', 'examiner_1', 'examiner_2', 'examiner_3',
         'exam_date', 'exam_time', 'exam_location'];
     $known = array_merge(array_values($identity), array_column($metrics, 0), array_values($statuses),
-        array_values($titles), $retired, ['academic_source_updated_at', 'ta2_krs_status', 'admission']);
+        array_values($titles), $omitted, ['academic_source_updated_at', 'ta2_krs_status', 'admission']);
     $extra = array_diff_key($snapshot, array_flip($known));
     $statusLabel = static fn ($value) => match (strtolower(trim(is_scalar($value) ? (string) $value : ''))) {
         'approved' => 'Disetujui', 'paid' => 'Lunas', 'pending' => 'Menunggu',
@@ -130,4 +130,3 @@
         </p>
     </div>
 </section>
-

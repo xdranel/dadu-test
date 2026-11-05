@@ -6,6 +6,7 @@ use App\Models\SidangTaRegistrationDraft;
 use App\Models\User;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\PermissionRegistrar;
@@ -42,6 +43,7 @@ test('draft_persists_uuid_payload_and_owner_relations', function () {
     expect(Str::isUuid($loaded->id))->toBeTrue();
     expect($loaded->payload)->toBe(['student_phone' => '081234567890']);
     expect($loaded->version)->toBe(1);
+    expect($loaded->requirements_version)->toBe(2);
     expect($loaded->status)->toBe('active');
     expect($loaded->reviewed_version)->toBeNull();
     expect($loaded->owner->is($this->owner))->toBeTrue();
@@ -150,4 +152,25 @@ test('final_document_model_keeps_registration_relation', function () {
     expect($document->getTable())->toBe('sidang_ta_registration_documents');
     expect($document->fresh()->registration->is($registration))->toBeTrue();
     expect($registration->fresh()->lock_version)->toBe(1);
+    expect($registration->fresh()->requirements_version)->toBe(2);
+});
+
+test('requirements_marker_defaults_to_two_in_database_without_model_attributes', function () {
+    $draftId = (string) Str::uuid();
+    DB::table('sidang_ta_registration_drafts')->insert([
+        'id' => $draftId, 'owner_user_id' => $this->owner->id,
+        'student_number' => '1202200003', 'sidang_ta_period_id' => $this->period->id,
+        'payload' => '{}',
+        'created_at' => now(), 'updated_at' => now(),
+    ]);
+    $registrationId = DB::table('sidang_ta_registrations')->insertGetId([
+        'sidang_ta_period_id' => $this->period->id,
+        'student_number' => '1202200004', 'student_name' => 'Database Default',
+        'student_phone' => '081234567890', 'parent_phone' => '081234567891',
+        'graduation_payment_date' => today()->toDateString(),
+        'diploma_biodata_accurate' => true, 'status' => 'submitted',
+        'created_at' => now(), 'updated_at' => now(),
+    ]);
+    expect((int) DB::table('sidang_ta_registration_drafts')->where('id', $draftId)->value('requirements_version'))->toBe(2);
+    expect((int) DB::table('sidang_ta_registrations')->where('id', $registrationId)->value('requirements_version'))->toBe(2);
 });

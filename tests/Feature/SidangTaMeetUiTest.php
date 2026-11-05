@@ -132,23 +132,27 @@ test('meet_ui_retest_and_unknown_can_open_review_with_five_academic_checks', fun
         $crawler = new Crawler(($this->reviewPage)($draft)->getContent());
         expect($crawler->filter('[data-admission-gate]')->count())->toBe(5);
         expect($crawler->filter('[data-eprt-mode="'.$mode.'"]')->count())->toBe(1);
+        foreach (['[data-open-registration]', '[data-confirm-registration]'] as $selector) {
+            expect($crawler->filter($selector)->getNode(0)->hasAttribute('disabled'))->toBeTrue();
+            expect($crawler->filter($selector)->attr(':disabled'))->toBe('sending || true');
+        }
         expect($crawler->filter('[data-review-document]')->count())->toBe(7);
         $this->deleteJson(route('sidang-ta-drafts.destroy', $draft), ['version' => $draft->version])->assertNoContent();
     }
 });
 
-test('meet_ui_waiver_review_has_eight_previews_and_held_send_buttons', function () {
+test('meet_ui_waiver_review_has_eight_previews_and_enabled_send_buttons', function () {
     $draft = ($this->meetDraft)('waiver');
     $crawler = new Crawler(($this->reviewPage)($draft)->getContent());
     expect($crawler->filter('[data-review-document]')->count())->toBe(8);
     expect($crawler->filter('[data-review-document="eprt_waiver_letter"]')->text(null, true))->toContain('Surat Permakluman EPRT');
     expect($crawler->filter('[data-review-document] a[data-document-preview]')->count())->toBe(8);
     expect($crawler->filter('[data-review-summary]')->text(null, true))->toContain('8 dokumen');
-    expect($crawler->filter('[data-meet-send-held]')->count())->toBe(1);
+    expect($crawler->filter('[data-meet-send-held]')->count())->toBe(0);
     foreach (['[data-open-registration]', '[data-confirm-registration]'] as $selector) {
         $button = $crawler->filter($selector);
-        expect($button->getNode(0)->hasAttribute('disabled'))->toBeTrue();
-        expect($button->attr(':disabled'))->toContain('true');
+        expect($button->getNode(0)->hasAttribute('disabled'))->toBeFalse();
+        expect($button->attr(':disabled'))->toBe('sending || false');
     }
     expect($crawler->filter('form[data-final-registration-form] input[type="file"]')->count())->toBe(0);
     expect(SidangTaRegistration::count())->toBe(0);
@@ -170,6 +174,8 @@ test('meet_ui_failed_tak_is_shown_without_blocking_the_review_page', function ()
     expect($gate->attr('data-gate-state'))->toBe('failed');
     expect($gate->text(null, true))->toContain('TAK minimal 60')->toContain('Belum memenuhi');
     expect($crawler->filter('[data-academic-blockers]')->text(null, true))->toContain('TAK minimal 60');
+    expect($crawler->filter('[data-open-registration]')->getNode(0)->hasAttribute('disabled'))->toBeTrue();
+    expect($crawler->filter('[data-confirm-registration]')->attr(':disabled'))->toBe('sending || true');
     expect($draft->fresh()->status)->toBe('active');
 });
 
@@ -225,4 +231,82 @@ test('meet_ui_mode_change_between_validation_and_render_returns_conflict_not_nul
     expect($calls)->toBe(2);
     expect($draft->documents()->count())->toBe(7);
     expect(Storage::disk('local')->allFiles())->toBe($paths);
+});
+
+test('meet_ui_bpp_is_visible_on_every_step_without_adding_an_academic_gate', function () {
+    $draft = ($this->meetDraft)();
+    $this->student->bppPayment()->firstOrFail()->update(['status' => 'paid']);
+    foreach ([1, 2, 3, 4] as $step) {
+        $crawler = new Crawler($this->get(route('sidang-ta-drafts.edit', ['draft' => $draft, 'step' => $step]))
+            ->assertOk()->getContent());
+        $panel = $crawler->filter('[data-academic-panel]');
+        expect($panel->text(null, true))->toContain('Status BPP')->toContain('Periode pembayaran belum terkonfirmasi');
+        expect($panel->filter('[data-academic-field="bpp_status"]')->text(null, true))->toBe('Lunas');
+    }
+    $this->student->bppPayment()->firstOrFail()->update(['status' => 'unpaid']);
+    $crawler = new Crawler(($this->reviewPage)($draft)->getContent());
+    expect($crawler->filter('[data-admission-gate]')->count())->toBe(5);
+    expect($crawler->filter('[data-open-registration]')->getNode(0)->hasAttribute('disabled'))->toBeFalse();
+    expect($crawler->filter('[data-confirm-registration]')->getNode(0)->hasAttribute('disabled'))->toBeFalse();
+});
+
+test('meet_ui_missing_bpp_is_displayed_as_unavailable', function () {
+    $draft = ($this->meetDraft)();
+    $this->student->bppPayment()->delete();
+    $crawler = new Crawler($this->get(route('sidang-ta-drafts.edit', ['draft' => $draft, 'step' => 2]))
+        ->assertOk()->getContent());
+    expect($crawler->filter('[data-academic-panel] [data-academic-field="bpp_status"]')->text(null, true))->toBe('Belum tersedia');
+});
+
+test('meet_ui_unconfirmed_krs_disables_send_visibly_and_reenables_after_period_link_is_restored', function () {
+    $draft = ($this->meetDraft)();
+    $krs = StudentCourse::where('student_number', $this->student->student_number)->firstOrFail();
+    $periodId = $krs->academic_period_id;
+    $krs->update(['academic_period_id' => null]);
+    $crawler = new Crawler(($this->reviewPage)($draft)->getContent());
+    expect($crawler->filter('[data-admission-gate="ta2_registered"]')->attr('data-gate-state'))->toBe('unknown');
+    expect($crawler->filter('#registration-send-readiness')->count())->toBe(1);
+    foreach (['[data-open-registration]', '[data-confirm-registration]'] as $selector) {
+        $button = $crawler->filter($selector);
+        expect($button->getNode(0)->hasAttribute('disabled'))->toBeTrue();
+        expect($button->attr(':disabled'))->toBe('sending || true');
+        expect($button->attr('aria-disabled'))->toBe('true');
+        expect($button->attr('aria-describedby'))->toBe('registration-send-readiness');
+        expect($button->attr('class'))->toContain('disabled:opacity-50')->toContain('disabled:cursor-not-allowed');
+    }
+    $krs->update(['academic_period_id' => $periodId]);
+    $crawler = new Crawler($this->get(route('sidang-ta-drafts.preview', $draft))->assertOk()->getContent());
+    expect($crawler->filter('[data-admission-gate="ta2_registered"]')->attr('data-gate-state'))->toBe('passed');
+    expect($crawler->filter('#registration-send-readiness')->count())->toBe(0);
+    foreach (['[data-open-registration]', '[data-confirm-registration]'] as $selector) {
+        $button = $crawler->filter($selector);
+        expect($button->getNode(0)->hasAttribute('disabled'))->toBeFalse();
+        expect($button->attr(':disabled'))->toBe('sending || false');
+        expect($button->attr('aria-disabled'))->toBe('false');
+    }
+    expect($crawler->filter('[data-open-registration]')->attr('aria-controls'))->toBe('confirm-send-registration');
+    expect($crawler->filter('#confirm-send-registration')->count())->toBe(1);
+    expect(SidangTaRegistration::count())->toBe(0);
+});
+
+test('meet_ui_capture_examples_open_the_shared_modal_without_navigation_or_form_submission', function () {
+    $draft = ($this->meetDraft)();
+    $crawler = new Crawler($this->get(route('sidang-ta-drafts.edit', ['draft' => $draft, 'step' => 2]))
+        ->assertOk()->getContent());
+    foreach (['ta_data_capture' => 'ta-data.png', 'online_supervision_capture' => 'bimbingan-online.png'] as $type => $filename) {
+        $guide = $crawler->filter('[data-upload-type="'.$type.'"] button[data-upload-guide]');
+        expect($guide->count())->toBe(1);
+        expect($guide->attr('type'))->toBe('button');
+        expect($guide->getNode(0)->hasAttribute('href'))->toBeFalse();
+        expect($guide->getNode(0)->hasAttribute('target'))->toBeFalse();
+        expect($guide->attr('aria-haspopup'))->toBe('dialog');
+        expect($guide->attr('data-preview-url'))->toBe(asset('assets/images/forms/sidang-ta/'.$filename));
+        expect($guide->attr('data-download-url'))->toBe('');
+        expect($guide->attr('data-file-type'))->toBe('png');
+        expect($guide->attr('x-on:click'))->toContain("sidang-ta-preview");
+        expect($guide->filter('img')->attr('src'))->toBe($guide->attr('data-preview-url'));
+        expect($guide->filter('img')->attr('alt'))->not->toBe('');
+    }
+    expect($crawler->filter('[data-document-preview-modal]')->count())->toBe(1);
+    expect($crawler->filter('[data-preview-download]')->attr('x-show'))->toBe('downloadUrl');
 });

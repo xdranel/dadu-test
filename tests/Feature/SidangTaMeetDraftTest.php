@@ -44,8 +44,7 @@ beforeEach(function () {
         $id = $this->postJson(route('sidang-ta-drafts.store'), ['sidang_ta_period_id' => $this->period->id,
             'student_phone' => '081234567890', 'parent_phone' => '081234567891'])->assertCreated()->json('data.id');
         $draft = SidangTaRegistrationDraft::findOrFail($id);
-        // Server-only test setup. UI creation intentionally stays version one during rollout.
-        $draft->update(['requirements_version' => 2]);
+        expect($draft->requirements_version)->toBe(2);
         return $draft->fresh();
     };
     $this->uploadStep = function ($draft, int $step, array $types, array $extra = []) {
@@ -216,13 +215,14 @@ test('meet_v2_missing_saved_capture_keeps_the_stage_incomplete_without_losing_ot
     expect($draft->documents()->count())->toBe(7);
 });
 
-test('meet_v2_rollout_guard_blocks_submit_without_consuming_the_saved_reviewed_draft', function () {
+test('meet_v2_missing_academic_facts_block_submit_without_consuming_the_saved_reviewed_draft', function () {
     $draft = ($this->finishMeetDraft)();
     $this->postJson(route('sidang-ta-drafts.review', $draft), ['version' => $draft->version])->assertOk();
     $paths = Storage::disk('local')->allFiles();
     $this->postJson(route('sidang-ta-registrations.store'), ['draft_id' => $draft->id,
         'version' => $draft->version, 'action' => 'submit'])->assertUnprocessable()
-        ->assertJsonPath('message', 'Pengiriman draft ini belum tersedia. Data dan berkas tetap tersimpan.');
+        ->assertJsonValidationErrors(['eligibility.level_2_passed', 'eligibility.ta2_registered',
+            'eligibility.skpi_approved', 'eligibility.tak_score', 'eligibility.passed_credits']);
     expect($draft->fresh()->status)->toBe('active');
     expect($draft->fresh()->reviewed_version)->toBe($draft->version);
     expect($draft->documents()->count())->toBe(7);
@@ -230,13 +230,13 @@ test('meet_v2_rollout_guard_blocks_submit_without_consuming_the_saved_reviewed_d
     expect(Storage::disk('local')->allFiles())->toBe($paths);
 });
 
-test('meet_v2_consumed_replay_returns_saved_registration_before_rollout_guard', function () {
+test('meet_v2_current_consumed_replay_returns_saved_registration_before_fresh_admission_checks', function () {
     $draft = ($this->finishMeetDraft)();
     $registration = SidangTaRegistration::create(['sidang_ta_period_id' => $this->period->id,
         'requirements_version' => 2, 'student_number' => $this->student->student_number,
         'student_name' => $this->student->name, 'student_phone' => '081234567890', 'parent_phone' => '081234567891',
         'graduation_payment_date' => today()->toDateString(), 'diploma_biodata_accurate' => true, 'status' => 'approved']);
-    $draft->update(['status' => 'consumed', 'submitted_registration_id' => $registration->id]);
+    $draft->update(['requirements_version' => 2, 'status' => 'consumed', 'submitted_registration_id' => $registration->id]);
     $paths = Storage::disk('local')->allFiles();
     $this->postJson(route('sidang-ta-registrations.store'), ['draft_id' => $draft->id,
         'version' => $draft->version, 'action' => 'submit'])->assertOk()

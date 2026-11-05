@@ -37,6 +37,7 @@ beforeEach(function () {
         'student_phone' => '081234567890', 'parent_phone' => '081234567891',
     ])->assertCreated()->json('data.id');
     $this->draft = SidangTaRegistrationDraft::findOrFail($id);
+    expect($this->draft->requirements_version)->toBe(2);
     $this->filesFor = function (int $step, ?bool $accurate = null) {
         $files = [];
         foreach (Requirements::typesForStep($step, $accurate) as $type) {
@@ -55,9 +56,9 @@ beforeEach(function () {
     };
 });
 
-test('saves_six_captures_and_resumes_with_private_downloads', function () {
+test('saves_two_captures_and_resumes_with_private_downloads', function () {
     ($this->saveUploadStep)(2, ['documents' => ($this->filesFor)(2)])
-        ->assertOk()->assertJsonCount(6, 'data.documents')
+        ->assertOk()->assertJsonCount(2, 'data.documents')
         ->assertJsonPath('data.first_incomplete_step', 3);
     $response = $this->getJson(route('sidang-ta-drafts.edit', $this->draft))->assertOk();
     expect($response->json('data.documents.0'))->not->toHaveKey('file_path');
@@ -73,15 +74,15 @@ test('completes_both_biodata_branches_and_removes_obsolete_files', function () {
     ($this->saveUploadStep)(3, ['documents' => ($this->filesFor)(3)])->assertOk();
     ($this->saveUploadStep)(4, [
         'diploma_biodata_accurate' => true, 'documents' => ($this->filesFor)(4, true),
-    ])->assertOk()->assertJsonCount(15, 'data.documents')->assertJsonPath('data.first_incomplete_step', null);
+    ])->assertOk()->assertJsonCount(7, 'data.documents')->assertJsonPath('data.first_incomplete_step', null);
     $oldPaths = $this->draft->documents()->whereIn('document_type', Requirements::DIPLOMA)->pluck('file_path')->all();
     ($this->saveUploadStep)(4, ['diploma_biodata_accurate' => false])->assertOk()
-        ->assertJsonCount(13, 'data.documents')->assertJsonPath('data.first_incomplete_step', 4);
+        ->assertJsonCount(5, 'data.documents')->assertJsonPath('data.first_incomplete_step', 4);
     expect($this->draft->fresh()->payload['diploma_biodata_accurate'])->toBeFalse();
     foreach ($oldPaths as $path) Storage::disk('local')->assertMissing($path);
     ($this->saveUploadStep)(4, [
         'diploma_biodata_accurate' => false, 'documents' => ($this->filesFor)(4, false),
-    ])->assertOk()->assertJsonCount(14, 'data.documents')->assertJsonPath('data.first_incomplete_step', null);
+    ])->assertOk()->assertJsonCount(6, 'data.documents')->assertJsonPath('data.first_incomplete_step', null);
 });
 
 test('missing_file_on_disk_is_not_complete', function () {
@@ -127,7 +128,7 @@ test('keeps_existing_files_on_partial_save_and_rejects_stale_version', function 
 
 test('storage_failure_preserves_old_metadata_and_files', function () {
     ($this->saveUploadStep)(2, ['documents' => ($this->filesFor)(2)])->assertOk();
-    $old = $this->draft->documents()->where('document_type', 'level_2_result_capture')->first();
+    $old = $this->draft->documents()->where('document_type', 'ta_data_capture')->first();
     $beforeFiles = Storage::disk('local')->allFiles();
     $version = $this->draft->fresh()->version;
     $temporary = UploadedFile::fake()->create('failed.pdf', 100, 'application/pdf');
@@ -139,8 +140,8 @@ test('storage_failure_preserves_old_metadata_and_files', function () {
     try {
         app(SidangTaDraftService::class)->saveStep($this->user, $this->draft, 2, $version, [
             'documents' => [
-                'level_2_result_capture' => UploadedFile::fake()->create('new.pdf', 100, 'application/pdf'),
-                'igracias_approval_capture' => $failed,
+                'ta_data_capture' => UploadedFile::fake()->create('new.pdf', 100, 'application/pdf'),
+                'online_supervision_capture' => $failed,
             ],
         ]);
     } catch (RuntimeException $exception) {
@@ -152,7 +153,7 @@ test('storage_failure_preserves_old_metadata_and_files', function () {
     expect($this->draft->fresh()->version)->toBe($version);
     Storage::disk('local')->assertExists($old->file_path);
     expect(Storage::disk('local')->allFiles())->toBe($beforeFiles);
-    expect($this->draft->documents()->count())->toBe(6);
+    expect($this->draft->documents()->count())->toBe(2);
 });
 
 test('another_user_cannot_download_draft_document', function () {

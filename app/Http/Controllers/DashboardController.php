@@ -41,6 +41,16 @@ class DashboardController extends Controller
 
         $activePeriod = \App\Models\GraduationPeriod::where('is_active', true)->first();
 
+        $taOpenPeriods = collect();
+        $taUpcomingPeriod = null;
+        if ($roles['mahasiswa'] && $user->can('sidang_ta_registration_read')) {
+            $taOpenPeriods = \App\Models\SidangTaPeriod::query()->openForRegistration()->get();
+            if ($taOpenPeriods->isEmpty()) {
+                $taUpcomingPeriod = \App\Models\SidangTaPeriod::query()->where('is_active', true)
+                    ->where('open_at', '>', now())->orderBy('open_at')->orderBy('id')->first();
+            }
+        }
+
         $studentNumber = $user->student_number ?? $user->username ?? '';
         $myGraduationRegistration = null;
         if (($roles['mahasiswa'] ?? false) && $studentNumber) {
@@ -70,7 +80,8 @@ class DashboardController extends Controller
         }
 
         return view('dashboard', compact(
-            'permissions', 'roles', 'activePeriod', 'myGraduationRegistration', 'graduationStats'
+            'permissions', 'roles', 'activePeriod', 'myGraduationRegistration', 'graduationStats',
+            'taOpenPeriods', 'taUpcomingPeriod'
         ));
     }
 }

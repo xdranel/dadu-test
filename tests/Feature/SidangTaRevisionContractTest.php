@@ -109,3 +109,18 @@ test('revision_contract_rejects_stale_source_version_instead_of_using_cached_rel
         expect($exception->getStatusCode())->toBe(409);
     }
 });
+
+test('revision_contract_unsupported_marker_is_rejected_before_targeted_classification', function (int $marker) {
+    $this->draft->update(['requirements_version' => $marker]);
+    $before = $this->draft->fresh()->getAttributes();
+    $paths = Storage::disk('local')->allFiles();
+    try {
+        Contract::isTargeted($this->draft);
+        $this->fail('Unsupported requirements must fail closed.');
+    } catch (Symfony\Component\HttpKernel\Exception\HttpExceptionInterface $exception) {
+        expect($exception->getStatusCode())->toBe(409);
+        expect($exception->getMessage())->toBe('Persyaratan pengajuan tidak sesuai. Muat ulang atau hubungi petugas.');
+    }
+    expect($this->draft->fresh()->getAttributes())->toBe($before);
+    expect(Storage::disk('local')->allFiles())->toBe($paths);
+})->with([1, 3]);

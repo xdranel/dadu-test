@@ -22,11 +22,12 @@
             </p>
         @endif
         <div class="flex flex-wrap justify-end gap-2">
-            <button type="submit" name="status" value="rejected" class="btn btn-secondary">
+            <button data-doc-reject type="submit" name="status" value="rejected" class="btn btn-secondary">
                 Minta perbaikan
             </button>
             <button data-doc-verify type="submit" name="status" value="verified"
-                    @disabled(!$available) class="btn btn-success disabled:cursor-not-allowed disabled:opacity-50">
+                    @disabled(!$available || $document->status === 'verified')
+                    class="btn btn-success disabled:cursor-not-allowed disabled:opacity-50">
                 Verifikasi
             </button>
         </div>

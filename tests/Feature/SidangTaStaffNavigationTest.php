@@ -35,6 +35,7 @@ beforeEach(function () {
         'student_phone' => '081234567890', 'parent_phone' => '081234567891',
         'graduation_payment_date' => today()->toDateString(), 'diploma_biodata_accurate' => true,
         'status' => 'submitted', 'submitted_at' => now(),
+        'academic_snapshot' => ['admission' => ['eprt' => ['mode' => 'automatic']]],
     ])->fresh();
     $this->periodData = ['name' => 'Periode Baru P1', 'is_active' => 1,
         'open_at' => now()->subHour()->format('Y-m-d H:i:s'),

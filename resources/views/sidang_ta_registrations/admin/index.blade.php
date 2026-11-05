@@ -2,9 +2,7 @@
     <x-slot name="header">Review Pendaftaran Sidang TA</x-slot>
     @php
         $statusLabels = \App\Services\SidangTaReviewQuery::STATUSES;
-        $groups = ['iGracias & Akademik' => \App\Support\SidangTaDocumentRequirements::CAPTURES,
-            'Pembayaran & Dokumen' => \App\Support\SidangTaDocumentRequirements::PAYMENT,
-            'Biodata' => array_merge(\App\Support\SidangTaDocumentRequirements::DIPLOMA, \App\Support\SidangTaDocumentRequirements::PDM)];
+        $groupTitles = ['iGracias & Akademik', 'Pembayaran & Dokumen', 'Biodata'];
         $at = now();
     @endphp
     <div data-ta-review-hub class="space-y-5">
@@ -157,7 +155,7 @@
                                 <th class="px-4 py-3">Prodi</th>
                                 <th class="px-4 py-3">Periode</th>
                                 <th class="px-4 py-3">Dikirim</th>
-                                @foreach($groups as $title => $types)
+                                @foreach($groupTitles as $title)
                                     <th class="px-4 py-3">{{ $title }}</th>
                                 @endforeach
                                 <th class="px-4 py-3">Status</th>
@@ -167,7 +165,8 @@
                             <tbody class="divide-y divide-slate-100">
                             @forelse($registrations as $registration)
                                 @php
-                                    $requiredTypes = array_merge(\App\Support\SidangTaDocumentRequirements::CAPTURES, \App\Support\SidangTaDocumentRequirements::PAYMENT, \App\Support\SidangTaDocumentRequirements::typesForStep(4, $registration->diploma_biodata_accurate));
+                                    $requiredTypes = \App\Support\SidangTaReviewEligibility::requiredTypes($registration);
+                                    $rowGroups = \App\Support\SidangTaReviewEligibility::groups($registration);
                                 @endphp
                                 <tr data-ta-row="{{ $registration->id }}" class="hover:bg-slate-50">
                                     <td class="px-4 py-4">
@@ -183,7 +182,7 @@
                                     <td class="whitespace-nowrap px-4 py-4 text-xs text-slate-600">
                                         {{ $registration->submitted_at?->format('d/m/Y H:i') ?? '-' }}
                                     </td>
-                                    @foreach($groups as $types)
+                                    @foreach($rowGroups as $types)
                                         <td class="px-4 py-4">
                                             <div class="flex max-w-32 flex-wrap gap-1.5">@include('sidang_ta_registrations.admin.partials.document-icons')</div>
                                         </td>

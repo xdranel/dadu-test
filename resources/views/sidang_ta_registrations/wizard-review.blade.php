@@ -2,15 +2,13 @@
     <x-slot name="header">Tinjau Pendaftaran Sidang TA</x-slot>
     @php
         $payload = $draft->payload;
+        $revisionExpired = (bool) ($meetContext['revision_expired'] ?? false);
+        $sendBlocked = !($meetContext['can_submit'] ?? false);
         $accurate = (bool) $payload['diploma_biodata_accurate'];
         $isRevision = $draft->source_registration_id !== null;
         $permission = $isRevision ? 'sidang_ta_registration_update' : 'sidang_ta_registration_create';
         $groups = [2 => 'Verifikasi iGracias & akademik', 3 => 'Pembayaran & dokumen', 4 => 'Biodata ijazah'];
-        $documentCount = count(array_merge(
-            \App\Support\SidangTaDocumentRequirements::CAPTURES,
-            \App\Support\SidangTaDocumentRequirements::PAYMENT,
-            \App\Support\SidangTaDocumentRequirements::typesForStep(4, $accurate)
-        ));
+        $documentCount = array_sum(array_map('count', $documentGroups));
         $confirmLabel = $isRevision ? 'Ya, kirim revisi' : 'Ya, kirim pendaftaran';
     @endphp
     <div class="mx-auto max-w-6xl space-y-5">
@@ -18,7 +16,9 @@
             <div role="alert" class="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800">
                 <p class="font-bold">Pendaftaran belum dapat dikirim.</p>
                 <ul class="mt-2 list-inside list-disc space-y-1">
-                    @foreach($errors->all() as $error)<li>{{ $error }}</li>@endforeach
+                    @foreach($errors->all() as $error)
+                        <li>{{ $error }}</li>
+                    @endforeach
                 </ul>
             </div>
         @endif
@@ -27,11 +27,14 @@
             <header class="border-b border-rose-100 bg-rose-50/60 p-5 sm:p-6">
                 <div class="flex flex-wrap items-start justify-between gap-3">
                     <div>
-                        <p class="text-xs font-semibold uppercase tracking-wide text-[#DA2D3B]">Pemeriksaan akhir{{ $isRevision ? ' · Revisi' : '' }}</p>
+                        <p class="text-xs font-semibold uppercase tracking-wide text-[#DA2D3B]">Pemeriksaan
+                            akhir{{ $isRevision ? ' · Revisi' : '' }}</p>
                         <h2 class="mt-1 text-xl font-bold text-slate-900">Tinjau sebelum kirim</h2>
-                        <p class="mt-2 max-w-2xl text-sm leading-relaxed text-slate-600">Periksa kembali data dan seluruh berkas sebelum mengirim pendaftaran kepada petugas.</p>
+                        <p class="mt-2 max-w-2xl text-sm leading-relaxed text-slate-600">Periksa kembali data dan
+                            seluruh berkas sebelum mengirim pendaftaran kepada petugas.</p>
                     </div>
-                    <span class="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-800">Belum dikirim</span>
+                    <span
+                        class="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-800">Belum dikirim</span>
                 </div>
             </header>
             <div class="space-y-5 p-5 sm:p-6">
@@ -39,12 +42,14 @@
                     <div class="min-w-0 rounded-xl bg-slate-50 p-4">
                         <p class="text-xs font-semibold text-slate-500">Mahasiswa</p>
                         <p class="mt-1 break-words text-base font-bold text-slate-900">{{ $student->name }}</p>
-                        <p class="mt-1 break-words text-sm text-slate-600">{{ $student->student_number }} · {{ $student->study_program ?: 'Program studi belum tersedia' }}</p>
+                        <p class="mt-1 break-words text-sm text-slate-600">{{ $student->student_number }}
+                            · {{ $student->study_program ?: 'Program studi belum tersedia' }}</p>
                     </div>
                     <div class="min-w-0 rounded-xl bg-slate-50 p-4">
                         <p class="text-xs font-semibold text-slate-500">Periode Sidang TA</p>
                         <p class="mt-1 break-words text-base font-bold text-slate-900">{{ $draft->period->name }}</p>
-                        <p class="mt-1 text-sm text-slate-600">{{ $documentCount }} dokumen dalam tinjauan{{ $isRevision ? ' · Periode pengajuan asal' : '' }}</p>
+                        <p class="mt-1 text-sm text-slate-600">{{ $documentCount }} dokumen dalam
+                            tinjauan{{ $isRevision ? ' · Periode pengajuan asal' : '' }}</p>
                     </div>
                 </div>
                 <dl class="grid gap-x-6 gap-y-5 sm:grid-cols-2">
@@ -85,17 +90,23 @@
                     <p class="text-xs leading-relaxed text-slate-500">
                         Data di bawah berasal dari draft yang tersimpan. Pendaftaran belum dikirim.
                     </p>
-                    <a class="text-sm font-semibold text-[#DA2D3B] hover:underline" href="{{ route('sidang-ta-drafts.edit', ['draft' => $draft, 'step' => 1]) }}">
+                    <a class="text-sm font-semibold text-[#DA2D3B] hover:underline"
+                       href="{{ route('sidang-ta-drafts.edit', ['draft' => $draft, 'step' => 1]) }}">
                         Ubah data kontak
                     </a>
                 </div>
             </div>
         </section>
 
+        @include('sidang_ta_registrations.partials.meet-admission-summary', ['admission' => $meetContext['admission']])
+
         @foreach($groups as $number => $title)
-            @php($types = \App\Support\SidangTaDocumentRequirements::typesForStep($number, $accurate))
+            @php
+                $types = $documentGroups[$number];
+            @endphp
             <section data-review-group="{{ $number }}" class="campus-card overflow-hidden">
-                <header class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-5 py-4 sm:px-6">
+                <header
+                    class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-5 py-4 sm:px-6">
                     <div class="flex items-center gap-3">
                         <div>
                             <h3 class="text-base font-bold text-slate-800">
@@ -106,16 +117,28 @@
                             </p>
                         </div>
                     </div>
-                    <a class="text-sm font-semibold text-[#DA2D3B] hover:underline" href="{{ route('sidang-ta-drafts.edit', ['draft' => $draft, 'step' => $number]) }}">Ubah tahap {{ $number }}</a>
+                    <a class="text-sm font-semibold text-[#DA2D3B] hover:underline"
+                       href="{{ route('sidang-ta-drafts.edit', ['draft' => $draft, 'step' => $number]) }}">Ubah
+                        tahap {{ $number }}</a>
                 </header>
+                @if(isset($meetContext['automatic'][$number]))
+                    <div class="px-5 pt-4 sm:px-6">
+                        @include('sidang_ta_registrations.partials.meet-automatic-cards', ['items' => $meetContext['automatic'][$number]])
+                    </div>
+                @endif
                 <div class="divide-y divide-slate-100 px-5 sm:px-6">
                     @foreach($types as $type)
-                        @php($document = $draft->documents->firstWhere('document_type', $type))
-                        <div data-review-document="{{ $type }}" class="flex flex-col gap-3 py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-5">
+                        @php
+                            $document = $draft->documents->firstWhere('document_type', $type);
+                            $documentLabel = \App\Models\SidangTaRegistration::DOCUMENT_TYPES[$type] ?? $type;
+                        @endphp
+                        <div data-review-document="{{ $type }}"
+                             class="flex flex-col gap-3 py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-5">
                             <div class="min-w-0">
-                                <p class="text-sm font-semibold leading-relaxed text-slate-800">{{ \App\Models\SidangTaRegistration::DOCUMENT_TYPES[$type] }}</p>
+                                <p class="text-sm font-semibold leading-relaxed text-slate-800">{{ $documentLabel }}</p>
                                 <p class="mt-1 break-words text-xs leading-relaxed text-slate-500">{{ $document->file_name }}</p>
-                                <p class="mt-1 text-xs text-slate-500">{{ number_format(($document->file_size ?? 0) / 1024) }} KB</p>
+                                <p class="mt-1 text-xs text-slate-500">{{ number_format(($document->file_size ?? 0) / 1024) }}
+                                    KB</p>
                             </div>
                             <a data-document-preview
                                class="btn btn-secondary shrink-0 self-start whitespace-nowrap !text-xs no-underline sm:self-auto"
@@ -124,7 +147,7 @@
                                data-download-url="{{ route('sidang-ta-draft-documents.download', $document) }}"
                                data-file-name="{{ $document->file_name }}" data-file-type="{{ $document->file_type }}"
                                target="_blank" rel="noopener" aria-haspopup="dialog"
-                               aria-label="Lihat {{ \App\Models\SidangTaRegistration::DOCUMENT_TYPES[$type] }}"
+                               aria-label="Lihat {{ $documentLabel }}"
                                x-on:click.prevent="$dispatch('sidang-ta-preview', $el.dataset)">
                                 Lihat berkas
                             </a>
@@ -141,12 +164,21 @@
                     Sudah memeriksa semua data?
                 </h2>
                 <p class="mt-1 text-sm leading-relaxed text-slate-600">
-                    Pastikan periode, kontak, pembayaran, biodata, dan setiap berkas sudah benar. Anda masih dapat kembali ke form untuk memperbaikinya.
+                    Pastikan periode, kontak, pembayaran, biodata, dan setiap berkas sudah benar. Anda masih dapat
+                    kembali ke form untuk memperbaikinya.
                 </p>
             </div>
+            @if($sendBlocked)
+                <p id="registration-send-readiness" data-meet-send-held @if($revisionExpired) data-revision-deadline-expired @endif role="{{ $revisionExpired ? 'alert' : 'status' }}" class="rounded-lg bg-amber-50 p-3 text-sm text-amber-900">
+                    {{ $revisionExpired ? 'Batas waktu revisi telah berakhir. Pengiriman revisi sudah ditutup. Data dan berkas tetap tersimpan untuk dilihat.'
+                        : ($isRevision ? 'Penuhi persyaratan akademik sebelum mengirim revisi. Data dan berkas tetap tersimpan.'
+                            : 'Penuhi persyaratan akademik dan EPRT sebelum mengirim. Draft dan berkas tetap tersimpan.') }}
+                </p>
+            @endif
             <div class="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div class="flex flex-wrap gap-2">
-                    <a class="btn btn-secondary" href="{{ route('sidang-ta-drafts.edit', ['draft' => $draft, 'step' => 1]) }}">
+                    <a class="btn btn-secondary"
+                       href="{{ route('sidang-ta-drafts.edit', ['draft' => $draft, 'step' => 1]) }}">
                         Kembali ke form
                     </a>
                     <a class="btn btn-secondary" href="{{ route('sidang-ta-registrations.index') }}">
@@ -154,20 +186,29 @@
                     </a>
                 </div>
                 @can($permission)
-                    <button data-open-registration type="button" class="btn btn-primary" :disabled="sending"
+                    <button data-open-registration type="button"
+                            class="btn btn-primary disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none"
+                            aria-disabled="{{ $sendBlocked ? 'true' : 'false' }}"
+                            :aria-disabled="sending || {{ $sendBlocked ? 'true' : 'false' }} ? 'true' : 'false'"
+                            @if($sendBlocked) aria-describedby="registration-send-readiness" @endif
+                            @disabled($sendBlocked) :disabled="sending || {{ $sendBlocked ? 'true' : 'false' }}"
                             aria-haspopup="dialog" aria-controls="confirm-send-registration"
-                            onclick="document.getElementById('confirm-send-registration').showModal()">Kirim Pendaftaran</button>
+                            onclick="document.getElementById('confirm-send-registration').showModal()">Kirim Pendaftaran
+                    </button>
+
                 @endcan
             </div>
             @can($permission)
-                <dialog id="confirm-send-registration" aria-labelledby="confirm-send-title" aria-describedby="confirm-send-description"
+                <dialog id="confirm-send-registration" aria-labelledby="confirm-send-title"
+                        aria-describedby="confirm-send-description"
                         @cancel="if (sending) $event.preventDefault()"
                         class="m-auto w-11/12 max-w-lg rounded-2xl border border-slate-200 bg-white p-5 text-slate-800 shadow-xl backdrop:bg-slate-900/50 sm:p-6">
                     <h2 id="confirm-send-title" class="text-lg font-bold">
                         {{ $isRevision ? 'Kirim revisi pendaftaran?' : 'Kirim pendaftaran sekarang?' }}
                     </h2>
                     <div id="confirm-send-description" class="mt-3 space-y-3 text-sm leading-relaxed text-slate-600">
-                        <p>Periksa kembali data dan seluruh dokumen. Setelah dikirim, pengajuan akan ditinjau oleh petugas.</p>
+                        <p>Periksa kembali data dan seluruh dokumen. Setelah dikirim, pengajuan akan ditinjau oleh
+                            petugas.</p>
                         <div class="rounded-xl border border-amber-200 bg-amber-50 p-3 text-amber-900">
                             <p class="font-semibold">Pastikan kembali:</p>
                             <ul class="mt-2 list-inside list-disc space-y-1">
@@ -176,20 +217,32 @@
                                 <li>Seluruh berkas lengkap, benar, dan dapat dibaca.</li>
                             </ul>
                         </div>
-                        <p>Jika masih ragu, pilih Periksa kembali. Jika sudah yakin, lanjutkan pengiriman. Perubahan setelah pengiriman mengikuti proses revisi yang tersedia.</p>
+                        <p>Jika masih ragu, pilih Periksa kembali. Jika sudah yakin, lanjutkan pengiriman. Perubahan
+                            setelah pengiriman mengikuti proses revisi yang tersedia.</p>
                     </div>
-                    <form data-final-registration-form method="POST" class="mt-5 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end"
+                    <form data-final-registration-form method="POST"
+                          class="mt-5 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end"
                           action="{{ $isRevision ? route('sidang-ta-registrations.update', $draft->source_registration_id) : route('sidang-ta-registrations.store') }}"
-                          @submit="if (sending) { $event.preventDefault(); } else { sending = true; }">
+                          @submit="if (sending || {{ $sendBlocked ? 'true' : 'false' }}) { $event.preventDefault(); } else { sending = true; }">
                         @csrf
-                        @if($isRevision) @method('PUT') @endif
+                        @if($isRevision)
+                            @method('PUT')
+                        @endif
                         <input type="hidden" name="draft_id" value="{{ $draft->id }}">
                         <input type="hidden" name="version" value="{{ $draft->version }}">
                         <input type="hidden" name="action" value="submit">
-                        <button data-cancel-registration type="button" autofocus class="btn btn-secondary" :disabled="sending"
-                                onclick="this.closest('dialog').close()">Periksa kembali</button>
-                        <button data-confirm-registration type="submit" class="btn btn-primary" :disabled="sending"
-                                x-text="sending ? 'Sedang mengirim…' : '{{ $confirmLabel }}'">{{ $confirmLabel }}</button>
+                        <button data-cancel-registration type="button" autofocus class="btn btn-secondary"
+                                :disabled="sending"
+                                onclick="this.closest('dialog').close()">Periksa kembali
+                        </button>
+                        <button data-confirm-registration type="submit"
+                                class="btn btn-primary disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none"
+                                aria-disabled="{{ $sendBlocked ? 'true' : 'false' }}"
+                                :aria-disabled="sending || {{ $sendBlocked ? 'true' : 'false' }} ? 'true' : 'false'"
+                                @if($sendBlocked) aria-describedby="registration-send-readiness" @endif
+                                @disabled($sendBlocked) :disabled="sending || {{ $sendBlocked ? 'true' : 'false' }}"
+                                x-text="sending ? 'Sedang mengirim…' : '{{ $confirmLabel }}'">{{ $confirmLabel }}
+                        </button>
                     </form>
                 </dialog>
             @endcan

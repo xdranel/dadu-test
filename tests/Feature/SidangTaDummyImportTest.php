@@ -96,3 +96,22 @@ test('meet_dummy_academic_profile_name_mismatch_skips_without_writing_approval_o
     expect(Student::where('student_number', $row['nim'])->value('name'))->toBe('Dummy TA EPRT Otomatis');
 });
 
+test('meet_dummy_krs_can_be_linked_by_reimport_after_academic_period_is_initialized', function () {
+    $this->academicPeriod->delete();
+    ($this->importAll)();
+    $student = Student::where('student_number', '1202299002')->firstOrFail();
+    $krs = StudentCourse::where('student_number', $student->student_number)->firstOrFail();
+    expect($krs->course_name)->toBe('TUGAS AKHIR 2');
+    expect($krs->academic_period_id)->toBeNull();
+    expect(app(SidangTaAdmissionFacts::class)->forStudent($student)['krs_status'])->toBe('unknown');
+    $period = AcademicPeriod::create(['year' => '2026/2027', 'semester' => 1,
+        'label' => 'Ganjil 2026/2027', 'start_date' => '2026-08-01', 'end_date' => '2027-01-31', 'is_active' => true]);
+    ($this->importDummy)('krs', '02-krs-ta2-dummy.json');
+    $facts = app(SidangTaAdmissionFacts::class)->forStudent($student);
+    expect((int) $krs->fresh()->academic_period_id)->toBe($period->id);
+    expect($facts['krs_status'])->toBe('eligible');
+    expect($facts['academic']['academic_passed'])->toBeTrue();
+    expect($facts['eprt']['mode'])->toBe('waiver');
+    expect(StudentCourse::whereIn('student_number', ['1202299001', '1202299002', '1202299003', '1202299004'])->count())->toBe(4);
+    expect(StudentEprt::where('student_number', $student->student_number)->count())->toBe(3);
+});

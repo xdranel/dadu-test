@@ -9,6 +9,7 @@ use Spatie\Permission\Models\Permission;
 use Spatie\Permission\PermissionRegistrar;
 
 beforeEach(function () {
+    \Illuminate\Support\Facades\Storage::fake('local');
     $this->user = User::factory()->create([
         'username' => '1202200001', 'email' => 'draft-card@mahasiswa.test',
         'status' => 'active', 'auth_source' => 'manual', 'must_change_password' => false,
@@ -94,7 +95,15 @@ test('stale_revision_has_delete_confirmation_without_continue_and_preserves_fina
         'student_name' => 'Draft Card Test', 'student_phone' => '081234567890',
         'parent_phone' => '081234567891', 'graduation_payment_date' => today()->toDateString(),
         'diploma_biodata_accurate' => true, 'status' => 'needs_review',
+        'academic_snapshot' => ['admission' => ['eprt' => ['mode' => 'automatic']]],
     ])->fresh();
+    foreach (\App\Support\SidangTaMeetRequirements::allTypes(true, 'automatic') as $i => $type) {
+        $path = 'sidang_ta/card/'.$source->id.'/'.$type.'.pdf';
+        \Illuminate\Support\Facades\Storage::disk('local')->put($path, '%PDF-1.4 card fixture');
+        $source->documents()->create(['document_type' => $type, 'file_name' => $type.'.pdf',
+            'file_path' => $path, 'file_type' => 'pdf', 'status' => $i === 0 ? 'rejected' : 'verified',
+            'notes' => $i === 0 ? 'Perbaiki capture.' : null]);
+    }
     $id = $this->postJson(route('sidang-ta-drafts.revision', $source))
         ->assertCreated()->json('data.id');
     $draft = SidangTaRegistrationDraft::findOrFail($id);

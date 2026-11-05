@@ -6,6 +6,7 @@ use App\Http\Requests\SaveSidangTaDraftStepRequest;
 use App\Models\SidangTaRegistrationDraft;
 use App\Models\SidangTaRegistration;
 use App\Services\SidangTaAcademicSnapshot;
+use App\Services\SidangTaAdmissionFacts;
 use App\Services\SidangTaRevisionDraftService;
 use App\Services\SidangTaDraftService;
 use App\Models\SidangTaPeriod;
@@ -14,6 +15,9 @@ use App\Services\SidangTaStudentContext;
 use App\Services\SidangTaDraftReviewService;
 use App\Models\SidangTaRegistrationDraftDocument;
 use App\Support\SidangTaDocumentRequirements;
+use App\Support\SidangTaMeetRequirements;
+use App\Support\SidangTaRevisionContract;
+use App\Support\SidangTaRevisionDeadline;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -56,10 +60,25 @@ class SidangTaDraftController extends Controller
                 ->with('success', 'Draft tersimpan. Anda dapat melanjutkan setelah tahap ini lengkap.');
     }
 
-    private function meetContext(SidangTaRegistrationDraft $draft, Student $student): ?array
+    private function meetContext(SidangTaRegistrationDraft $draft, Student $student): array
     {
-        if ($draft->requirements_version !== 2) return null;
-        $admission = app(\App\Services\SidangTaAdmissionFacts::class)->forStudent($student);
+        SidangTaDocumentRequirements::assertKnownVersion($draft);
+        $admission = app(SidangTaAdmissionFacts::class)->forStudent($student);
+        $targeted = SidangTaRevisionContract::isTargeted($draft);
+        $revisionExpired = false;
+        if ($targeted) {
+            $source = SidangTaRevisionContract::source($draft);
+            $revisionExpired = SidangTaRevisionDeadline::hasExpired($source);
+            $snapshot = $source->academic_snapshot ?? [];
+            $stored = $snapshot['admission'] ?? [];
+            $storedMode = $stored['eprt']['mode'] ?? null;
+            abort_unless(in_array($storedMode, ['automatic', 'waiver'], true), 409,
+                'Persyaratan EPRT pengajuan asal belum lengkap.');
+            $admission['eprt'] = ['mode' => $storedMode, 'requires_waiver' => $storedMode === 'waiver',
+                'message' => $storedMode === 'waiver' ? 'Surat Permakluman mengikuti pengajuan asal.' : 'EPRT memenuhi syarat saat pengajuan asal.'];
+            $admission['eprt_facts'] = ['score' => $stored['eprt_facts']['score'] ?? $snapshot['eprt_score'] ?? null,
+                'confirmed_attempts' => $stored['eprt_facts']['confirmed_attempts'] ?? null];
+        }
         $mode = $admission['eprt']['mode'];
         $facts = $admission['facts'];
         $level = match ($facts['level_2_passed']) { true => 'Lulus', false => 'Belum lulus', default => 'Belum tersedia' };
@@ -74,10 +93,16 @@ class SidangTaDraftController extends Controller
         $accurate = $choice === null ? null : (bool) $choice;
         $types = [];
         foreach ([2, 3, 4] as $step) {
-            $types[$step] = \App\Support\SidangTaMeetRequirements::typesForStep($step, $accurate, $mode);
+            $types[$step] = $targeted ? SidangTaRevisionContract::typesForStep($draft, $step)
+                : SidangTaMeetRequirements::typesForStep($step, $accurate, $mode);
         }
         return [
-            'admission' => $admission, 'types' => $types,
+            'admission' => $admission, 'types' => $types, 'targeted' => $targeted,
+            'revision_expired' => $revisionExpired,
+            'editable_types' => $targeted ? SidangTaRevisionContract::editableTypes($draft) : [],
+            'can_submit' => !$revisionExpired && ($draft->source_registration_id === null || $targeted)
+                && $admission['academic']['academic_passed']
+                && in_array($mode, ['automatic', 'waiver'], true),
             'academic' => ['sidang_tingkat_2' => $level, 'skpi_status' => $skpi, 'ta2_krs_label' => $krs,
                 'tak_score' => $facts['tak_score'], 'passed_credits' => $facts['passed_credits'], 'eprt_score' => $score],
             'automatic' => [
@@ -88,7 +113,7 @@ class SidangTaDraftController extends Controller
                 3 => [
                     ['key' => 'bpp', 'title' => 'BPP semester berjalan', 'value' => $payment,
                         'hint' => 'Periode pembayaran belum terkonfirmasi. Tidak memerlukan unggahan.'],
-                    ['key' => 'eprt', 'title' => 'EPRT', 'value' => $score === null ? 'Belum tersedia' : 'Nilai '.$score,
+                    ['key' => 'eprt', 'title' => $targeted ? 'EPRT pengajuan asal' : 'EPRT', 'value' => $score === null ? 'Belum tersedia' : 'Nilai '.$score,
                         'hint' => $admission['eprt']['message'].($attempts === null ? '' : ' '.$attempts.' tes tercatat.')],
                 ],
             ],
@@ -113,7 +138,7 @@ class SidangTaDraftController extends Controller
         $openPeriods = SidangTaPeriod::query()->openForRegistration()->get();
         $academic = app(SidangTaAcademicSnapshot::class)->forStudent($student);
         $meetContext = $this->meetContext($draft, $student);
-        if ($meetContext) $academic = array_replace($academic, $meetContext['academic']);
+        $academic = array_replace($academic, $meetContext['academic']);
         return view('sidang_ta_registrations.wizard', compact(
             'draft', 'student', 'step', 'maxStep', 'completedThrough', 'openPeriods', 'academic', 'stepProgress', 'meetContext'
         ));
@@ -192,12 +217,7 @@ class SidangTaDraftController extends Controller
         $draft->loadMissing(['period', 'documents']);
         $student = app(SidangTaStudentContext::class)->studentFor($request->user());
         $meetContext = $this->meetContext($draft, $student);
-        $documentGroups = $meetContext['types'] ?? [];
-        if (!$meetContext) {
-            foreach ([2, 3, 4] as $step) {
-                $documentGroups[$step] = SidangTaDocumentRequirements::typesForDraftStep($draft, $step);
-            }
-        }
+        $documentGroups = $meetContext['types'];
         // Use one resolved set in the view. A mode change after service validation must not cause null dereferences.
         foreach ($documentGroups as $types) {
             foreach ($types as $type) {

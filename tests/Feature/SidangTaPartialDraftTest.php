@@ -34,6 +34,7 @@ beforeEach(function () {
     $id = $this->actingAs($this->user)->postJson(route('sidang-ta-drafts.store'), $this->data)
         ->assertCreated()->json('data.id');
     $this->draft = SidangTaRegistrationDraft::findOrFail($id);
+    expect($this->draft->requirements_version)->toBe(2);
     $this->filesFor = function (int $step, ?bool $accurate = null) {
         $files = [];
         foreach (Requirements::typesForStep($step, $accurate) as $type) {
@@ -66,10 +67,10 @@ test('partial_capture_is_persisted_and_resumable_without_unlocking_next_step', f
 
 test('separate_capture_saves_complete_stage_without_reuploading_previous_files', function () {
     $files = ($this->filesFor)(2);
-    ($this->savePartial)(2, ['documents' => array_slice($files, 0, 2, true)])->assertOk();
+    ($this->savePartial)(2, ['documents' => array_slice($files, 0, 1, true)])->assertOk();
     $first = $this->draft->documents()->where('document_type', Requirements::CAPTURES[0])->firstOrFail();
-    ($this->savePartial)(2, ['documents' => array_slice($files, 2, null, true)])
-        ->assertOk()->assertJsonCount(6, 'data.documents')->assertJsonPath('data.version', 3)
+    ($this->savePartial)(2, ['documents' => array_slice($files, 1, null, true)])
+        ->assertOk()->assertJsonCount(2, 'data.documents')->assertJsonPath('data.version', 3)
         ->assertJsonPath('data.first_incomplete_step', 3);
     expect($first->fresh()->file_path)->toBe($first->file_path);
     Storage::disk('local')->assertExists($first->file_path);
@@ -79,7 +80,7 @@ test('separate_capture_saves_complete_stage_without_reuploading_previous_files',
 test('payment_file_saves_without_date_but_stage_four_stays_locked', function () {
     ($this->savePartial)(2, ['documents' => ($this->filesFor)(2)])->assertOk();
     ($this->savePartial)(3, ['documents' => array_slice(($this->filesFor)(3), 0, 1, true)])
-        ->assertOk()->assertJsonCount(7, 'data.documents')->assertJsonPath('data.first_incomplete_step', 3);
+        ->assertOk()->assertJsonCount(3, 'data.documents')->assertJsonPath('data.first_incomplete_step', 3);
     $progress = Requirements::progress($this->draft->fresh(), 3);
     expect($progress['stored_documents'])->toBe(1);
     expect($progress['missing'])->toContain('Tanggal pembayaran wisuda');
@@ -90,7 +91,7 @@ test('payment_file_saves_without_date_but_stage_four_stays_locked', function () 
 test('null_biodata_choice_is_saved_without_becoming_pdm', function () {
     ($this->throughThree)();
     ($this->savePartial)(4, ['diploma_biodata_accurate' => null])->assertOk()
-        ->assertJsonCount(13, 'data.documents')->assertJsonPath('data.first_incomplete_step', 4);
+        ->assertJsonCount(5, 'data.documents')->assertJsonPath('data.first_incomplete_step', 4);
     expect($this->draft->fresh()->payload['diploma_biodata_accurate'])->toBeNull();
     $crawler = new Crawler($this->get(route('sidang-ta-drafts.edit', ['draft' => $this->draft, 'step' => 4]))
         ->assertOk()->getContent());
@@ -104,12 +105,12 @@ test('one_diploma_file_saves_and_second_file_makes_review_available', function (
     $files = ($this->filesFor)(4, true);
     ($this->savePartial)(4, ['diploma_biodata_accurate' => true,
         'documents' => array_slice($files, 0, 1, true)])->assertOk()
-        ->assertJsonCount(14, 'data.documents')->assertJsonPath('data.first_incomplete_step', 4);
+        ->assertJsonCount(6, 'data.documents')->assertJsonPath('data.first_incomplete_step', 4);
     $this->postJson(route('sidang-ta-drafts.review', $this->draft), [
         'version' => $this->draft->fresh()->version,
     ])->assertUnprocessable();
     ($this->savePartial)(4, ['documents' => array_slice($files, 1, null, true)])->assertOk()
-        ->assertJsonCount(15, 'data.documents')->assertJsonPath('data.first_incomplete_step', null);
+        ->assertJsonCount(7, 'data.documents')->assertJsonPath('data.first_incomplete_step', null);
     $version = $this->draft->fresh()->version;
     $this->postJson(route('sidang-ta-drafts.review', $this->draft), ['version' => $version])->assertOk();
     expect($this->draft->fresh()->reviewed_version)->toBe($version);
@@ -119,9 +120,9 @@ test('invalid_provided_file_rejects_whole_new_batch_and_keeps_saved_progress', f
     ($this->savePartial)(2, ['documents' => array_slice(($this->filesFor)(2), 0, 1, true)])->assertOk();
     $before = Storage::disk('local')->allFiles();
     ($this->savePartial)(2, ['documents' => [
-        Requirements::CAPTURES[1] => UploadedFile::fake()->create('valid.pdf', 100, 'application/pdf'),
-        Requirements::CAPTURES[2] => UploadedFile::fake()->create('invalid.txt', 100, 'text/plain'),
-    ]])->assertUnprocessable()->assertJsonValidationErrors('documents.'.Requirements::CAPTURES[2]);
+        Requirements::CAPTURES[0] => UploadedFile::fake()->create('valid.pdf', 100, 'application/pdf'),
+        Requirements::CAPTURES[1] => UploadedFile::fake()->create('invalid.txt', 100, 'text/plain'),
+    ]])->assertUnprocessable()->assertJsonValidationErrors('documents.'.Requirements::CAPTURES[1]);
     expect($this->draft->fresh()->version)->toBe(2);
     expect($this->draft->documents()->count())->toBe(1);
     expect(Storage::disk('local')->allFiles())->toBe($before);
@@ -136,7 +137,7 @@ test('biodata_files_require_known_active_branch_even_for_partial_save', function
         'documents' => array_slice(($this->filesFor)(4, true), 0, 1, true)])
         ->assertUnprocessable()->assertJsonValidationErrors('documents');
     expect($this->draft->fresh()->version)->toBe($version);
-    expect($this->draft->documents()->count())->toBe(13);
+    expect($this->draft->documents()->count())->toBe(5);
 });
 
 test('partial_draft_cannot_bypass_review_or_final_submission', function () {
@@ -162,26 +163,57 @@ test('stale_partial_save_does_not_add_files_or_change_version', function () {
     expect(Storage::disk('local')->allFiles())->toBe($before);
 });
 
-test('partial_revision_branch_change_never_deletes_final_files', function () {
-    ($this->throughThree)();
-    ($this->savePartial)(4, ['diploma_biodata_accurate' => true, 'documents' => ($this->filesFor)(4, true)])->assertOk();
-    $version = $this->draft->fresh()->version;
-    $this->postJson(route('sidang-ta-drafts.review', $this->draft), ['version' => $version])->assertOk();
-    $id = $this->postJson(route('sidang-ta-registrations.store'), [
-        'draft_id' => $this->draft->id, 'version' => $version, 'action' => 'submit',
-    ])->assertOk()->json('data.id');
-    $source = SidangTaRegistration::findOrFail($id);
-    $source->status = 'needs_review';
-    $source->lock_version++;
-    $source->save();
+test('partial_revision_rejects_branch_change_and_preserves_borrowed_final_files', function () {
+    // This case needs a final source, rather than the empty new-registration draft created by the shared setup.
+    $this->deleteJson(route('sidang-ta-drafts.destroy', $this->draft), [
+        'version' => $this->draft->version,
+    ])->assertNoContent();
+    expect(SidangTaRegistrationDraft::find($this->draft->id))->toBeNull();
+    $source = SidangTaRegistration::create([
+        'sidang_ta_period_id' => $this->period->id, 'student_number' => '1202200001',
+        'student_name' => 'Partial Test', 'study_program' => 'Informatika',
+        'requirements_version' => 2,
+        'academic_snapshot' => ['admission' => ['eprt' => ['mode' => 'automatic']]],
+        'student_phone' => '081234567890', 'parent_phone' => '081234567891',
+        'graduation_payment_date' => today()->toDateString(), 'diploma_biodata_accurate' => true,
+        'status' => 'needs_review', 'submitted_at' => now()->subHour(),
+        'review_notes' => 'Perbaiki surat pernyataan biodata.',
+    ]);
+    $source->forceFill(['lock_version' => 2])->save();
+    foreach (array_merge(Requirements::CAPTURES, Requirements::PAYMENT, Requirements::DIPLOMA) as $type) {
+        $path = "sidang_ta/final/{$source->id}/{$type}.pdf";
+        Storage::disk('local')->put($path, '%PDF-1.4 final');
+        $source->documents()->create([
+            'document_type' => $type, 'file_name' => $type.'.pdf', 'file_path' => $path,
+            'file_type' => 'pdf', 'file_size' => 14,
+            'status' => $type === 'diploma_statement' ? 'rejected' : 'verified',
+            'notes' => $type === 'diploma_statement' ? 'Unggah surat yang terbaca.' : null,
+        ]);
+    }
+    $source = $source->fresh();
+    expect($source->requirements_version)->toBe(2);
+    expect($source->lock_version)->toBe(2);
+    $sourceBefore = $source->getAttributes();
+    $sourceDocumentsBefore = $source->documents()->orderBy('id')->get()->toArray();
     $paths = $source->documents()->pluck('file_path')->all();
-    $revisionId = $this->postJson(route('sidang-ta-drafts.revision', $source))->assertCreated()->json('data.id');
+    $revisionId = $this->postJson(route('sidang-ta-drafts.revision', $source))
+        ->assertCreated()->assertJsonCount(7, 'data.documents')
+        ->assertJsonPath('data.first_incomplete_step', 4)->json('data.id');
     $this->draft = SidangTaRegistrationDraft::findOrFail($revisionId);
-    ($this->savePartial)(4, ['diploma_biodata_accurate' => false])->assertOk()
-        ->assertJsonCount(13, 'data.documents')->assertJsonPath('data.first_incomplete_step', 4);
+    expect($this->draft->requirements_version)->toBe(2);
+    $borrowedBefore = $this->draft->documents()->orderBy('id')->get()->toArray();
+    expect($this->draft->documents()->whereNotNull('source_document_id')->count())->toBe(7);
+    $version = $this->draft->version;
+    ($this->savePartial)(4, ['diploma_biodata_accurate' => false])->assertUnprocessable()
+        ->assertJsonValidationErrors('diploma_biodata_accurate');
+    $this->getJson(route('sidang-ta-drafts.edit', $this->draft))->assertOk()
+        ->assertJsonCount(7, 'data.documents')->assertJsonPath('data.first_incomplete_step', 4);
+    expect($this->draft->fresh()->version)->toBe($version);
+    expect($this->draft->fresh()->payload['diploma_biodata_accurate'])->toBeTrue();
+    expect($this->draft->documents()->orderBy('id')->get()->toArray())->toBe($borrowedBefore);
+    expect($source->fresh()->getAttributes())->toBe($sourceBefore);
+    expect($source->documents()->orderBy('id')->get()->toArray())->toBe($sourceDocumentsBefore);
     foreach ($paths as $path) Storage::disk('local')->assertExists($path);
-    expect($source->fresh()->status)->toBe('needs_review');
-    expect($source->documents()->count())->toBe(15);
 });
 
 test('html_save_stays_on_current_step_and_continue_requires_saved_complete_stage', function () {
@@ -193,7 +225,7 @@ test('html_save_stays_on_current_step_and_continue_requires_saved_complete_stage
     $this->post($url, ['version' => 1, 'documents' => array_slice($files, 0, 1, true)])
         ->assertRedirect($edit)->assertSessionHasNoErrors();
     $crawler = new Crawler($this->get($edit)->assertOk()->getContent());
-    expect($crawler->filter('[data-step-progress]')->text(null, true))->toContain('1 dari 6 dokumen tersimpan.');
+    expect($crawler->filter('[data-step-progress]')->text(null, true))->toContain('1 dari 2 dokumen tersimpan.');
     expect($crawler->filter('button[data-next-step][disabled]')->count())->toBe(1);
     expect($crawler->filter('a[data-next-step]')->count())->toBe(0);
     $this->post($url, ['version' => 2, 'documents' => array_slice($files, 1, null, true)])
@@ -221,5 +253,5 @@ test('omitted_scalar_preserves_value_and_explicit_null_clears_without_false_coer
     ($this->savePartial)(4, ['diploma_biodata_accurate' => null])->assertOk()
         ->assertJsonPath('data.first_incomplete_step', 4);
     expect($this->draft->fresh()->payload['diploma_biodata_accurate'])->toBeNull();
-    expect($this->draft->documents()->count())->toBe(15);
+    expect($this->draft->documents()->count())->toBe(7);
 });

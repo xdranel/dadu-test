@@ -1,0 +1,49 @@
+{
+  "source": "DUMMY SIDANG TA - bukan data resmi",
+  "data": [
+    {
+      "nim": "1202299001",
+      "kode_matakuliah": "DUMMY-TA2",
+      "nama_matakuliah": "TUGAS AKHIR 2",
+      "kelas_matakuliah": "DUMMY-TA",
+      "sks": 4,
+      "tahun_akademik": "2026/2027",
+      "semester_term": "GANJIL",
+      "semester": 8,
+      "prodi": "Informatika"
+    },
+    {
+      "nim": "1202299002",
+      "kode_matakuliah": "DUMMY-TA2",
+      "nama_matakuliah": "TUGAS AKHIR 2",
+      "kelas_matakuliah": "DUMMY-TA",
+      "sks": 4,
+      "tahun_akademik": "2026/2027",
+      "semester_term": "GANJIL",
+      "semester": 8,
+      "prodi": "Informatika"
+    },
+    {
+      "nim": "1202299003",
+      "kode_matakuliah": "DUMMY-TA2",
+      "nama_matakuliah": "TUGAS AKHIR 2",
+      "kelas_matakuliah": "DUMMY-TA",
+      "sks": 4,
+      "tahun_akademik": "2026/2027",
+      "semester_term": "GANJIL",
+      "semester": 8,
+      "prodi": "Informatika"
+    },
+    {
+      "nim": "1202299004",
+      "kode_matakuliah": "DUMMY-TA2",
+      "nama_matakuliah": "TUGAS AKHIR 2",
+      "kelas_matakuliah": "DUMMY-TA",
+      "sks": 4,
+      "tahun_akademik": "2026/2027",
+      "semester_term": "GANJIL",
+      "semester": 8,
+      "prodi": "Informatika"
+    }
+  ]
+}

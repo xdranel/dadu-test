@@ -40,18 +40,20 @@ beforeEach(function () {
         $id = $this->postJson(route('sidang-ta-drafts.store'), $this->data)
             ->assertCreated()->json('data.id');
         $draft = SidangTaRegistrationDraft::findOrFail($id);
-        $draft->payload = array_replace($draft->payload, [
-            'graduation_payment_date' => today()->toDateString(), 'diploma_biodata_accurate' => true,
-        ]);
-        $draft->save();
-        foreach (array_merge(Requirements::CAPTURES, Requirements::PAYMENT, Requirements::DIPLOMA) as $type) {
-            $path = "sidang_ta/drafts/{$draft->id}/{$type}.pdf";
-            Storage::disk('local')->put($path, '%PDF-ui');
-            $draft->documents()->create([
-                'document_type' => $type, 'file_name' => $type.'.pdf',
-                'file_path' => $path, 'file_size' => 7, 'file_type' => 'pdf',
-            ]);
+        expect($draft->requirements_version)->toBe(2);
+        foreach ([2, 3, 4] as $step) {
+            $data = ['version' => $draft->fresh()->version];
+            if ($step === 3) $data['graduation_payment_date'] = today()->toDateString();
+            if ($step === 4) $data['diploma_biodata_accurate'] = true;
+            foreach (Requirements::typesForStep($step, true) as $type) {
+                $data['documents'][$type] = \Illuminate\Http\UploadedFile::fake()
+                    ->create($type.'.pdf', 100, 'application/pdf');
+            }
+            $this->postJson(route('sidang-ta-drafts.steps.store', ['draft' => $draft, 'step' => $step]), $data)
+                ->assertOk();
         }
+        $draft = $draft->fresh();
+        expect($draft->documents()->count())->toBe(7);
         return $draft;
     };
 });
@@ -155,6 +157,8 @@ test('s2_index_active_registration_hides_start_and_respects_revision_permission'
         'student_name' => $this->student->name, 'study_program' => $this->student->study_program,
         'student_phone' => '081234567890', 'parent_phone' => '081234567891',
         'graduation_payment_date' => today()->toDateString(), 'diploma_biodata_accurate' => true,
+        'requirements_version' => 2,
+        'academic_snapshot' => ['admission' => ['eprt' => ['mode' => 'automatic']]],
         'status' => 'needs_review', 'submitted_at' => now(),
     ]);
     $url = route('sidang-ta-registrations.index');

@@ -29,6 +29,9 @@ beforeEach(function () {
     $this->sequence = 0;
     $this->makeRegistration = function (array $overrides = []) {
         $this->sequence++;
+        $overrides['academic_snapshot'] = array_replace_recursive(
+            ['admission' => ['eprt' => ['mode' => 'automatic']]], $overrides['academic_snapshot'] ?? []
+        );
         return SidangTaRegistration::create(array_replace([
             'sidang_ta_period_id' => $this->a->id, 'student_number' => 'P2A'.str_pad((string) $this->sequence, 6, '0', STR_PAD_LEFT),
             'student_name' => 'Mahasiswa '.$this->sequence, 'study_program' => 'Informatika',
@@ -132,29 +135,29 @@ test('p2a_no_active_period_and_empty_vs_filtered_empty_are_distinct', function (
     expect($crawler->filter('[data-ta-empty]')->text(null, true))->toBe('Tidak ada pengajuan yang cocok dengan filter.');
 });
 
-test('p2a_document_matrix_distinguishes_status_missing_unavailable_and_biodata_na', function () {
+test('p2a_document_matrix_shows_only_current_branch_and_distinguishes_all_review_states', function () {
     $accurate = ($this->makeRegistration)();
     $pdm = ($this->makeRegistration)(['diploma_biodata_accurate' => false]);
     ($this->attach)($accurate, Requirements::CAPTURES[0], 'verified');
     ($this->attach)($accurate, Requirements::CAPTURES[1], 'rejected');
-    ($this->attach)($accurate, Requirements::CAPTURES[2]);
-    ($this->attach)($accurate, Requirements::CAPTURES[3], 'verified', false);
+    ($this->attach)($accurate, Requirements::PAYMENT[0]);
+    ($this->attach)($accurate, Requirements::PAYMENT[1], 'verified', false);
     ($this->attach)($accurate, Requirements::PDM[0], 'verified');
     ($this->attach)($pdm, Requirements::PDM[0], 'verified');
     ($this->attach)($pdm, Requirements::DIPLOMA[0], 'verified');
     $crawler = new Crawler(($this->listing)()->getContent());
     $row = $crawler->filter('[data-ta-row="'.$accurate->id.'"]');
-    expect($row->filter('[data-ta-doc]')->count())->toBe(16);
+    expect($row->filter('[data-ta-doc]')->count())->toBe(7);
     foreach ([Requirements::CAPTURES[0] => 'verified', Requirements::CAPTURES[1] => 'rejected',
-                 Requirements::CAPTURES[2] => 'pending', Requirements::CAPTURES[3] => 'unavailable',
-                 Requirements::CAPTURES[4] => 'missing', Requirements::PDM[0] => 'na'] as $type => $state) {
+                 Requirements::PAYMENT[0] => 'pending', Requirements::PAYMENT[1] => 'unavailable',
+                 Requirements::PAYMENT[2] => 'missing'] as $type => $state) {
         expect($row->filter('[data-ta-doc="'.$type.'"]')->attr('data-doc-state'))->toBe($state);
     }
-    expect($row->filter('a[data-ta-doc="'.Requirements::CAPTURES[3].'"]')->count())->toBe(0);
-    expect($row->filter('a[data-ta-doc="'.Requirements::PDM[0].'"]')->count())->toBe(0);
+    expect($row->filter('a[data-ta-doc="'.Requirements::PAYMENT[1].'"]')->count())->toBe(0);
+    expect($row->filter('[data-ta-doc="'.Requirements::PDM[0].'"]')->count())->toBe(0);
     $row = $crawler->filter('[data-ta-row="'.$pdm->id.'"]');
-    expect($row->filter('[data-ta-doc]')->count())->toBe(16);
-    expect($row->filter('[data-doc-state="na"]')->count())->toBe(2);
+    expect($row->filter('[data-ta-doc]')->count())->toBe(6);
+    expect($row->filter('[data-ta-doc="'.Requirements::DIPLOMA[0].'"], [data-ta-doc="'.Requirements::DIPLOMA[1].'"]')->count())->toBe(0);
     expect($row->filter('a[data-ta-doc="'.Requirements::PDM[0].'"]')->count())->toBe(1);
 });
 

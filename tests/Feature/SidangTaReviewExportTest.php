@@ -33,6 +33,10 @@ beforeEach(function () {
     $this->sequence = 0;
     $this->makeRegistration = function (array $overrides = []) {
         $this->sequence++;
+        $overrides['academic_snapshot'] = array_replace_recursive(
+            ['student_name' => 'Nama Historis', 'gpa' => 3.25, 'passed_credits' => 140,
+                'admission' => ['eprt' => ['mode' => 'automatic']]], $overrides['academic_snapshot'] ?? []
+        );
         return SidangTaRegistration::create(array_replace([
             'sidang_ta_period_id' => $this->a->id, 'student_number' => '0000'.str_pad((string) $this->sequence, 6, '0', STR_PAD_LEFT),
             'student_name' => 'Export '.$this->sequence, 'study_program' => 'Informatika',
@@ -105,7 +109,7 @@ test('p2b_xlsx_preserves_text_ids_phones_and_literal_formula_like_content', func
     ($this->attach)($registration, 'thesis_draft', 'rejected', true, '=SUM(2,3)');
     [, $rows, $path] = ($this->exportRows)();
     $row = $rows->first();
-    expect($row)->toHaveCount(88);
+    expect($row)->toHaveCount(57);
     expect($row['NIM'])->toBe('001234567890123456');
     expect($row['HP Mahasiswa'])->toBe('001234567890');
     expect($row['HP Orang Tua/Wali'])->toBe('000987654321');
@@ -148,7 +152,7 @@ test('p2b_export_document_columns_distinguish_na_missing_and_unavailable', funct
     $a = $rows->firstWhere('ID Pengajuan', (string) $accurate->id);
     $b = $rows->firstWhere('ID Pengajuan', (string) $pdm->id);
     $thesis = SidangTaRegistration::DOCUMENT_TYPES['thesis_draft'];
-    $capture = SidangTaRegistration::DOCUMENT_TYPES['level_2_result_capture'];
+    $capture = SidangTaRegistration::DOCUMENT_TYPES['ta_data_capture'];
     $pdmLabel = SidangTaRegistration::DOCUMENT_TYPES['pdm_submission_proof'];
     expect($a[$thesis.' — Status'])->toBe('Terverifikasi');
     expect($a[$thesis.' — Ketersediaan'])->toBe('Tidak ditemukan');

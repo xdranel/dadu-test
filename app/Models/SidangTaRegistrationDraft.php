@@ -23,7 +23,7 @@ class SidangTaRegistrationDraft extends Model
     ];
 
     protected $attributes = [
-        'requirements_version' => 1,
+        'requirements_version' => 2,
         'payload' => '{}', 'version' => 1, 'status' => self::STATUS_ACTIVE,
     ];
 

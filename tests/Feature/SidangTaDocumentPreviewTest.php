@@ -39,18 +39,20 @@ beforeEach(function () {
         $id = $this->postJson(route('sidang-ta-drafts.store'), $this->data)
             ->assertCreated()->json('data.id');
         $draft = SidangTaRegistrationDraft::findOrFail($id);
-        $draft->payload = array_replace($draft->payload, [
-            'graduation_payment_date' => today()->toDateString(), 'diploma_biodata_accurate' => true,
-        ]);
-        $draft->save();
-        foreach (array_merge(Requirements::CAPTURES, Requirements::PAYMENT, Requirements::DIPLOMA) as $type) {
-            $path = "sidang_ta/drafts/{$draft->id}/{$type}.pdf";
-            Storage::disk('local')->put($path, '%PDF-ui');
-            $draft->documents()->create([
-                'document_type' => $type, 'file_name' => $type.'.pdf',
-                'file_path' => $path, 'file_size' => 7, 'file_type' => 'pdf',
-            ]);
+        expect($draft->requirements_version)->toBe(2);
+        foreach ([2, 3, 4] as $step) {
+            $data = ['version' => $draft->fresh()->version];
+            if ($step === 3) $data['graduation_payment_date'] = today()->toDateString();
+            if ($step === 4) $data['diploma_biodata_accurate'] = true;
+            foreach (Requirements::typesForStep($step, true) as $type) {
+                $data['documents'][$type] = \Illuminate\Http\UploadedFile::fake()
+                    ->create($type.'.pdf', 100, 'application/pdf');
+            }
+            $this->postJson(route('sidang-ta-drafts.steps.store', ['draft' => $draft, 'step' => $step]), $data)
+                ->assertOk();
         }
+        $draft = $draft->fresh();
+        expect($draft->documents()->count())->toBe(7);
         return $draft;
     };
 
@@ -62,14 +64,22 @@ beforeEach(function () {
             'student_name' => $this->student->name, 'study_program' => $this->student->study_program,
             'student_phone' => '081234567890', 'parent_phone' => '081234567891',
             'graduation_payment_date' => today()->toDateString(), 'diploma_biodata_accurate' => true,
+            'requirements_version' => 2,
+            'academic_snapshot' => ['admission' => ['eprt' => ['mode' => 'automatic']]],
             'status' => $status, 'submitted_at' => now(),
         ])->fresh();
-        $path = "sidang_ta/final/{$registration->id}/capture.pdf";
-        Storage::disk('local')->put($path, '%PDF-1.4 preview');
-        $document = $registration->documents()->create([
-            'document_type' => 'level_2_result_capture', 'file_name' => 'capture.pdf',
-            'file_path' => $path, 'file_type' => 'pdf', 'file_size' => 16,
-        ]);
+        expect($registration->requirements_version)->toBe(2);
+        foreach (array_merge(Requirements::CAPTURES, Requirements::PAYMENT, Requirements::DIPLOMA) as $index => $type) {
+            $path = "sidang_ta/final/{$registration->id}/{$type}.pdf";
+            Storage::disk('local')->put($path, '%PDF-1.4 preview');
+            $saved = $registration->documents()->create([
+                'document_type' => $type, 'file_name' => $index === 0 ? 'capture.pdf' : $type.'.pdf',
+                'file_path' => $path, 'file_type' => 'pdf', 'file_size' => 16,
+                'status' => $status === 'needs_review' && $index === 0 ? 'rejected' : 'verified',
+                'notes' => $status === 'needs_review' && $index === 0 ? 'Ganti capture.' : null,
+            ]);
+            if ($index === 0) $document = $saved;
+        }
         return [$registration, $document];
     };
 });
@@ -162,7 +172,7 @@ test('preview_review_page_has_no_number_badges_and_escaped_modal_triggers', func
     $crawler = new Crawler($this->get(route('sidang-ta-drafts.preview', $draft))->assertOk()->getContent());
     expect($crawler->filter('[data-review-group]')->count())->toBe(3);
     expect($crawler->filter('[data-review-group] header span[aria-hidden="true"]')->count())->toBe(0);
-    expect($crawler->filter('a[data-document-preview]')->count())->toBe(15);
+    expect($crawler->filter('a[data-document-preview]')->count())->toBe(7);
     expect($crawler->filter('[data-document-preview-modal]')->count())->toBe(1);
     $link = $crawler->filter('a[data-document-preview]')->reduce(fn (Crawler $n) =>
         $n->attr('data-preview-url') === route('sidang-ta-draft-documents.preview', $document));
@@ -179,7 +189,9 @@ test('preview_review_page_has_no_number_badges_and_escaped_modal_triggers', func
 test('preview_final_detail_uses_one_modal_and_keeps_direct_download_as_secondary_data', function () {
     [$registration, $document] = ($this->makeFinal)();
     $crawler = new Crawler($this->get(route('sidang-ta-registrations.show', $registration))->assertOk()->getContent());
-    $link = $crawler->filter('a[data-document-preview]');
+    expect($crawler->filter('a[data-document-preview]')->count())->toBe(7);
+    $link = $crawler->filter('a[data-document-preview]')->reduce(fn (Crawler $node) =>
+        $node->attr('href') === route('sidang-ta-registration-documents.preview', $document));
     expect($link->count())->toBe(1);
     expect($link->attr('href'))->toBe(route('sidang-ta-registration-documents.preview', $document));
     expect($link->attr('data-download-url'))->toBe(route('sidang-ta-registration-documents.download', $document));

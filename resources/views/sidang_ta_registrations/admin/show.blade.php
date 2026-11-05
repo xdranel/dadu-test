@@ -23,6 +23,10 @@
                 <p class="text-xs font-semibold text-[#DA2D3B]">
                     {{ $registration->period?->name ?? 'Periode tidak tersedia' }}
                 </p>
+                <p data-ta-review-window class="mt-1 text-xs text-slate-500">
+                    Dibuka {{ $registration->period?->open_at?->format('d/m/Y H:i') ?? '-' }} ·
+                    Tenggat {{ $registration->period?->close_at?->format('d/m/Y H:i') ?? '-' }}
+                </p>
                 <h2 class="mt-1 break-words text-xl font-bold text-slate-900">
                     {{ $registration->student_name }}
                 </h2>
@@ -61,55 +65,14 @@
                 @endforeach
             </dl>
         </section>
+        @if($readonlyNeedsReview)
+            <p data-meet-review-locked role="status" class="rounded-xl bg-amber-50 p-4 text-sm text-amber-900">
+                Pengajuan sedang menunggu revisi mahasiswa. Berkas dapat dilihat; perubahan peninjauan dikunci.
+            </p>
+        @endif
         @include('sidang_ta_registrations.partials.detail-academic')
-        <section class="campus-card space-y-4 p-5">
-            <h3 class="font-bold text-slate-800">Dokumen pengajuan</h3>
-            <div class="divide-y divide-slate-100">
-                @forelse($registration->documents as $document)
-                    @php($available = \Illuminate\Support\Facades\Storage::disk('local')->exists($document->file_path))
-                    <article id="review-document-{{ $document->id }}" data-ta-detail-document="{{ $document->id }}"
-                             class="scroll-mt-24 flex flex-wrap items-center justify-between gap-3 py-4">
-                        <div class="min-w-0">
-                            <p class="text-sm font-semibold text-slate-800">
-                                {{ \App\Models\SidangTaRegistration::DOCUMENT_TYPES[$document->document_type] ?? $document->document_type }}
-                            </p>
-                            <p class="mt-1 break-words text-xs text-slate-500">
-                                {{ $document->file_name }} · {{ number_format(($document->file_size ?? 0) / 1024) }} KB
-                            </p>
-                            <p class="mt-1 text-xs text-slate-600">
-                                {{ $documentLabels[$document->status] ?? $document->status }}
-                            </p>
-                            @if($document->notes)
-                                <p class="mt-2 whitespace-pre-line break-words text-xs text-rose-700">
-                                    {{ $document->notes }}
-                                </p>
-                            @endif
-                        </div>
-                        @if($available)
-                            <a data-document-preview
-                               href="{{ route('sidang-ta-registration-documents.preview', $document) }}"
-                               data-preview-url="{{ route('sidang-ta-registration-documents.preview', $document) }}"
-                               data-download-url="{{ route('sidang-ta-registration-documents.download', $document) }}"
-                               data-file-name="{{ $document->file_name }}" data-file-type="{{ $document->file_type }}"
-                               x-on:click.prevent="$dispatch('sidang-ta-preview', $el.dataset)" target="_blank"
-                               rel="noopener" aria-haspopup="dialog" class="btn btn-secondary">
-                                Lihat berkas
-                            </a>
-                        @else
-                            <p class="text-xs font-medium text-orange-700">
-                                Berkas tidak ditemukan.
-                            </p>
-                        @endif
-                        @include('sidang_ta_registrations.admin.partials.document-review-form')
-                    </article>
-                @empty
-                    <p class="py-4 text-sm text-slate-500">
-                        Belum ada dokumen tersimpan.
-                    </p>
-                @endforelse
-            </div>
-        </section>
-        @if(in_array($registration->status, ['submitted', 'needs_review'], true))
+        @include('sidang_ta_registrations.admin.partials.meet-document-groups')
+        @if($reviewable)
             @include('sidang_ta_registrations.admin.partials.registration-decision')
         @endif
         @if($registration->review_notes)

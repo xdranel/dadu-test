@@ -47,3 +47,19 @@ test('preview close requests native close and close event reset removes viewer U
     assert.equal(state.fileName, '');
     assert.equal(state.isPdf, false);
 });
+
+test('guide image reuses the document dialog without a download URL or extra opening', () => {
+    const { state, calls } = setup();
+    state.open({ previewUrl: '/documents/1/preview', downloadUrl: '/documents/1/download', fileName: 'a.pdf', fileType: 'pdf' });
+    state.open({ previewUrl: '/assets/images/forms/sidang-ta/ta-data.png', downloadUrl: '',
+        fileName: 'Contoh Data TA', fileType: 'png' });
+    assert.equal(state.previewUrl, '/assets/images/forms/sidang-ta/ta-data.png');
+    assert.equal(state.downloadUrl, '');
+    assert.equal(state.fileName, 'Contoh Data TA');
+    assert.equal(state.isPdf, false);
+    assert.deepEqual(calls, ['show']);
+    state.close();
+    state.reset();
+    assert.equal(state.previewUrl, '');
+    assert.equal(state.downloadUrl, '');
+});

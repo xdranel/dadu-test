@@ -31,6 +31,12 @@ class SidangTaRegistrationController extends Controller
             ->with(['period', 'sourceRegistration'])->latest()->get();
         $activeRegistration = SidangTaRegistration::where('student_number', $number)
             ->whereIn('status', ['submitted', 'needs_review'])->latest()->first();
+        foreach ($registrations as $registration) {
+            \App\Support\SidangTaReviewEligibility::requiredTypes($registration);
+        }
+        foreach ($drafts as $draft) {
+            \App\Support\SidangTaDocumentRequirements::assertKnownVersion($draft);
+        }
         return view('sidang_ta_registrations.index', compact('registrations', 'openPeriods', 'drafts', 'activeRegistration'));
     }
 
@@ -40,6 +46,7 @@ class SidangTaRegistrationController extends Controller
         $active = SidangTaRegistration::where('student_number', $student->student_number)
             ->whereIn('status', ['submitted', 'needs_review'])->latest()->first();
         if ($active) {
+            \App\Support\SidangTaReviewEligibility::requiredTypes($active);
             return redirect()->route($active->status === 'needs_review'
                 ? 'sidang-ta-registrations.edit' : 'sidang-ta-registrations.show', $active);
         }
@@ -47,15 +54,32 @@ class SidangTaRegistrationController extends Controller
             ->where('student_number', $student->student_number)->where('status', 'active')
             ->whereNull('source_registration_id')->first();
         if ($existing) {
+            \App\Support\SidangTaDocumentRequirements::assertKnownVersion($existing);
             return redirect()->route('sidang-ta-drafts.edit', $existing);
         }
         $openPeriods = SidangTaPeriod::query()->openForRegistration()->get();
         $academic = app(SidangTaAcademicSnapshot::class)->forStudent($student);
+        $admission = app(\App\Services\SidangTaAdmissionFacts::class)->forStudent($student);
+        $facts = $admission['facts'];
+        $academic = array_replace($academic, [
+            'sidang_tingkat_2' => match ($facts['level_2_passed']) {
+                true => 'Lulus', false => 'Belum lulus', default => 'Belum tersedia',
+            },
+            'skpi_status' => match ($facts['skpi_approved']) {
+                true => 'Disetujui', false => 'Belum memenuhi', default => 'Belum tersedia',
+            },
+            'ta2_krs_label' => match ($admission['krs_status']) {
+                'eligible' => 'Terdaftar', 'unconfirmed' => 'Belum terkonfirmasi', default => 'Belum tersedia',
+            },
+            'tak_score' => $facts['tak_score'], 'passed_credits' => $facts['passed_credits'],
+            'eprt_score' => $admission['eprt_facts']['score'],
+        ]);
+        $meetContext = ['targeted' => false, 'revision_expired' => false];
         $draft = null;
         $step = $maxStep = 1;
         $completedThrough = 0;
         return view('sidang_ta_registrations.wizard', compact(
-            'draft', 'student', 'step', 'maxStep', 'completedThrough', 'openPeriods', 'academic'
+            'draft', 'student', 'step', 'maxStep', 'completedThrough', 'openPeriods', 'academic', 'meetContext'
         ));
     }
 
@@ -89,6 +113,7 @@ class SidangTaRegistrationController extends Controller
         $registration = $sidang_ta_registration;
         abort_unless($registration->student_number === $student->student_number
             && $registration->status === 'needs_review', 403);
+        \App\Support\SidangTaReviewEligibility::requiredTypes($registration);
         return view('sidang_ta_registrations.revision-start', compact('registration'));
     }
 
@@ -126,10 +151,26 @@ class SidangTaRegistrationController extends Controller
     public function adminShow(SidangTaRegistration $sidang_ta_registration)
     {
         $registration = $sidang_ta_registration->load(['period', 'documents', 'logs']);
-        $reviewable = in_array($registration->status, ['submitted', 'needs_review'], true);
+        $needsReview = $registration->status === 'needs_review';
+        $readonlyNeedsReview = $needsReview;
+        $reviewable = $registration->status === 'submitted';
         $requiredTypes = \App\Support\SidangTaReviewEligibility::requiredTypes($registration);
         $approvalBlockers = \App\Support\SidangTaReviewEligibility::blockers($registration);
-        return view('sidang_ta_registrations.admin.show', compact('registration', 'reviewable', 'requiredTypes', 'approvalBlockers'));
+        $documentGroups = \App\Support\SidangTaReviewEligibility::groups($registration);
+        $revisionBlockers = [];
+        if ($reviewable) {
+            try {
+                if (\App\Support\SidangTaRevisionDeadline::hasExpired($registration)) {
+                    throw ValidationException::withMessages(['action' => \App\Support\SidangTaRevisionDeadline::MESSAGE]);
+                }
+                \App\Support\SidangTaRevisionContract::assertCanRequest($registration);
+            } catch (ValidationException $exception) {
+                $revisionBlockers = array_values(array_merge(...array_values($exception->errors())));
+            }
+        }
+        return view('sidang_ta_registrations.admin.show', compact(
+            'registration', 'reviewable', 'needsReview', 'readonlyNeedsReview', 'requiredTypes', 'approvalBlockers', 'documentGroups', 'revisionBlockers'
+        ));
     }
 
     public function review(Request $request, SidangTaRegistration $sidang_ta_registration)
@@ -254,13 +295,17 @@ class SidangTaRegistrationController extends Controller
     private function authorizeStudentOrReviewer(SidangTaRegistration $registration): void
     {
         $user = auth()->user();
-        if ($user->can('sidang_ta_registration_review')) return;
+        if ($user->can('sidang_ta_registration_review')) {
+            \App\Support\SidangTaReviewEligibility::requiredTypes($registration);
+            return;
+        }
         try {
             $student = app(SidangTaStudentContext::class)->studentFor($user);
         } catch (ValidationException $exception) {
             abort(403);
         }
         abort_unless($registration->student_number === $student->student_number, 403);
+        \App\Support\SidangTaReviewEligibility::requiredTypes($registration);
     }
 
     private function finalizeDraft(StoreSidangTaRegistrationRequest $request, ?SidangTaRegistration $source = null)

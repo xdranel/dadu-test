@@ -1,0 +1,41 @@
+{
+  "source": "DUMMY SIDANG TA - bukan data resmi",
+  "data": [
+    {
+      "nim": "1202299001",
+      "nama_siswa": "Dummy TA EPRT Otomatis",
+      "prodi": "Informatika",
+      "academic_year": 2022,
+      "active_semester": 8,
+      "email": "dummy-ta-1@mahasiswa.test",
+      "kelas": "DUMMY-TA"
+    },
+    {
+      "nim": "1202299002",
+      "nama_siswa": "Dummy TA Surat Permakluman",
+      "prodi": "Informatika",
+      "academic_year": 2022,
+      "active_semester": 8,
+      "email": "dummy-ta-2@mahasiswa.test",
+      "kelas": "DUMMY-TA"
+    },
+    {
+      "nim": "1202299003",
+      "nama_siswa": "Dummy TA Tes EPRT Ulang",
+      "prodi": "Informatika",
+      "academic_year": 2022,
+      "active_semester": 8,
+      "email": "dummy-ta-3@mahasiswa.test",
+      "kelas": "DUMMY-TA"
+    },
+    {
+      "nim": "1202299004",
+      "nama_siswa": "Dummy TA TAK Kurang",
+      "prodi": "Informatika",
+      "academic_year": 2022,
+      "active_semester": 8,
+      "email": "dummy-ta-4@mahasiswa.test",
+      "kelas": "DUMMY-TA"
+    }
+  ]
+}

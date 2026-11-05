@@ -301,16 +301,19 @@ test('meet_final_extra_legacy_document_is_rejected_without_retiring_any_file', f
     ($this->assertPreserved)($draft, $paths);
 });
 
-test('meet_final_staff_can_read_preview_and_export_new_files_but_mutation_is_held', function () {
+test('meet_final_staff_can_read_export_and_verify_while_revision_requires_document_feedback', function () {
     $draft = ($this->markReviewed)(($this->meetDraft)('waiver'));
     $id = ($this->submitMeet)($draft)->assertOk()->json('data.id');
     $registration = SidangTaRegistration::findOrFail($id);
     $snapshot = $registration->academic_snapshot;
     ($this->asReviewer)();
     $crawler = new Crawler($this->get(route('admin.sidang-ta-registrations.show', $registration))->assertOk()->getContent());
-    expect($crawler->filter('[data-meet-review-held]')->count())->toBe(1);
-    expect($crawler->filter('[data-doc-review-form]')->count())->toBe(0);
-    expect($crawler->filter('form[action="'.route('admin.sidang-ta-registrations.review', $registration).'"]')->count())->toBe(0);
+    expect($crawler->filter('[data-meet-review-held]')->count())->toBe(0);
+    expect($crawler->filter('[data-ta-revision-blockers]')->count())->toBe(1);
+    expect($crawler->filter('[data-ta-revision-blockers]')->text(null, true))->toContain('Tandai minimal satu dokumen');
+    expect($crawler->filter('[data-ta-request-revision]')->getNode(0)->hasAttribute('disabled'))->toBeTrue();
+    expect($crawler->filter('[data-doc-review-form]')->count())->toBe(8);
+    expect($crawler->filter('form[action="'.route('admin.sidang-ta-registrations.review', $registration).'"]')->count())->toBe(1);
     expect($crawler->filter('a[data-document-preview]')->count())->toBe(8);
     $waiver = $registration->documents()->where('document_type', Meet::WAIVER)->firstOrFail();
     $this->get(route('sidang-ta-registration-documents.preview', $waiver))->assertOk();
@@ -320,62 +323,49 @@ test('meet_final_staff_can_read_preview_and_export_new_files_but_mutation_is_hel
     expect($row->filter('[data-ta-doc="eprt_waiver_letter"]')->attr('title'))->toContain('Surat Permakluman EPRT');
     expect($row->filter('[data-ta-doc="level_2_result_capture"], [data-ta-doc="transcript_khs"]')->count())->toBe(0);
     $export = app(SidangTaReviewExport::class)->row($registration->fresh()->load(['documents', 'period']));
-    expect($export)->toHaveCount(92);
+    expect($export)->toHaveCount(57);
     expect($export['Surat Permakluman EPRT — Status'])->toBe('Menunggu verifikasi');
     expect($export['KRS Sidang TA 2'])->toBe('Terdaftar');
-    expect($export[SidangTaRegistration::DOCUMENT_TYPES['transcript_khs'].' — Status'])->toBe('N/A');
+    expect(array_key_exists('KHS (PDF, SKS lulus minimal 120) — Status', $export))->toBeFalse();
+    expect($export['Bukti Pengajuan PDM — Status'])->toBe('N/A');
     $this->postJson(route('admin.sidang-ta-registrations.documents.review', [
         'sidang_ta_registration' => $registration, 'document' => $waiver,
-    ]), ['registration_version' => $registration->lock_version, 'status' => 'verified'])->assertUnprocessable();
+    ]), ['registration_version' => $registration->lock_version, 'status' => 'verified'])->assertOk();
     $this->postJson(route('admin.sidang-ta-registrations.review', $registration), [
-        'registration_version' => $registration->lock_version, 'action' => 'needs_review', 'review_notes' => 'Perbaiki',
-    ])->assertUnprocessable();
-    expect($waiver->fresh()->status)->toBe('pending');
+        'registration_version' => $registration->fresh()->lock_version, 'action' => 'needs_review', 'review_notes' => 'Perbaiki',
+    ])->assertUnprocessable()->assertJsonValidationErrors('action');
+    expect($waiver->fresh()->status)->toBe('verified');
     expect($registration->fresh()->status)->toBe('submitted');
     expect($registration->fresh()->academic_snapshot)->toBe($snapshot);
-    expect($registration->logs()->count())->toBe(1);
+    expect($registration->logs()->count())->toBe(2);
 });
 
-test('meet_final_mixed_version_xlsx_has_the_same_headers_and_preserves_waiver_status', function () {
+test('meet_final_unsupported_marker_one_blocks_submission_without_changing_files', function () {
+    $draft = ($this->markReviewed)(($this->meetDraft)('waiver'));
+    $draft->update(['requirements_version' => 1]); // Persisted unsupported data, never client input.
+    $before = $draft->fresh()->getAttributes();
+    $documents = $draft->documents()->orderBy('id')->get()->toArray();
+    $paths = Storage::disk('local')->allFiles();
+    ($this->submitMeet)($draft)->assertConflict()->assertJsonPath('message', 'Persyaratan pengajuan tidak sesuai. Muat ulang atau hubungi petugas.');
+    expect($draft->fresh()->getAttributes())->toBe($before);
+    expect($draft->documents()->orderBy('id')->get()->toArray())->toBe($documents);
+    ($this->assertPreserved)($draft, $paths);
+});
+
+test('meet_final_revision_start_rejects_an_incomplete_review_plan_without_changing_source_files', function () {
     $draft = ($this->markReviewed)(($this->meetDraft)('waiver'));
     $id = ($this->submitMeet)($draft)->assertOk()->json('data.id');
     $registration = SidangTaRegistration::findOrFail($id);
-    $legacy = $registration->replicate();
-    $legacy->fill(['requirements_version' => 1, 'student_number' => '1202299066',
-        'student_name' => 'Legacy Export', 'academic_snapshot' => null])->save();
-    ($this->asReviewer)();
-    $response = $this->get(route('admin.sidang-ta-registrations.export'))->assertOk();
-    $path = $response->baseResponse->getFile()->getPathname();
-    try {
-        $rows = (new \Rap2hpoutre\FastExcel\FastExcel)->import($path);
-        expect($rows)->toHaveCount(2);
-        $modern = $rows->firstWhere('ID Pengajuan', (string) $id);
-        $old = $rows->firstWhere('ID Pengajuan', (string) $legacy->id);
-        expect($modern)->toHaveCount(92);
-        expect(array_keys($modern))->toBe(array_keys($old));
-        expect($modern['Surat Permakluman EPRT — Status'])->toBe('Menunggu verifikasi');
-        expect($old['Surat Permakluman EPRT — Status'])->toBe('N/A');
-    } finally {
-        if (is_file($path)) unlink($path);
-    }
-});
-
-test('meet_final_version_two_revision_stays_held_without_changing_final_or_borrowed_files', function () {
-    $draft = ($this->markReviewed)(($this->meetDraft)('waiver'));
-    $id = ($this->submitMeet)($draft)->assertOk()->json('data.id');
-    $registration = SidangTaRegistration::findOrFail($id);
-    $registration->update(['status' => 'needs_review']); // Controlled fixture until the new staff workflow is wired.
+    $registration->update(['status' => 'needs_review']); // Simulate an incomplete server-side review plan.
     $snapshot = $registration->academic_snapshot;
     $paths = Storage::disk('local')->allFiles();
-    $revisionId = $this->postJson(route('sidang-ta-drafts.revision', $registration))->assertCreated()->json('data.id');
-    $revision = SidangTaRegistrationDraft::findOrFail($revisionId);
-    $this->putJson(route('sidang-ta-registrations.update', $registration), [
-        'draft_id' => $revisionId, 'version' => $revision->version, 'action' => 'submit',
-    ])->assertUnprocessable()->assertJsonPath('message', 'Pengiriman revisi ini belum tersedia. Data dan berkas tetap tersimpan.');
-    expect($revision->fresh()->status)->toBe('active');
+    $this->postJson(route('sidang-ta-drafts.revision', $registration))->assertUnprocessable()
+        ->assertJsonValidationErrors('action');
+    expect(SidangTaRegistrationDraft::where('source_registration_id', $id)->where('status', 'active')->count())->toBe(0);
     expect($registration->fresh()->status)->toBe('needs_review');
     expect($registration->fresh()->academic_snapshot)->toBe($snapshot);
     expect($registration->documents()->count())->toBe(8);
+    expect($registration->documents()->where('status', 'pending')->count())->toBe(8);
     expect($registration->logs()->count())->toBe(1);
     expect(Storage::disk('local')->allFiles())->toBe($paths);
 });

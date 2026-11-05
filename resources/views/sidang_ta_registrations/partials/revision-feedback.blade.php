@@ -22,7 +22,10 @@
                 @php
                     $sourceDocument = $item['document'];
                     $label = !$sourceDocument ? 'Belum ada dokumen' : ($item['missing_file'] ? 'Berkas tidak ditemukan' : (['pending' => 'Menunggu verifikasi', 'verified' => 'Terverifikasi', 'rejected' => 'Perlu perbaikan'][$sourceDocument->status] ?? $sourceDocument->status));
-                    $stepNumber = in_array($type, \App\Support\SidangTaDocumentRequirements::CAPTURES, true) ? 2 : (in_array($type, \App\Support\SidangTaDocumentRequirements::PAYMENT, true) ? 3 : 4);
+                    $stepNumber = 4;
+                    foreach (array_values(\App\Support\SidangTaReviewEligibility::groups($registration)) as $index => $groupTypes) {
+                        if (in_array($type, $groupTypes, true)) $stepNumber = $index + 2;
+                    }
                 @endphp
                 <li data-feedback-type="{{ $type }}" class="border-t border-amber-200 pt-3 text-xs text-amber-900">
                     <p class="font-semibold">

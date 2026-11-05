@@ -2,6 +2,30 @@
 use App\Models\User;
 use Illuminate\Support\Facades\Http;
 
+
+use Illuminate\Http\Client\Request as HttpRequest;
+
+beforeEach(function () {
+    config(['services.recaptcha.enabled' => true]);
+    Http::preventStrayRequests();
+    $this->fakeStudentGateway = function () {
+        Http::fake([
+            'https://www.google.com/recaptcha/api/siteverify' => Http::response(['success' => true]),
+            '*/issueauth' => function (HttpRequest $request) {
+                if ($request['username'] === '1202200001' && $request['password'] === 'password') {
+                    return Http::response(['token' => 'test-student-token']);
+                }
+                return Http::response(['message' => 'Username atau password salah.'], 401);
+            },
+            '*/issueprofile' => Http::response([
+                'user' => '1202200001', 'fullname' => 'KRISNA MAHASISWA',
+                'email' => 'krisna@mahasiswa.test', 'phone' => '081234567890',
+                'numberid' => '1202200001', 'studyprogram' => 'Informatika',
+            ]),
+        ]);
+    };
+});
+
 test('login screen can be rendered', function () {
     $response = $this->get('/login');
 
@@ -52,6 +76,7 @@ test('users can logout', function () {
 
 test('sso login works for mock student and syncs to database', function () {
     $this->seed();
+    ($this->fakeStudentGateway)();
 
     $response = $this->post('/auth/login-proses', [
         'username' => '1202200001',
@@ -67,6 +92,11 @@ test('sso login works for mock student and syncs to database', function () {
     expect($user->name)->toBe('KRISNA MAHASISWA');
     expect($user->employee_id)->toBe('1202200001');
     expect($user->hasRole('mahasiswa'))->toBeTrue();
+    Http::assertSent(fn (HttpRequest $request) => str_ends_with($request->url(), '/issueauth')
+        && $request['username'] === '1202200001' && $request['password'] === 'password');
+    Http::assertSent(fn (HttpRequest $request) => str_ends_with($request->url(), '/issueprofile')
+        && $request->hasHeader('Authorization', 'Bearer test-student-token'));
+
 });
 
 test('sso login works for mock dosen and syncs to database', function () {
@@ -103,6 +133,7 @@ test('sso login works for mock dosen and syncs to database', function () {
 
 test('sso login fails with wrong password and returns expected error message', function () {
     $this->seed();
+    ($this->fakeStudentGateway)();
 
     $response = $this->post('/auth/login-proses', [
         'username' => '1202200001',
@@ -114,10 +145,12 @@ test('sso login fails with wrong password and returns expected error message', f
     $response->assertSessionHasErrors([
         'username' => 'Username atau password salah.',
     ]);
+    Http::assertNotSent(fn (HttpRequest $request) => str_ends_with($request->url(), '/issueprofile'));
 });
 
 test('sso login fails with unknown username and returns expected error message', function () {
     $this->seed();
+    ($this->fakeStudentGateway)();
 
     $response = $this->post('/auth/login-proses', [
         'username' => 'usertidakada',
@@ -129,10 +162,12 @@ test('sso login fails with unknown username and returns expected error message',
     $response->assertSessionHasErrors([
         'username' => 'Username atau password salah.',
     ]);
+    Http::assertNotSent(fn (HttpRequest $request) => str_ends_with($request->url(), '/issueprofile'));
 });
 
 test('sso login works when user inputs full campus email address', function () {
     $this->seed();
+    ($this->fakeStudentGateway)();
 
     $response = $this->post('/auth/login-proses', [
         'username' => '1202200001@student.telkomuniversity.ac.id',
@@ -147,4 +182,3 @@ test('sso login works when user inputs full campus email address', function () {
     expect($user->username)->toBe('1202200001');
     expect($user->hasRole('mahasiswa'))->toBeTrue();
 });
-

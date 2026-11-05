@@ -29,6 +29,7 @@ class SidangTaDraftAccess
     public function check(User $user, SidangTaRegistrationDraft $draft, bool $write = false): void
     {
         $this->owner($user, $draft);
+        \App\Support\SidangTaDocumentRequirements::assertKnownVersion($draft);
         abort_unless($draft->status === SidangTaRegistrationDraft::STATUS_ACTIVE, 409);
         if ($write) {
             $this->assertCanWrite($user, $draft);
@@ -46,6 +47,8 @@ class SidangTaDraftAccess
         abort_unless($source->status === 'needs_review'
             && $source->lock_version === $draft->source_version, 409,
             'Pengajuan berubah. Buang draft revisi lama lalu muat ulang pengajuan.');
+
+        if ($write) \App\Support\SidangTaRevisionDeadline::ensureOpen($source);
 
         foreach ($draft->documents()->whereNotNull('source_document_id')->get() as $document) {
             $valid = $source->documents()->whereKey($document->source_document_id)

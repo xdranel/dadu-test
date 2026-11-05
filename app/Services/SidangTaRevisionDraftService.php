@@ -7,6 +7,9 @@ use App\Models\SidangTaRegistrationDraft;
 use App\Models\Student;
 use App\Models\User;
 use App\Support\SidangTaDocumentRequirements as Requirements;
+use App\Support\SidangTaReviewEligibility as Eligibility;
+use App\Support\SidangTaRevisionContract as Revision;
+use App\Support\SidangTaRevisionDeadline;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
@@ -29,8 +32,13 @@ class SidangTaRevisionDraftService
                 ->where('status', SidangTaRegistrationDraft::STATUS_ACTIVE)->lockForUpdate()->first();
             $source = SidangTaRegistration::whereKey($registration->id)->lockForUpdate()->firstOrFail();
             abort_unless($source->student_number === $student->student_number, 403);
+            abort_unless($source->requirements_version === 2, 409,
+                'Persyaratan pengajuan tidak sesuai. Muat ulang atau hubungi petugas.');
             abort_unless($source->status === 'needs_review', 409, 'Pengajuan tidak sedang membutuhkan revisi.');
+            SidangTaRevisionDeadline::ensureOpen($source);
+            Revision::assertCanRequest($source);
             if ($existing) {
+                Requirements::assertKnownVersion($existing);
                 abort_unless((string) $existing->owner_user_id === (string) $user->id, 409);
                 $this->access->check($user, $existing, true);
                 return $existing;
@@ -41,15 +49,14 @@ class SidangTaRevisionDraftService
                 'sidang_ta_period_id' => $source->sidang_ta_period_id,
                 'source_registration_id' => $source->id,
                 'source_version' => $source->lock_version,
-                'requirements_version' => $source->requirements_version,
+                'requirements_version' => 2,
                 'payload' => [
                     'student_phone' => $source->student_phone, 'parent_phone' => $source->parent_phone,
                     'graduation_payment_date' => $source->graduation_payment_date?->toDateString(),
                     'diploma_biodata_accurate' => $source->diploma_biodata_accurate,
                 ],
             ]);
-            $types = array_merge(Requirements::CAPTURES, Requirements::PAYMENT,
-                Requirements::typesForStep(4, $source->diploma_biodata_accurate));
+            $types = Eligibility::requiredTypes($source);
             foreach ($source->documents()->whereIn('document_type', $types)->get() as $document) {
                 $draft->documents()->create([
                     'document_type' => $document->document_type, 'file_name' => $document->file_name,
@@ -61,6 +68,7 @@ class SidangTaRevisionDraftService
         });
     }
 
+
     public function discard(User $user, SidangTaRegistrationDraft $draft, int $version): void
     {
         $student = $this->access->owner($user, $draft);
@@ -68,6 +76,7 @@ class SidangTaRevisionDraftService
         $paths = DB::transaction(function () use ($user, $draft, $version, $student) {
             Student::whereKey($student->id)->lockForUpdate()->firstOrFail();
             $locked = SidangTaRegistrationDraft::whereKey($draft->id)->lockForUpdate()->firstOrFail();
+            Requirements::assertKnownVersion($locked);
             $this->access->owner($user, $locked);
             $this->access->assertCanWrite($user, $locked);
             abort_unless($locked->status === SidangTaRegistrationDraft::STATUS_ACTIVE

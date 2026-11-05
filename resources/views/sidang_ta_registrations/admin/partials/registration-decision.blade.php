@@ -1,4 +1,5 @@
 @php
+    $revisionBlockers = $revisionBlockers ?? ['Data kelengkapan revisi belum tersedia. Muat ulang halaman.'];
     $oldForm = old('_review_form') === 'decision';
     $rawVersion = $oldForm ? old('registration_version') : $registration->lock_version;
     $versionValue = is_scalar($rawVersion) ? (string) $rawVersion : '';
@@ -13,6 +14,14 @@
     <h3 class="font-bold text-slate-800">
         Keputusan petugas
     </h3>
+    @if($revisionBlockers !== [])
+        <div data-ta-revision-blockers role="status" class="rounded-xl bg-amber-50 p-3 text-xs text-amber-900">
+            <p class="font-semibold">Selesaikan pemeriksaan dokumen sebelum meminta revisi.</p>
+            <ul class="mt-2 list-inside list-disc space-y-1">
+                @foreach($revisionBlockers as $message)<li>{{ $message }}</li>@endforeach
+            </ul>
+        </div>
+    @endif
     @if($approvalBlockers !== [])
         <div data-ta-approval-blockers
              class="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
@@ -40,10 +49,17 @@
         </p>
     @endif
     <div class="flex flex-wrap justify-end gap-2">
-        <button type="submit" class="btn btn-secondary" name="action" value="needs_review">Minta Revisi</button>
-        <button type="submit" class="btn btn-secondary" name="action" value="rejected">Tolak</button>
+        <button data-ta-request-revision type="submit"
+                class="btn btn-secondary disabled:cursor-not-allowed disabled:opacity-50"
+                name="action" value="needs_review" @disabled($revisionBlockers !== [])>
+            Minta Revisi
+        </button>
+        <button type="submit" class="btn btn-secondary" name="action" value="rejected">
+            Tolak
+        </button>
         <button data-ta-approve type="submit" class="btn btn-primary disabled:cursor-not-allowed disabled:opacity-50"
-                name="action" value="approved" @disabled($approvalBlockers !== [])>Setujui
+                name="action" value="approved" @disabled($approvalBlockers !== [])>
+            Setujui
         </button>
     </div>
 </form>

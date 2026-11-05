@@ -48,3 +48,5 @@ Schedule::call(function () {
         DB::table('queue_tickets')->delete();
     });
 })->dailyAt('08:00')->timezone('Asia/Jakarta');
+
+Schedule::command('sidang-ta:expire-revisions')->everyMinute()->withoutOverlapping(10);

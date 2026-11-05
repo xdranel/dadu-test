@@ -118,16 +118,55 @@
 
                     {{-- Card: Pendaftaran Sidang TA --}}
                     @can('sidang_ta_registration_read')
-                        <section class="campus-card flex flex-col gap-3 p-5">
-                            <h3 class="font-bold">
-                                Pendaftaran Sidang TA
-                            </h3>
-                            <p class="text-sm text-slate-500">
-                                Pilih periode, lanjutkan draft tersimpan, atau lihat riwayat pengajuan.
-                            </p>
-                            <a class="btn btn-primary" href="{{ route('sidang-ta-registrations.index') }}">
-                                Buka Pendaftaran Sidang TA
-                            </a>
+                        <section data-ta-dashboard-card
+                                 class="flex flex-col overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm transition-shadow duration-300 hover:shadow-md">
+                            <div class="relative flex h-24 items-center justify-center overflow-hidden bg-gradient-to-br from-[#DA2D3B] to-[#b91c2c]">
+                                <div class="absolute -left-4 -top-4 h-20 w-20 rounded-full bg-white/10"></div>
+                                <div class="absolute -bottom-6 -right-3 h-24 w-24 rounded-full bg-white/10"></div>
+                                <svg aria-hidden="true" class="relative z-10 h-10 w-10 text-white drop-shadow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M4 4h6a3 3 0 0 1 3 3v14a4 4 0 0 0-4-2H4V4Zm16 0h-4a3 3 0 0 0-3 3v14a4 4 0 0 1 4-2h3V4Z"/>
+                                </svg>
+                                <span class="absolute right-2.5 top-2.5 rounded-full bg-white/20 px-2.5 py-0.5 text-[9px] font-bold tracking-wide text-white">
+                                    {{ $taOpenPeriods->isNotEmpty() ? 'TERBUKA' : ($taUpcomingPeriod ? 'AKAN DATANG' : 'BELUM DIBUKA') }}
+                                </span>
+                            </div>
+                            <div class="flex flex-col p-4">
+                                <h3 class="text-sm font-bold leading-snug text-slate-800">Pendaftaran Sidang TA</h3>
+                                <p class="mt-1 text-xs leading-relaxed text-slate-500">
+                                    Pengajuan sidang tugas akhir dan pemeriksaan kelengkapan berkas.
+                                </p>
+                                <div class="mt-3 space-y-2">
+                                    @foreach($taOpenPeriods as $period)
+                                        <div data-ta-dashboard-period="{{ $period->id }}" class="space-y-1 rounded-xl border border-slate-100 bg-slate-50 p-2.5">
+                                            <p class="flex items-start gap-1.5 text-xs font-medium text-slate-600">
+                                                <span class="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-[#DA2D3B]"></span>
+                                                <span>Periode terbuka: <strong class="font-semibold text-[#DA2D3B]">{{ $period->name }}</strong></span>
+                                            </p>
+                                            <p class="pl-3 text-[11px] text-slate-500">
+                                                <time data-ta-open-at datetime="{{ $period->open_at->toIso8601String() }}">{{ $period->open_at->translatedFormat('d M Y H:i') }}</time>
+                                                s.d. <time data-ta-close-at datetime="{{ $period->close_at->toIso8601String() }}">{{ $period->close_at->translatedFormat('d M Y H:i') }}</time>
+                                            </p>
+                                        </div>
+                                    @endforeach
+                                    @if($taOpenPeriods->isEmpty() && $taUpcomingPeriod)
+                                        <div data-ta-dashboard-upcoming="{{ $taUpcomingPeriod->id }}" class="space-y-1 rounded-xl border border-slate-100 bg-slate-50 p-2.5">
+                                            <p class="text-xs font-medium text-slate-600">Periode mendatang: <strong class="font-semibold text-[#DA2D3B]">{{ $taUpcomingPeriod->name }}</strong></p>
+                                            <p class="text-[11px] text-slate-500">
+                                                <time data-ta-open-at datetime="{{ $taUpcomingPeriod->open_at->toIso8601String() }}">{{ $taUpcomingPeriod->open_at->translatedFormat('d M Y H:i') }}</time>
+                                                s.d. <time data-ta-close-at datetime="{{ $taUpcomingPeriod->close_at->toIso8601String() }}">{{ $taUpcomingPeriod->close_at->translatedFormat('d M Y H:i') }}</time>
+                                            </p>
+                                        </div>
+                                    @elseif($taOpenPeriods->isEmpty())
+                                        <p data-ta-dashboard-empty class="rounded-xl border border-slate-100 bg-slate-50 p-2.5 text-xs text-slate-500">Belum ada periode Sidang TA terbuka.</p>
+                                    @endif
+                                </div>
+                                <div class="mt-auto pt-3">
+                                    <a data-ta-dashboard-link href="{{ route('sidang-ta-registrations.index') }}"
+                                       class="btn btn-primary w-full justify-center rounded-xl py-2 text-xs font-bold shadow-sm transition-all hover:shadow-md">
+                                        Buka Pendaftaran Sidang TA
+                                    </a>
+                                </div>
+                            </div>
                         </section>
                     @endcan
 

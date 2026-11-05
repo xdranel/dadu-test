@@ -40,18 +40,20 @@ beforeEach(function () {
         $id = $this->postJson(route('sidang-ta-drafts.store'), $this->data)
             ->assertCreated()->json('data.id');
         $draft = SidangTaRegistrationDraft::findOrFail($id);
-        $draft->payload = array_replace($draft->payload, [
-            'graduation_payment_date' => today()->toDateString(), 'diploma_biodata_accurate' => true,
-        ]);
-        $draft->save();
-        foreach (array_merge(Requirements::CAPTURES, Requirements::PAYMENT, Requirements::DIPLOMA) as $type) {
-            $path = "sidang_ta/drafts/{$draft->id}/{$type}.pdf";
-            Storage::disk('local')->put($path, '%PDF-ui');
-            $draft->documents()->create([
-                'document_type' => $type, 'file_name' => $type.'.pdf',
-                'file_path' => $path, 'file_size' => 7, 'file_type' => 'pdf',
-            ]);
+        expect($draft->requirements_version)->toBe(2);
+        foreach ([2, 3, 4] as $step) {
+            $data = ['version' => $draft->fresh()->version];
+            if ($step === 3) $data['graduation_payment_date'] = today()->toDateString();
+            if ($step === 4) $data['diploma_biodata_accurate'] = true;
+            foreach (Requirements::typesForStep($step, true) as $type) {
+                $data['documents'][$type] = \Illuminate\Http\UploadedFile::fake()
+                    ->create($type.'.pdf', 100, 'application/pdf');
+            }
+            $this->postJson(route('sidang-ta-drafts.steps.store', ['draft' => $draft, 'step' => $step]), $data)
+                ->assertOk();
         }
+        $draft = $draft->fresh();
+        expect($draft->documents()->count())->toBe(7);
         return $draft;
     };
 });
@@ -111,13 +113,14 @@ test('g1_academic_panel_is_present_on_all_four_steps_and_keeps_zero_gpa', functi
             ->assertDontSee('Dosen Pembimbing G1')->assertSee('0,00')
             ->assertSee('KRS Sidang TA 2')->assertDontSee('Pembimbing &amp; Penguji', false)
             ->assertDontSee('Jadwal sidang TA')->assertDontSee('Sidang tingkat 3')
-            ->assertDontSee('Status BPP')->assertDontSee('Status i-Basila')->assertDontSee('Ketersediaan TAK');
+            ->assertSee('Status BPP')->assertDontSee('Status i-Basila')->assertDontSee('Ketersediaan TAK');
         $xpath = sidangTaUiXpath($response->getContent());
         expect($xpath->query('//aside[@data-academic-panel]')->length)->toBe(1);
         expect($xpath->query('//aside[@data-academic-panel]//*[@data-save-status]')->length)->toBe(0);
     }
     expect(SidangTaRegistration::count())->toBe(0);
 });
+
 
 test('g1_saved_draft_still_cannot_navigate_to_unfinished_future_step', function () {
     $id = $this->postJson(route('sidang-ta-drafts.store'), $this->data)->assertCreated()->json('data.id');
@@ -134,14 +137,14 @@ test('g1_payment_date_error_is_inline_and_does_not_change_saved_documents', func
     $draft = ($this->completeDraft)();
     $url = route('sidang-ta-drafts.edit', ['draft' => $draft, 'step' => 3]);
     $this->from($url)->post(route('sidang-ta-drafts.steps.store', ['draft' => $draft, 'step' => 3]), [
-        'version' => 1, 'graduation_payment_date' => today()->addDay()->toDateString(),
+        'version' => $draft->version, 'graduation_payment_date' => today()->addDay()->toDateString(),
     ])->assertRedirect($url)->assertSessionHasErrors('graduation_payment_date');
     $response = $this->get($url)->assertOk();
     $xpath = sidangTaUiXpath($response->getContent());
     expect($xpath->query('//*[@id="error-graduation_payment_date"]')->item(0)->textContent)
         ->toContain('Tanggal pembayaran wisuda tidak boleh melewati hari ini.');
-    expect($draft->fresh()->version)->toBe(1);
-    expect($draft->documents()->count())->toBe(15);
+    expect($draft->fresh()->version)->toBe($draft->version);
+    expect($draft->documents()->count())->toBe(7);
 });
 
 test('g1_inactive_biodata_upload_is_initially_disabled_and_has_dynamic_binding', function () {
@@ -172,15 +175,15 @@ test('g1_invalid_biodata_error_is_attached_to_radio_group', function () {
     $draft = ($this->completeDraft)();
     $url = route('sidang-ta-drafts.edit', ['draft' => $draft, 'step' => 4]);
     $this->from($url)->post(route('sidang-ta-drafts.steps.store', ['draft' => $draft, 'step' => 4]), [
-        'version' => 1, 'diploma_biodata_accurate' => 'invalid',
+        'version' => $draft->version, 'diploma_biodata_accurate' => 'invalid',
     ])->assertRedirect($url)->assertSessionHasErrors('diploma_biodata_accurate');
     $response = $this->get($url)->assertOk();
     $xpath = sidangTaUiXpath($response->getContent());
     expect($xpath->query('//fieldset[@id="diploma-biodata-group" and @aria-invalid="true"]')->length)->toBe(1);
     expect($xpath->query('//*[@id="error-diploma_biodata_accurate"]')->item(0)->textContent)
         ->toContain('Pilihan kesesuaian biodata tidak valid.');
-    expect($draft->fresh()->version)->toBe(1);
-    expect($draft->documents()->count())->toBe(15);
+    expect($draft->fresh()->version)->toBe($draft->version);
+    expect($draft->documents()->count())->toBe(7);
 });
 
 test('g1_missing_saved_file_keeps_step_incomplete_and_preserves_other_saved_files', function () {
@@ -190,19 +193,19 @@ test('g1_missing_saved_file_keeps_step_incomplete_and_preserves_other_saved_file
     Storage::disk('local')->delete($document->file_path);
     $url = route('sidang-ta-drafts.edit', ['draft' => $draft, 'step' => 2]);
     $this->from($url)->post(route('sidang-ta-drafts.steps.store', ['draft' => $draft, 'step' => 2]), [
-        'version' => 1,
+        'version' => $draft->version,
     ])->assertRedirect($url)->assertSessionHasNoErrors();
     $response = $this->get($url)->assertOk();
     $crawler = new \Symfony\Component\DomCrawler\Crawler($response->getContent());
-    expect($crawler->filter('[data-step-progress]')->text(null, true))->toContain('5 dari 6 dokumen tersimpan.')
+    expect($crawler->filter('[data-step-progress]')->text(null, true))->toContain('1 dari 2 dokumen tersimpan.')
         ->toContain(\App\Models\SidangTaRegistration::DOCUMENT_TYPES[$document->document_type]);
     expect($crawler->filter('button[data-next-step][disabled]')->count())->toBe(1);
     $response->assertDontSee(route('sidang-ta-draft-documents.download', $other), false)
         ->assertDontSee(route('sidang-ta-draft-documents.download', $document), false)
         ->assertSee($other->file_name);
     expect(Storage::disk('local')->exists($other->file_path))->toBeTrue();
-    expect($draft->fresh()->version)->toBe(2);
-    expect($draft->documents()->count())->toBe(15);
+    expect($draft->fresh()->version)->toBe($draft->version + 1);
+    expect($draft->documents()->count())->toBe(7);
 });
 
 test('meet_krs_requires_one_active_period_and_explicit_ta2_name', function () {
