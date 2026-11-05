@@ -1,0 +1,31 @@
+version: '3.8'
+
+services:
+  chatbot-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: chatbot-api
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./docs:/app/docs
+      - ./vectorstore:/app/vectorstore
+      - ./data:/app/data
+    env_file:
+      - .env
+    depends_on:
+      - ollama
+    restart: unless-stopped
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    restart: unless-stopped
+
+volumes:
+  ollama_data:

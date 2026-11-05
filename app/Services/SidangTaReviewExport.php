@@ -1,0 +1,119 @@
+<?php
+
+namespace App\Services;
+
+use App\Models\SidangTaRegistration;
+use App\Support\SidangTaDocumentRequirements as Requirements;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\ValidationException;
+use Rap2hpoutre\FastExcel\FastExcel;
+use RuntimeException;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
+use Throwable;
+
+class SidangTaReviewExport
+{
+    public const SNAPSHOT_COLUMNS = [
+        'Snapshot NIM' => 'student_number',
+        'Snapshot Nama' => 'student_name',
+        'Snapshot Prodi' => 'study_program',
+        'Email Kampus' => 'student_email',
+        'Semester' => 'semester',
+        'IPK' => 'gpa',
+        'SKS Lulus' => 'passed_credits',
+        'Sidang Tingkat 2' => 'sidang_tingkat_2',
+        'Judul TA Indonesia' => 'ta_title',
+        'Judul TA Inggris' => 'ta_title_en',
+        'Pembimbing 1' => 'advisor_1',
+        'Pembimbing 2' => 'advisor_2',
+        'Penguji 1' => 'examiner_1',
+        'Penguji 2' => 'examiner_2',
+        'Penguji 3' => 'examiner_3',
+        'Tanggal Sidang' => 'exam_date',
+        'Waktu Sidang' => 'exam_time',
+        'Lokasi Sidang' => 'exam_location',
+        'TAK' => 'tak_score',
+        'EPrT' => 'eprt_score',
+        'Status BPP' => 'bpp_status',
+        'Status SKPI' => 'skpi_status',
+        'Status TAK' => 'skpi_tak',
+        'Sidang Tingkat 3' => 'level_3_status',
+        'Status i-Basila' => 'ibasila_status',
+        'Sumber Akademik Diperbarui' => 'academic_source_updated_at',
+    ];
+
+    private function text(mixed $value): string
+    {
+        if ($value === null || (is_string($value) && in_array(trim($value), ['', '-'], true))) return 'Belum tersedia';
+        if (is_bool($value)) return $value ? 'Ya' : 'Tidak';
+        if (is_scalar($value)) return (string) $value;
+        return json_encode($value, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_INVALID_UTF8_SUBSTITUTE)
+            ?: 'Belum tersedia';
+    }
+
+    public function row(SidangTaRegistration $registration): array
+    {
+        $snapshot = is_array($registration->academic_snapshot) ? $registration->academic_snapshot : [];
+        $row = [
+            'ID Pengajuan' => (string) $registration->id,
+            'Periode Sidang TA' => $this->text($registration->period?->name),
+            'NIM' => $this->text($registration->student_number),
+            'Nama Mahasiswa' => $this->text($registration->student_name),
+            'Program Studi' => $this->text($registration->study_program),
+            'HP Mahasiswa' => $this->text($registration->student_phone),
+            'HP Orang Tua/Wali' => $this->text($registration->parent_phone),
+            'Tanggal Bayar Wisuda' => $this->text($registration->graduation_payment_date?->format('Y-m-d')),
+            'Biodata Ijazah' => $registration->diploma_biodata_accurate ? 'Sudah sesuai' : 'Belum sesuai (PDM)',
+            'Status Pengajuan' => SidangTaReviewQuery::STATUSES[$registration->status] ?? $this->text($registration->status),
+            'Dikirim' => $this->text($registration->submitted_at?->format('Y-m-d H:i:s')),
+            'Ditinjau' => $this->text($registration->reviewed_at?->format('Y-m-d H:i:s')),
+            'Catatan Petugas' => $this->text($registration->review_notes),
+            'Versi Pengajuan' => (string) $registration->lock_version,
+        ];
+        foreach (self::SNAPSHOT_COLUMNS as $label => $key) $row[$label] = $this->text($snapshot[$key] ?? null);
+        $required = array_merge(Requirements::CAPTURES, Requirements::PAYMENT,
+            Requirements::typesForStep(4, $registration->diploma_biodata_accurate));
+        $labels = ['pending' => 'Menunggu verifikasi', 'verified' => 'Terverifikasi', 'rejected' => 'Perlu perbaikan'];
+        foreach (SidangTaRegistration::DOCUMENT_TYPES as $type => $label) {
+            $applicable = in_array($type, $required, true);
+            $document = $registration->documents->firstWhere('document_type', $type);
+            $row[$label.' — Status'] = !$applicable ? 'N/A' : (!$document ? 'Belum ada dokumen'
+                : ($labels[$document->status] ?? $this->text($document->status)));
+            $row[$label.' — Ketersediaan'] = !$applicable ? 'N/A' : (!$document ? 'Tidak ada metadata'
+                : (Storage::disk('local')->exists($document->file_path) ? 'Tersedia' : 'Tidak ditemukan'));
+            $row[$label.' — Catatan'] = !$applicable ? 'N/A' : $this->text($document?->notes);
+        }
+        return $row;
+    }
+
+    public function download(Collection $registrations): BinaryFileResponse
+    {
+        if ($registrations->isEmpty()) {
+            throw ValidationException::withMessages(['export' => 'Tidak ada pengajuan yang cocok untuk diekspor.']);
+        }
+        $rows = $registrations->map(fn (SidangTaRegistration $registration) => $this->row($registration));
+        $temporary = tempnam(sys_get_temp_dir(), 'dadu-ta-xlsx-');
+        if ($temporary === false) throw new RuntimeException('File sementara ekspor tidak dapat dibuat.');
+        $path = $temporary.'.xlsx';
+        if (!@rename($temporary, $path)) {
+            @unlink($temporary);
+            throw new RuntimeException('File sementara XLSX tidak dapat disiapkan.');
+        }
+        try {
+            (new FastExcel($rows))->stringValues()->setColumnFormat([
+                'Semester' => 'number', 'IPK' => 'number', 'SKS Lulus' => 'number',
+                'TAK' => 'number', 'EPrT' => 'number',
+            ])->escapeFormulas()->export($path);
+            clearstatcache(true, $path);
+            return response()->download($path, 'Sidang_TA_'.now()->format('Y-m-d_H-i-s').'.xlsx', [
+                'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                'Cache-Control' => 'private, no-store',
+                'X-Content-Type-Options' => 'nosniff',
+            ])->setPrivate()->deleteFileAfterSend(true);
+        } catch (Throwable $exception) {
+            if (is_file($path)) @unlink($path);
+            throw $exception;
+        }
+    }
+}
