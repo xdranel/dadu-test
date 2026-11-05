@@ -1,0 +1,177 @@
+name: dadu-test
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+x-app-environment: &app-environment
+  APP_NAME: "DADU Test"
+  APP_ENV: staging
+  APP_DEBUG: "false"
+  APP_KEY: ${APP_KEY:?Run bash docker/scripts/init-env.sh first}
+  APP_URL: ${APP_URL:-https://dadu-test.gendhiramona.site}
+  APP_TIMEZONE: Asia/Jakarta
+  APP_LOCALE: id
+  APP_FALLBACK_LOCALE: en
+  APP_MAINTENANCE_DRIVER: file
+  LOG_CHANNEL: stderr
+  LOG_LEVEL: warning
+  DB_CONNECTION: mysql
+  DB_HOST: db
+  DB_PORT: "3306"
+  DB_DATABASE: dadu
+  DB_USERNAME: dadu
+  DB_PASSWORD: ${DADU_DB_PASSWORD:?Run the environment initializer first}
+  DB_CHARSET: utf8mb4
+  DB_COLLATION: utf8mb4_0900_ai_ci
+  DB_SOCKET: ""
+  SESSION_DRIVER: database
+  SESSION_SECURE_COOKIE: "true"
+  SESSION_LIFETIME: "120"
+  CACHE_STORE: database
+  CACHE_PREFIX: dadu_test_
+  QUEUE_CONNECTION: database
+  # The longest existing scraper job declares a four-hour timeout.
+  DB_QUEUE_RETRY_AFTER: "14700"
+  FILESYSTEM_DISK: local
+  MAIL_MAILER: log
+  AUTH_WITH_CAPTCHA: "false"
+  CHATBOT_API_URL: ${CHATBOT_API_URL:-http://127.0.0.1:8000}
+  CHATBOT_API_KEY: ${CHATBOT_API_KEY:-}
+
+x-runtime: &runtime
+  image: dadu-test-php:local
+  restart: unless-stopped
+  init: true
+  environment: *app-environment
+  volumes:
+    - app_storage:/var/www/html/storage
+  networks:
+    - backend
+  logging: *logging
+  depends_on:
+    db:
+      condition: service_healthy
+
+services:
+  db:
+    image: mysql:8.4.10
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: dadu
+      MYSQL_USER: dadu
+      MYSQL_PASSWORD: ${DADU_DB_PASSWORD:?Run the environment initializer first}
+      MYSQL_ROOT_PASSWORD: ${DADU_DB_ROOT_PASSWORD:?Run the environment initializer first}
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_0900_ai_ci
+      - --innodb-buffer-pool-size=128M
+      - --max-connections=30
+      - --performance-schema=OFF
+      - --mysqlx=OFF
+      - --table-open-cache=400
+      - --tmp-table-size=16M
+      - --max-heap-table-size=16M
+    volumes:
+      - mysql_data:/var/lib/mysql
+    networks:
+      - backend
+    mem_limit: 640m
+    cpus: 0.75
+    logging: *logging
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >-
+          MYSQL_PWD="$${MYSQL_PASSWORD}" mysql --protocol=TCP -h127.0.0.1
+          -u"$${MYSQL_USER}" "$${MYSQL_DATABASE}" -Nse 'SELECT 1' >/dev/null
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 60s
+
+  app:
+    <<: *runtime
+    build:
+      context: .
+      target: app
+    mem_limit: 768m
+    cpus: 1.5
+
+  web:
+    image: dadu-test-web:local
+    build:
+      context: .
+      target: web
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8091:8080"
+    volumes:
+      - app_storage:/var/www/html/storage:ro
+    networks:
+      backend:
+      proxy:
+        aliases:
+          - dadu-test-web
+    depends_on:
+      app:
+        condition: service_started
+    mem_limit: 64m
+    cpus: 0.25
+    logging: *logging
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8080/up"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+
+  scheduler:
+    <<: *runtime
+    command: ["php", "-d", "max_execution_time=0", "artisan", "schedule:work", "--no-interaction"]
+    mem_limit: 192m
+    cpus: 0.25
+    stop_grace_period: 70s
+
+  worker:
+    <<: *runtime
+    command:
+      - php
+      - -d
+      - max_execution_time=0
+      - artisan
+      - queue:work
+      - database
+      - --sleep=3
+      - --tries=1
+      - --memory=192
+      - --timeout=14400
+      - --max-time=3600
+      - --no-interaction
+    mem_limit: 320m
+    cpus: 0.5
+    stop_grace_period: 14430s
+
+  setup:
+    <<: *runtime
+    restart: "no"
+    profiles: ["tools"]
+    command: ["php", "docker/scripts/seed-test-accounts.php"]
+    environment:
+      <<: *app-environment
+      DADU_TEST_PASSWORD: ${DADU_TEST_PASSWORD:?Run the environment initializer first}
+    mem_limit: 512m
+    cpus: 1.0
+
+networks:
+  backend:
+    driver: bridge
+  proxy:
+    external: true
+    name: proxy-net
+
+volumes:
+  mysql_data:
+  app_storage:

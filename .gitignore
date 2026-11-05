@@ -27,3 +27,8 @@ academic-chatbot/data/
 academic-chatbot/__pycache__/
 academic-chatbot/**/__pycache__/
 academic-chatbot/*.pyc
+
+# Server-only deployment secrets and backups
+/.env.docker*
+!/.env.docker.example
+/backups/
