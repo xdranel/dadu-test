@@ -1,0 +1,73 @@
+{
+  "generated_at": "2026-11-05T10:20:00+07:00",
+  "source": "iGracias + BASILA",
+  "total": 1,
+  "selected_menus": [
+    "akademik",
+    "bahasa",
+    "tak",
+    "keuangan",
+    "mata_kuliah",
+    "jadwal_sidang",
+    "skpi",
+    "maju_sidang",
+    "basila_foto"
+  ],
+  "data": [
+    {
+      "no": 1,
+      "nim": "0000000000",
+      "nama": "MAHASISWA CONTOH",
+      "dosen_wali": "DWX",
+      "sidang_tingkat_1": "Y",
+      "sidang_tingkat_2": "Y",
+      "sidang_tingkat_3": "Y",
+      "sidang_tingkat_4": "N",
+      "sks_belum_lulus": "0",
+      "nilai_bahasa": "525",
+      "jenis_tes_bahasa": "EPrT",
+      "jumlah_tes_bahasa": 2,
+      "riwayat_nilai_bahasa": [
+        {
+          "jenis_tes": "EPrT",
+          "nilai": "525",
+          "kedaluwarsa": "2027-06-15",
+          "status_berlaku": "Berlaku"
+        },
+        {
+          "jenis_tes": "EPrT",
+          "nilai": "480",
+          "kedaluwarsa": "2025-08-20",
+          "status_berlaku": "Kedaluwarsa"
+        }
+      ],
+      "total_tak": "80",
+      "status_keuangan": "LUNAS",
+      "status_keuangan_asli": "LUNAS",
+      "semester": "2627/1",
+      "ipk": "3.75",
+      "sks_lulus": "146",
+      "mk_mengulang": null,
+      "mk_belum_lulus": null,
+      "indeks_nilai_tugas_akhir": "A",
+      "tanggal_sidang": "20-11-2026",
+      "waktu": "09:00 - 10:30",
+      "tempat": "Ruang Sidang Contoh",
+      "judul_tugas_akhir": "Judul Tugas Akhir Contoh",
+      "pembimbing_1": "Dosen Pembimbing 1",
+      "pembimbing_2": "Dosen Pembimbing 2",
+      "penguji_1": "Dosen Penguji 1",
+      "penguji_2": "Dosen Penguji 2",
+      "skpi_status_1": "Y",
+      "skpi_status_2": "Y",
+      "skpi_status_3": "Y",
+      "status_skpi": "Disetujui",
+      "persetujuan_maju_sidang": "APPROVED",
+      "status_maju_sidang_asli": "APPROVED",
+      "pembimbing_ta": "Dosen Pembimbing TA",
+      "status_ta": "APPROVED",
+      "status_permintaan": null,
+      "approval_foto_dosen_wali_basila": "Y"
+    }
+  ]
+}

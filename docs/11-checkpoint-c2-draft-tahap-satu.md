@@ -421,3 +421,6 @@ Sesuaikan password lokal; jangan salin kredensial produksi. Untuk semua suite, u
 Setelah test lulus, beri tahu agar rescan source asli dapat dilakukan sebelum atau sesudah disalin ke dadu-test sesuai kebutuhanmu. Berikutnya D menambahkan simpan upload tahap 2–4, revisi dan cleanup aman; E memasang wizard HTML. Jangan menambahkan tombol submit final draft sebelum F.
 
 Referensi diperiksa melalui Context7: [Laravel HTTP tests](https://github.com/laravel/docs/blob/13.x/http-tests.md), [row locking](https://github.com/laravel/docs/blob/13.x/queries.md#pessimistic-locking). Asisten hanya memeriksa sintaks dokumen, bukan menjalankan kode aplikasi atau mengklaim test sudah lulus.
+
+
+Pembaruan setelah pengguna menyelesaikan C2 dan menyalin source: baca [12 rescan C2](12-rescan-c2-sebelum-upload.md) untuk typo dan relasi sisa, lalu [13 D1](13-checkpoint-d1-upload-draft.md) untuk upload dan command generator. Request pada 13 menggantikan request C2; test skip tahap pada dokumen ini juga harus diganti sesuai 13.

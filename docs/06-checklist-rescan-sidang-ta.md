@@ -131,3 +131,6 @@ Untuk error body terlalu besar: uji transport nyata dan nilai PHP HTTP mengikuti
 Cari ulang `SidangTaPeriod::active`, `saveDocuments`, `$request->file('documents')`, `action`, `needs_review`, `draft`, route download dan penggunaan snapshot. Pastikan endpoint lama tidak menjalankan implementasi final lama. Periksa juga migrations, factories/fixtures, Blade import JS sebelum Alpine.start, permission seed/migration, dashboard, dan penghapusan file consumed/revisi.
 
 Bandingkan sumber sebelum/sesudah menulis setiap revisi dokumen. Perubahan dari pengguna saat scan berlangsung dicatat sebagai perubahan eksternal, bukan ditimpa. Saat sesi awal ini, scan hash sebelum/sesudah setiap dokumen menunjukkan tidak ada perubahan source oleh asisten. Belum ada hasil test aplikasi/browser untuk dinyatakan lulus.
+
+
+Pembaruan E: [17](17-checkpoint-e-wizard-student.md) menyediakan kode 10 test wizard/review lengkap, command build dan checklist browser. Ini menggantikan daftar target saja untuk checkpoint E. Suite yang sudah lulus tetap dijalankan pengguna sebagai regresi di MySQL Podman.

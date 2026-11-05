@@ -256,3 +256,8 @@ Tidak menjalankan setup lagi agar password/roles tidak di-reset. File .env.docke
 - Docker daemon/Compose CLI tidak tersedia lokal (hanya Podman); validasi Compose config, build image, migration/seed, koneksi MySQL, Nginx -t/runtime dan browser menunggu server pengguna. Jangan menyatakan image/build atau hosting sudah berhasil hanya dari lint.
 
 Referensi: [Docker startup order](https://docs.docker.com/compose/how-tos/startup-order/), [external networks](https://docs.docker.com/reference/compose-file/networks/#external), [Laravel deployment](https://laravel.com/docs/13.x/deployment), [Cloudflare published applications](https://developers.cloudflare.com/tunnel/concepts/routing/).
+
+
+## Pembaruan runtime setelah63b
+
+Bukti pengguna mengonfirmasi perbaikan master FPM: configuration test successful, app Up, web healthy, database healthy dan http://127.0.0.1:8091/login200. Scheduler/worker masih Up pada digest image lama sesuai lingkup recreate app/web. Selanjutnya verifikasi NPM dan publik pada [63b](63b-koreksi-php-fpm-exit78.md). Belum ada klaim login browser, akses subdomain publik, atau upload server sudah lulus. Tidak perlu mengulang migration/seed untuk melanjutkan pemeriksaan ini.

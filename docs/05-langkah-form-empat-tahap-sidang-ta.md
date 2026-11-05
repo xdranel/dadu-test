@@ -100,7 +100,7 @@ Pada tabel final `sidang_ta_registrations`, tambahkan `lock_version` unsigned in
 - `SidangTaDraftService::start(User $user, array $validated, ?SidangTaRegistration $source = null): SidangTaRegistrationDraft`.
 - `saveStep(User $user, SidangTaRegistrationDraft $draft, int $step, int $expectedVersion, array $validated): SidangTaRegistrationDraft`.
 - `firstIncompleteStep(SidangTaRegistrationDraft $draft): ?int` — hitung ulang dari payload + jenis file yang berlaku + keberadaan file fisik, bukan angka step kiriman client.
-- `markReviewed(User $user, SidangTaRegistrationDraft $draft, int $expectedVersion): SidangTaRegistrationDraft`.
+- Tinjau dipisah ke `SidangTaDraftReviewService::mark(User $user, SidangTaRegistrationDraft $draft, int $version): SidangTaRegistrationDraft` dan `preview(User $user, SidangTaRegistrationDraft $draft): SidangTaRegistrationDraft`, sesuai panduan rinci 17.
 - `submit(User $user, SidangTaRegistrationDraft $draft, int $expectedVersion): SidangTaRegistration`.
 - `discard(User $user, SidangTaRegistrationDraft $draft): void` — hanya active dan owned; tidak menghapus dokumen final yang dipinjam revisi.
 
@@ -128,6 +128,8 @@ Route baru seluruhnya di grup auth/password.changed/dashboard yang ada:
 
 ## Checkpoint D — Save per tahap, revisi dan keamanan file
 
+Panduan rinci D1 draft baru: [13](13-checkpoint-d1-upload-draft.md), didahului koreksi [12](12-rescan-c2-sebelum-upload.md). D1 sudah dilaporkan lulus; [14](14-rescan-d1-sebelum-revisi.md) memuat rescan dan [15](15-checkpoint-d2-draft-revisi.md) memuat D2 revisi/discard beserta command dan test lengkap. Dokumen 13 memuat command generator dan kode test lengkap; daftar seluruh D di bawah tetap target gabungan, bukan klaim revisi sudah diimplementasikan.
+
 - [ ] `SaveSidangTaDraftStepRequest` mengizinkan `step` 1–4 dari route; `version` wajib integer; validasi prasyarat server sebelum menerima tahap yang lebih jauh. Tahap 1 mengirim kontak/periode untuk draft baru; revisi memakai periode asal tanpa syarat masih terbuka dan menolak perpindahan periode. Tahap 2 enam capture; tahap 3 tanggal+7 PDF; tahap 4 boolean+PDF cabang terpilih.
 - [ ] Whitelist `documents` menggunakan `array:` dengan key tahap yang berlaku. Unknown key, array menggantikan satu file, input path dan file tahap lain ditolak. Ambil hanya validated UploadedFile, jangan iterasi seluruh `$request->file('documents')`. Request yang sama sekali tidak mengirim file boleh memakai existing file sah untuk tahap tersebut.
 - [ ] Server menghitung persyaratan dari **data tersimpan yang digabung perubahan tervalidasi**. Existing row saja tidak cukup: file harus ada, source revisi harus milik registration asal, dan cabang harus berlaku. Format existing final file sah lama dihormati; upload pengganti mengikuti aturan baru.
@@ -143,6 +145,8 @@ Route baru seluruhnya di grup auth/password.changed/dashboard yang ada:
 **Selesai bila:** test `rejects_unknown_document_key`, `keeps_old_file_when_replacement_fails`, `rejects_stale_draft_version`, `persists_files_after_logout`, `switches_biodata_branch_safely`, `rejects_skipped_step` lulus.
 
 ## Checkpoint E — Empat tahap dan review dari data tersimpan
+
+Panduan lengkap tersedia pada [17](17-checkpoint-e-wizard-student.md), sesudah [rescan 16](16-rescan-d2-sebelum-wizard.md). Berisi command generator, kode Blade/JS, review service dan 10 test. Final submit dipasang F, bukan diarahkan ke legacy store/update pada checkpoint E.
 
 - [ ] Pertahankan header/panel data akademik yang relevan dan pola visual aplikasi. Stepper menampilkan Tahap 1–4, judul ringkas, kondisi terkunci/tersimpan/aktif; mobile tetap terbaca tanpa menyembunyikan tombol.
 - [ ] GET create menampilkan tahap 1 dan pilihan periode, tanpa membuat row melalui GET. Setelah POST tahap 1 sukses, redirect ke edit draft. GET edit final revisi menampilkan data awal atau redirect draft yang sudah ada, tanpa mengubah final pada GET.
@@ -160,6 +164,8 @@ Route baru seluruhnya di grup auth/password.changed/dashboard yang ada:
 **Selesai bila:** uji browser empat tahap, dua cabang, revisi, tutup-buka dan mobile lulus; `npm run build` berhasil. UI tidak lagi mengirim seluruh 14/15 file dalam satu request; tahap terberat 7 file (70 MiB pada batas aplikasi), final tanpa file. Konfigurasi 04 tetap aman untuk masa transisi form lama.
 
 ## Checkpoint F — Finalisasi yang lengkap, atomik dan dapat diulang
+
+Panduan rinci [20](20-checkpoint-f-finalisasi-draft.md) tersedia sesudah [rescan19](19-rescan-e-siap-finalisasi.md), lengkap command generator, kode finalizer/snapshot/request/controller/Blade dan 13 test. Finalizer dipisah ke SidangTaDraftFinalizer, bukan menumpuk seluruh metode pada DraftService; store/update lama wajib diganti.
 
 - [ ] Final request wajib `draft_id` UUID, `version` integer, `action` in:submit; tanpa action/bernilai lain ditolak. Jangan memilih required/nullable seluruh pengajuan berdasarkan flag action. Tolak file baru pada endpoint final agar sumber data hanya draft tersimpan.
 - [ ] Di transaksi dengan urutan lock Student → draft → source registration bila revisi, cek owner dan permission sesuai source terlebih dahulu. **Branch consumed diperiksa sebelum syarat active/kelengkapan/source needs_review**: jika expectedVersion cocok dengan versi draft saat sukses, kembalikan submitted_registration_id tanpa perubahan. Finalisasi tidak menaikkan version draft, sehingga replay memakai version yang sama; save terhadap consumed ditolak.
@@ -194,3 +200,6 @@ Route baru seluruhnya di grup auth/password.changed/dashboard yang ada:
 - [Alpine templating](https://alpinejs.dev/essentials/templating): `x-show` mempertahankan node tersembunyi, `x-if` menghapus/membuat node; diambil melalui Context7. Karena draft server, setiap tahap dapat dirender ulang tanpa mempertahankan FileList tahap lain.
 
 Rencana ini belum dijalankan. Pemeriksaan sebelum/sesudah penulisan hanya membaca sumber; source kedua folder tetap sama dengan baseline scan.
+
+
+Pembaruan prioritas pengguna 2 November 2026: setelah E, selesaikan fungsi student (termasuk finalisasi F) sebelum visual/desain/perapian tampilan. Lihat rescan18 untuk kasus periode masa depan yang memang belum boleh dipilih dan koreksi query step kosong. Jangan mengubah aturan periode demi menampilkan seluruh periode aktif.

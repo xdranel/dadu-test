@@ -78,3 +78,36 @@ Buka juga hostname normal di browser. Jika DNS browser masih gagal meskipun curl
 Sebelum patch, smoke test entrypoint menggunakan stub perintah di /tmp menemukan branch FPM masih melalui gosu (FAIL), sedangkan CLI melalui gosu (PASS). Setelah patch, kedua pemeriksaan PASS: master FPM tidak melalui gosu, cache config/CLI tetap melalui gosu. Ini memeriksa control flow dengan stub, bukan klaim bahwa image Docker sudah berjalan.
 
 Shell syntax dan git diff --check lulus. Source app/resources/routes/tests/database/config di dua clone tetap sama dengan baseline sebelum deployment. Seluruh source/deployment di-hash sebelum/sesudah tiap perubahan Markdown dan tidak berubah selama penulisan. Tidak ada SSH, build image server, restart, commit/push, atau operasi database oleh asisten. Hasil runtime menunggu langkah pengguna.
+
+
+## Hasil runtime setelah pengguna menerapkan patch
+
+Pengguna mengirim bukti server: php-fpm -t memberi configuration test successful; app tidak lagi Restarting78, web healthy, db healthy, scheduler/worker aktif. GET/HEAD /login pada127.0.0.1:8091 memberi200 dengan cache-control private dan cookie secure. Nilai cookie dari output tidak disalin ke dokumen ini. Ini memverifikasi perbaikan FPM dan request lokal aplikasi; URL publik belum dinyatakan berhasil.
+
+Scheduler/worker masih memakai digest image sebelumnya karena patch hanya membutuhkan recreate app/web. Keduanya tetap Up; perilaku CLI sebelumnya juga melalui www-data. Tidak perlu menghentikan job/restart seluruh stack hanya untuk mengubah tampilan nama image.
+
+Pemeriksaan berikutnya pada **server**:
+
+```bash
+curl --max-time 10 -sS -o /dev/null -w 'NPM HTTP %{http_code}\n' \
+  -H 'Host: dadu-test.gendhiramona.site' \
+  http://100.100.208.106:80/login
+```
+
+Lalu dari **laptop browser** ulangi probe publik yang sebelumnya502:
+
+```bash
+curl --connect-timeout 10 --max-time 20 \
+  --resolve dadu-test.gendhiramona.site:443:104.21.62.243 \
+  -sS -o /dev/null -w 'PUBLIC HTTP %{http_code}\n' \
+  https://dadu-test.gendhiramona.site/login
+```
+
+Jika keduanya200, buka hostname normal di browser dan uji login tiga akun. Jika curl --resolve200 tetapi browser masih server not found, lanjutkan resolver laptop/browser pada63a. Jika NPM atau PUBLIC masih502, kirim statusnya untuk melacak lapisan yang tersisa; jangan mengulang build atau reset DB tanpa temuan baru.
+
+
+## Hasil publik berikutnya
+
+Pengguna mengulang probe HTTPS dengan curl --resolve dan mendapat **PUBLIC HTTP200** pada /login. Bersama bukti lokal200 dan FPM config test successful, ini membuktikan jalur publik melalui IP Cloudflare yang diuji berhasil mencapai halaman login. Rebuild/restart tambahan belum diperlukan dari hasil ini.
+
+Probe --resolve melewati DNS lokal; hasil ini belum membuktikan resolusi hostname browser atau autentikasi/upload aplikasi. Selanjutnya buka hostname normal di browser, login superadmin/Krisna/dummy002 menggunakan DADU_TEST_PASSWORD dari .env.docker server, cek switch role, simpan upload dan preview. Jangan kirim password/cookie ke chat. Jika browser masih server not found, periksa DNS laptop/browser pada63a; jika login/CSRF/upload gagal, diagnosis dilakukan berdasarkan error aktual. Belum ada klaim seluruh modul/server manual test lulus.
