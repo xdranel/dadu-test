@@ -1,0 +1,24 @@
+{
+  "source": "DUMMY DEMO TA 67 - data sintetis, bukan data kampus resmi",
+  "total": 2,
+  "data": [
+    {
+      "nim": "1202200001",
+      "nama_siswa": "Krisna Mahasiswa",
+      "prodi": "Informatika",
+      "academic_year": 2022,
+      "active_semester": 8,
+      "email": "krisna@mahasiswa.test",
+      "kelas": "DEMO67"
+    },
+    {
+      "nim": "1202299002",
+      "nama_siswa": "Mahasiswa Dummy TA 2",
+      "prodi": "Informatika",
+      "academic_year": 2022,
+      "active_semester": 8,
+      "email": "dummy-ta-2@mahasiswa.test",
+      "kelas": "DEMO67"
+    }
+  ]
+}

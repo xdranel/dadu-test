@@ -208,7 +208,7 @@ test('g1_missing_saved_file_keeps_step_incomplete_and_preserves_other_saved_file
     expect($draft->documents()->count())->toBe(7);
 });
 
-test('meet_krs_requires_one_active_period_and_explicit_ta2_name', function () {
+test('meet_krs_requires_one_active_period_and_accepted_ta_names', function () {
     \App\Models\AcademicPeriod::query()->update(['is_active' => false]);
     $service = app(\App\Services\SidangTaAcademicSnapshot::class);
     expect($service->ta2KrsStatus($this->student))->toBe('unknown');
@@ -220,12 +220,14 @@ test('meet_krs_requires_one_active_period_and_explicit_ta2_name', function () {
     $row = \App\Models\StudentCourse::create(['student_number' => $this->student->student_number,
         'course_code' => $course->course_code, 'course_name' => 'TUGAS AKHIR', 'course_class' => 'A',
         'academic_year' => '2026/2027', 'semester' => 8, 'academic_period_id' => $period->id]);
-    foreach (['TUGAS AKHIR', 'TUGAS AKHIR 1', 'TUGAS AKHIR 20', 'PROPOSAL TUGAS AKHIR'] as $name) {
+    foreach (['TUGAS AKHIR 1', 'TUGAS AKHIR 20', 'PROPOSAL TUGAS AKHIR'] as $name) {
         $row->update(['course_name' => $name]);
         expect($service->ta2KrsStatus($this->student))->toBe('unconfirmed');
     }
-    $row->update(['course_name' => '  tugas akhir  2  ']);
-    expect($service->ta2KrsStatus($this->student))->toBe('eligible');
+    foreach (['TUGAS AKHIR', '  tugas akhir  2  '] as $name) {
+        $row->update(['course_name' => $name]);
+        expect($service->ta2KrsStatus($this->student))->toBe('eligible');
+    }
     $snapshot = $service->forStudent($this->student->fresh());
     expect($snapshot['ta2_krs_status'])->toBe('eligible');
     expect($snapshot['ta2_krs_label'])->toBe('Terdaftar');

@@ -1,0 +1,102 @@
+{
+  "source": "DUMMY DEMO TA 67 - data sintetis, bukan data kampus resmi",
+  "total": 2,
+  "selected_menus": [
+    "akademik",
+    "bahasa",
+    "tak",
+    "keuangan",
+    "mata_kuliah",
+    "skpi",
+    "maju_sidang"
+  ],
+  "finance_period": "2627/1",
+  "data": [
+    {
+      "nim": "1202200001",
+      "nama": "Krisna Mahasiswa",
+      "sidang_tingkat_1": "Y",
+      "sidang_tingkat_2": "Y",
+      "sidang_tingkat_3": "N",
+      "sidang_tingkat_4": "N",
+      "sks_belum_lulus": "0",
+      "ipk": "3.50",
+      "sks_lulus": "130",
+      "semester": "8",
+      "mk_mengulang": "-",
+      "mk_belum_lulus": "-",
+      "indeks_nilai_tugas_akhir": "-",
+      "status_skpi": "Disetujui",
+      "skpi_status_1": "Y",
+      "skpi_status_2": "Y",
+      "skpi_status_3": "Y",
+      "persetujuan_maju_sidang": "APPROVED",
+      "status_maju_sidang_asli": "APPROVED",
+      "status_ta": "1",
+      "status_permintaan": "1",
+      "nilai_bahasa": "470",
+      "jenis_tes_bahasa": "Online EPrT",
+      "jumlah_tes_bahasa": 1,
+      "riwayat_nilai_bahasa": [
+        {
+          "jenis_tes": "Online EPrT",
+          "nilai": "470",
+          "kedaluwarsa": "19 Mei 2028",
+          "status_berlaku": "Berlaku"
+        }
+      ],
+      "total_tak": "80",
+      "status_keuangan": "LUNAS",
+      "status_keuangan_asli": "SUDAH LUNAS"
+    },
+    {
+      "nim": "1202299002",
+      "nama": "Mahasiswa Dummy TA 2",
+      "sidang_tingkat_1": "Y",
+      "sidang_tingkat_2": "Y",
+      "sidang_tingkat_3": "N",
+      "sidang_tingkat_4": "N",
+      "sks_belum_lulus": "0",
+      "ipk": "3.50",
+      "sks_lulus": "130",
+      "semester": "8",
+      "mk_mengulang": "-",
+      "mk_belum_lulus": "-",
+      "indeks_nilai_tugas_akhir": "-",
+      "status_skpi": "Disetujui",
+      "skpi_status_1": "Y",
+      "skpi_status_2": "Y",
+      "skpi_status_3": "Y",
+      "persetujuan_maju_sidang": "APPROVED",
+      "status_maju_sidang_asli": "APPROVED",
+      "status_ta": "1",
+      "status_permintaan": "1",
+      "nilai_bahasa": "449",
+      "jenis_tes_bahasa": "Online EPrT",
+      "jumlah_tes_bahasa": 3,
+      "riwayat_nilai_bahasa": [
+        {
+          "jenis_tes": "Online EPrT",
+          "nilai": "449",
+          "kedaluwarsa": "19 Mei 2028",
+          "status_berlaku": "Berlaku"
+        },
+        {
+          "jenis_tes": "Online EPrT",
+          "nilai": "449",
+          "kedaluwarsa": "20 Mei 2028",
+          "status_berlaku": "Berlaku"
+        },
+        {
+          "jenis_tes": "Online EPrT",
+          "nilai": "449",
+          "kedaluwarsa": "21 Mei 2028",
+          "status_berlaku": "Berlaku"
+        }
+      ],
+      "total_tak": "60",
+      "status_keuangan": "LUNAS",
+      "status_keuangan_asli": "SUDAH LUNAS"
+    }
+  ]
+}

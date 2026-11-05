@@ -91,6 +91,8 @@ test('meet_facts_ta2_uses_linked_active_period_and_can_complete_all_five_gates',
     expect(($this->readFacts)()['academic']['academic_passed'])->toBeTrue();
     expect(($this->readFacts)()['eprt']['mode'])->toBe('unknown');
     $krs->update(['course_name' => 'TUGAS AKHIR']);
+    expect(($this->readFacts)()['academic']['academic_passed'])->toBeTrue();
+    $krs->update(['course_name' => 'TUGAS AKHIR 1']);
     expect(($this->readFacts)()['facts']['ta2_registered'])->toBeNull();
     expect(($this->readFacts)()['academic']['academic_passed'])->toBeFalse();
 });

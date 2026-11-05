@@ -42,8 +42,23 @@ class StudentAcademicProfileImportService
      * @param  array  $data  Array of rows dari JSON iGracias+BASILA
      * @return array  Summary ['created' => int, 'updated' => int, 'skipped' => int, 'mismatched' => int, 'errors' => array]
      */
-    public function import(array $data): array
+    public function import(array $data, ?array $selectedMenus = null, ?string $financePeriod = null): array
     {
+        // Nested fixtures/imports remain readable; current flat exports use the normalizer.
+        $legacyContainers = ['tugas_akhir', 'tak', 'basila', 'sidang_tingkat', 'course_issues',
+            'bpp', 'nilai_ta', 'eprt', 'skpi', 'pembayaran_wisuda'];
+        $officialFields = ['status_skpi', 'persetujuan_maju_sidang', 'jumlah_tes_bahasa', 'riwayat_nilai_bahasa'];
+        $legacyOnly = $selectedMenus === null && $financePeriod === null;
+        foreach ($data as $row) {
+            if (!is_array($row) || array_intersect(array_keys($row), $legacyContainers) === []
+                || array_intersect(array_keys($row), $officialFields) !== []) {
+                $legacyOnly = false;
+                break;
+            }
+        }
+        if (!$legacyOnly) {
+            return app(AcademicProfileJsonImportService::class)->import($data, $selectedMenus, $financePeriod);
+        }
         $summary = [
             'created'    => 0,
             'updated'    => 0,

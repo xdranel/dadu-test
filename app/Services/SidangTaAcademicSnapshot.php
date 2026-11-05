@@ -60,11 +60,12 @@ class SidangTaAcademicSnapshot
         if ($names->isEmpty()) return 'unknown';
         foreach ($names as $name) {
             $normalized = strtoupper(trim(preg_replace('/\s+/', ' ', (string) $name)));
-            if (in_array($normalized, ['TUGAS AKHIR 2', 'TUGAS AKHIR II', 'SIDANG TA 2', 'TA 2', 'TA-2', 'FINAL THESIS 2'], true)) {
+            if (in_array($normalized, ['TUGAS AKHIR', 'TUGAS AKHIR 2', 'TUGAS AKHIR II', 'SIDANG TA 2', 'TA 2', 'TA-2', 'FINAL THESIS 2'], true)) {
                 return 'eligible';
             }
         }
-        // Generic names await official mapping; do not report them as passed.
+        // Match the whole normalized name; proposals/TA1/TA20 are not accepted.
         return 'unconfirmed';
     }
+
 }

@@ -32,13 +32,17 @@ class SidangTaAdmissionPolicy
     /** EPRT is separate from the five academic gates; waiver still needs a PDF. */
     public static function eprt(mixed $score, mixed $confirmedAttempts): array
     {
-        $score = self::number($score);
-        if ($score !== null && $score >= 450) {
+        $numericScore = self::number($score);
+        if ($score !== null && $numericScore === null) {
+            return ['mode' => 'unknown', 'requires_waiver' => false,
+                'message' => 'Data nilai atau riwayat tes EPRT belum lengkap.'];
+        }
+        if ($numericScore !== null && $numericScore >= 450) {
             return ['mode' => 'automatic', 'requires_waiver' => false,
                 'message' => 'Nilai EPRT memenuhi syarat.'];
         }
         $attempts = self::number($confirmedAttempts);
-        if ($score === null || $attempts === null || floor($attempts) !== $attempts) {
+        if ($attempts === null || floor($attempts) !== $attempts) {
             return ['mode' => 'unknown', 'requires_waiver' => false,
                 'message' => 'Data nilai atau riwayat tes EPRT belum lengkap.'];
         }
@@ -58,4 +62,3 @@ class SidangTaAdmissionPolicy
         return is_finite($number) && $number >= 0 ? $number : null;
     }
 }
-

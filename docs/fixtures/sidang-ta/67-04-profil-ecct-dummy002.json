@@ -1,0 +1,24 @@
+{
+  "source": "DUMMY DEMO TA 67 - data sintetis, bukan data kampus resmi",
+  "total": 1,
+  "selected_menus": [
+    "bahasa"
+  ],
+  "data": [
+    {
+      "nim": "1202299002",
+      "nama": "Mahasiswa Dummy TA 2",
+      "nilai_bahasa": null,
+      "jenis_tes_bahasa": "Online ECCT",
+      "jumlah_tes_bahasa": 3,
+      "riwayat_nilai_bahasa": [
+        {
+          "jenis_tes": "Online ECCT",
+          "nilai": "3,5",
+          "kedaluwarsa": "19 Mei 2028",
+          "status_berlaku": "Berlaku"
+        }
+      ]
+    }
+  ]
+}

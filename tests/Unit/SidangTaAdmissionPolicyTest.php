@@ -87,7 +87,7 @@ test('meet_policy_eprt_below_450_before_three_tests_requires_retest', function (
 });
 
 test('meet_policy_eprt_unknown_data_never_activates_waiver_or_automatic_approval', function () {
-    foreach ([[null, 3], [449, null], [449, 2.5], [true, 3], [-1, 3], [449, -1], [NAN, 3], [449, INF], [[], 3]] as [$score, $attempts]) {
+    foreach ([[null, null], ['invalid', 3], [449, null], [449, 2.5], [true, 3], [-1, 3], [449, -1], [NAN, 3], [449, INF], [[], 3]] as [$score, $attempts]) {
         $result = Policy::eprt($score, $attempts);
         expect($result['mode'])->toBe('unknown');
         expect($result['requires_waiver'])->toBeFalse();
@@ -104,3 +104,15 @@ test('meet_policy_eprt_is_not_a_sixth_academic_gate_and_waiver_is_not_final_appr
     expect(Policy::eprt(449, 3))->not->toHaveKey('can_submit');
 });
 
+
+
+test('meet_policy_null_language_score_uses_official_count_without_inventing_zero', function () {
+    expect(Policy::eprt(null, 3)['mode'])->toBe('waiver');
+    expect(Policy::eprt(null, 3)['requires_waiver'])->toBeTrue();
+    expect(Policy::eprt(null, 4)['mode'])->toBe('waiver');
+    foreach ([0, 1, 2] as $count) {
+        expect(Policy::eprt(null, $count)['mode'])->toBe('retest');
+    }
+    expect(Policy::eprt(null, null)['mode'])->toBe('unknown');
+    expect(Policy::eprt('invalid', 3)['mode'])->toBe('unknown');
+});

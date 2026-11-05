@@ -291,7 +291,7 @@ class SyncController extends Controller
 
         $jsonString = file_get_contents($request->file('json_file')->getRealPath());
 
-        
+
 
         $data = json_decode($jsonString, true);
 
@@ -440,7 +440,7 @@ class SyncController extends Controller
             }
 
             $studyProgram = $row[5] ?? '';
-            
+
             $academicYearRaw = $row[10] ?? '';
             $academicYear = $academicYearRaw;
             if (strlen($academicYear) === 4 && is_numeric($academicYear)) {
@@ -811,7 +811,7 @@ class SyncController extends Controller
                                             ? (int) $row[6]
                                             : (strtoupper($semesterTerm ?? '') === 'GENAP' ? 2 : 1),
                     'semester_term'   => $semesterTerm,
-                            
+
                     'academic_year'   => $academicYear ?: null,
                     'credits'         => is_numeric($row[4] ?? null) ? (int) $row[4] : 3,
                     // enrolled_count TIDAK disimpan — kolom sudah dihapus dari tabel courses.
@@ -925,60 +925,45 @@ class SyncController extends Controller
         $request->validate([
             'json_file' => ['required', 'file', 'mimetypes:application/json,text/plain'],
         ]);
-
-        $jsonString = file_get_contents($request->file('json_file')->getRealPath());
-        $payload = json_decode($jsonString, true);
-
+        $payload = json_decode(file_get_contents($request->file('json_file')->getRealPath()), true);
         if (json_last_error() !== JSON_ERROR_NONE || !is_array($payload)) {
-            return back()->with('error', 'Format JSON tidak valid: ' . json_last_error_msg());
+            return back()->withErrors(['json_file' => 'Format JSON tidak valid.']);
         }
 
-        // Ambil array `data` dari wrapper JSON iGracias+BASILA
-        $data = $payload['data'] ?? $payload;
-
-        // Kalau root adalah object tunggal (bukan array of objects)
-        if (!empty($data) && !isset($data[0])) {
-            $data = [$data];
-        }
+        $wrapped = array_key_exists('data', $payload);
+        $data = $wrapped ? $payload['data'] : $payload;
+        if (!is_array($data)) return back()->withErrors(['json_file' => 'Data profil harus berupa array.']);
+        if (!array_is_list($data)) $data = [$data];
+        $context = $wrapped ? array_intersect_key($payload, array_flip(['selected_menus', 'finance_period'])) : [];
+        $context = \Illuminate\Support\Facades\Validator::make($context, [
+            'selected_menus' => ['sometimes', 'array', 'list'],
+            'selected_menus.*' => ['required', 'string'],
+            'finance_period' => ['sometimes', 'nullable', 'string', 'regex:/^\d{4}\/[12]$/D'],
+        ])->validate();
 
         $log = SyncLog::create([
-            'module'       => 'academic_profile',
-            'status'       => 'processing',
-            'triggered_by' => auth()->user()->email,
-            'started_at'   => now(),
+            'module' => 'academic_profile', 'status' => 'processing',
+            'triggered_by' => auth()->user()->email, 'started_at' => now(),
         ]);
-
         try {
-            $service = new StudentAcademicProfileImportService();
-            $result  = $service->import($data);
-
+            $result = app(StudentAcademicProfileImportService::class)->import(
+                $data, $context['selected_menus'] ?? null, $context['finance_period'] ?? null
+            );
             $log->update([
-                'status'            => 'completed',
-                'total_records'     => count($data),
+                'status' => 'completed', 'total_records' => count($data),
                 'processed_records' => $result['created'] + $result['updated'],
-                'skipped_records'   => $result['skipped'] + $result['mismatched'],
-                'error_message'     => !empty($result['errors'])
-                    ? implode(' | ', array_slice($result['errors'], 0, 10))
-                    : null,
-                'completed_at'      => now(),
+                'skipped_records' => $result['skipped'] + $result['mismatched'],
+                'error_message' => $result['errors'] === [] ? null : implode(' | ', array_slice($result['errors'], 0, 10)),
+                'completed_at' => now(),
             ]);
-
-            $msg = "Import Profil Akademik selesai: "
-                 . "{$result['created']} baru, {$result['updated']} diperbarui, "
-                 . "{$result['skipped']} dilewati, {$result['mismatched']} NIM-nama mismatch.";
-
-            return redirect()->route('sync.index')->with('success', $msg);
-
-        } catch (\Exception $e) {
-            Log::error('ImportAcademicProfile: ' . $e->getMessage());
-
-            $log->update([
-                'status'        => 'failed',
-                'error_message' => $e->getMessage(),
-                'completed_at'  => now(),
-            ]);
-
-            return back()->with('error', 'Terjadi kesalahan: ' . $e->getMessage());
+            $message = "Import Profil Akademik selesai: {$result['created']} baru, {$result['updated']} diperbarui, "
+                ."{$result['skipped']} dilewati, {$result['mismatched']} NIM-nama mismatch.";
+            if ($result['errors'] !== []) $message .= ' Ada catatan pada log sinkronisasi.';
+            return redirect()->route('sync.index')->with('success', $message);
+        } catch (\Throwable $exception) {
+            Log::warning('ImportAcademicProfile failed', ['exception' => $exception::class]);
+            $log->update(['status' => 'failed', 'error_message' => 'Import profil akademik gagal.', 'completed_at' => now()]);
+            return back()->with('error', 'Import profil akademik gagal. Periksa format dan log aplikasi.');
         }
     }
 
