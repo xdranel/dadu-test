@@ -43,7 +43,7 @@ Bagian command lengkap ditambahkan setelah file Docker diverifikasi. Jangan mema
 | docker/php/app.ini + pool.conf | Upload12M/file, POST192M,2 child PHP, opcache |
 | docker/nginx/default.conf | Root public, HTTPS dari proxy, auth reset/register guest ditutup |
 | docker/scripts/init-env.sh | Membuat APP_KEY/password baru sekali, mode0600; tidak menimpa existing |
-| docker/scripts/entrypoint.sh | Siapkan permission volume dan jalankan PHP sebagai www-data |
+| docker/scripts/entrypoint.sh | Siapkan volume; FPM master membuka log sebagai root, pool worker/CLI sebagai www-data |
 | docker/scripts/seed-test-accounts.php | Tiga akun staging manual dan role; bukan DatabaseSeeder umum |
 | docker/scripts/backup.sh | Dump SQL, storage/app, dan copy environment ke backups/ |
 | .gitignore | Mengecualikan .env.docker dan backups/ |
@@ -100,6 +100,9 @@ docker stop wedding-app-1 wedding-cloudflared-1 wedding-mysql-1
 Ini tidak menghapus volume atau data wedding. Jangan hentikan container cloudflared (tanpa prefix wedding), NPM, portfolio, atau Portainer. Jangan memakai docker system prune/volume prune untuk langkah ini. Jangan memakai tunnel wedding-staging-tunnel untuk DADU jika connector wedding dihentikan.
 
 ## E. Build dan bootstrap aplikasi — urutan satu per satu
+
+**Koreksi runtime63b:** image awal mengalami FPM exit78 karena master diturunkan ke www-data sebelum membuka log. File entrypoint dan pool sudah diperbaiki langsung. Untuk server yang sudah bootstrap dan saat ini Restarting(78), ikuti [63b](63b-koreksi-php-fpm-exit78.md) agar hanya pull/build/recreate app+web; jangan mengulang migration/seed/bootstrap.
+
 
 Pastikan terminal server berada di /opt/dadu-test. Build pertama bisa cukup lama pada Celeron; Composer check-platform-reqs akan menghentikan build jika PHP image yang didapat tidak memenuhi composer.lock. Jangan menambahkan --ignore-platform-reqs.
 
@@ -183,9 +186,10 @@ Di Cloudflare Zero Trust → Networks/Connectors → Tunnels, buka **xdranel-lap
 | Subdomain | dadu-test |
 | Domain | gendhiramona.site |
 | Path | kosong |
-| Service Type | HTTP |
-| URL |100.100.208.106:80 |
+| Service URL (field gabungan seperti screenshot pengguna) | http://100.100.208.106:80 |
 | HTTP Host Header (additional settings) | dadu-test.gendhiramona.site |
+
+Pada UI pengguna, Service URL adalah satu field gabungan dan wajib diawali http://. Nilai tanpa protokol pada panduan sebelumnya hanya berlaku bila UI mempunyai Type HTTP terpisah; screenshot terbaru menunjukkan UI berbeda. Pastikan tidak ada pesan Invalid service URL format dan klik Save. Jika browser masih server not found, ikuti [63a — koreksi Service URL dan DNS](63a-koreksi-service-url-tunnel-dan-dns.md).
 
 Jangan memasukkan URL publik wedding/login sebagai Service origin. Tidak perlu Tunnel baru, token baru, atau cloudflared container tambahan. CNAME DNS biasanya dibuat otomatis oleh dashboard Tunnel; jangan menambahkan A dan CNAME bersamaan pada nama dadu-test yang sama. DNS CNAME dan Tunnel yang kamu ingat itu dapat menjadi bagian jalur yang sama.
 

@@ -9,6 +9,9 @@ if [ "$(id -u)" = 0 ]; then
         storage/framework/sessions storage/framework/views storage/logs bootstrap/cache
     if [ "${1:-}" = php-fpm ]; then
         gosu www-data php artisan config:cache --no-ansi
+        # The official image opens container log descriptors in the FPM master.
+        # Keep the master privileged; pool workers drop to www-data themselves.
+        exec "$@"
     fi
     exec gosu www-data "$@"
 fi
