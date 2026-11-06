@@ -299,6 +299,10 @@ class SyncController extends Controller
             return back()->with('error', 'Format JSON tidak valid: ' . json_last_error_msg());
         }
 
+        if ($request->type === 'krs' && \App\Support\OfficialKrsJsonNormalizer::supports($data)) {
+            return $this->importOfficialKrs($data);
+        }
+
         // Handle case where root JSON contains the DataTables "aaData" key
         if (isset($data['aaData']) && is_array($data['aaData'])) {
             $data = $data['aaData'];
@@ -380,6 +384,38 @@ class SyncController extends Controller
             ]);
 
             return back()->with('error', 'Terjadi kesalahan saat mengimpor data: ' . $e->getMessage());
+        }
+    }
+
+    private function importOfficialKrs(array $payload)
+    {
+        try {
+            $rows = (new \App\Support\OfficialKrsJsonNormalizer)->rows($payload);
+        } catch (\InvalidArgumentException $exception) {
+            return back()->withErrors(['json_file' => $exception->getMessage()]);
+        }
+        $log = SyncLog::create([
+            'module' => 'krs', 'status' => 'processing', 'total_records' => count($rows),
+            'triggered_by' => auth()->user()->email, 'started_at' => now(),
+        ]);
+        try {
+            $result = app(\App\Services\OfficialKrsJsonImportService::class)->import($rows);
+            $skipped = $result['skipped'] + $result['mismatched'];
+            $log->update([
+                'status' => 'completed', 'processed_records' => $result['processed'],
+                'skipped_records' => $skipped,
+                'error_message' => $result['errors'] === [] ? null : implode(' | ', array_slice($result['errors'], 0, 10)),
+                'completed_at' => now(),
+            ]);
+            $message = "Import KRS resmi selesai: {$result['processed']} mahasiswa diproses, "
+                ."{$result['courses']} entri mata kuliah disimpan, {$result['skipped']} dilewati, "
+                ."{$result['mismatched']} NIM-nama mismatch, {$result['removed']} KRS lama pada periode terkait dihapus.";
+            if ($result['errors'] !== []) $message .= ' Ada catatan pada log sinkronisasi.';
+            return redirect()->route('sync.index')->with('success', $message);
+        } catch (\Throwable $exception) {
+            Log::warning('Official KRS import failed', ['exception' => $exception::class]);
+            $log->update(['status' => 'failed', 'error_message' => 'Import KRS resmi gagal.', 'completed_at' => now()]);
+            return back()->with('error', 'Import KRS resmi gagal. Periksa log aplikasi.');
         }
     }
 

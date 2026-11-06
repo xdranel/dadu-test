@@ -12,13 +12,14 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
+        // Fail before creating seed data if staging secrets/roster are incomplete.
+        app(DemoAccountSeeder::class)->plannedAccounts();
         $this->call([
             RoleSeeder::class,
             RolePermissionSeeder::class,
             UnitSeeder::class,
             SyncSettingSeeder::class,
-            UserSeeder::class,
-            SidangTaTesterSeeder::class,
+            DemoAccountSeeder::class,
             QueueTicketSeeder::class,
         ]);
     }

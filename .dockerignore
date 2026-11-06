@@ -19,6 +19,7 @@ tests
 docs
 academic-chatbot
 backups
+private-import
 *.sql
 *.sqlite
 *.sqlite3

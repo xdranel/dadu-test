@@ -162,6 +162,15 @@ services:
     environment:
       <<: *app-environment
       DADU_TEST_PASSWORD: ${DADU_TEST_PASSWORD:?Run the environment initializer first}
+      DADU_BLACKBOX_JSON: /run/demo/blackbox-accounts.json
+    volumes:
+      - app_storage:/var/www/html/storage
+      - type: bind
+        source: ${DADU_BLACKBOX_JSON_PATH:-./private-import/blackbox-accounts.json}
+        target: /run/demo/blackbox-accounts.json
+        read_only: true
+        bind:
+          create_host_path: false
     mem_limit: 512m
     cpus: 1.0
 

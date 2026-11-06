@@ -34,6 +34,12 @@ function academicJson66Row(array $overrides = []): array
     ], $overrides);
 }
 
+function financeJson73Row(array $overrides = []): array
+{
+    return array_replace(['no' => 1, 'nim' => '1202266001', 'nama' => 'Mahasiswa Sintetis JSON 66',
+        'semester' => '7', 'periode_keuangan' => '2627/1', 'status_keuangan' => 'KREDIT'], $overrides);
+}
+
 beforeEach(function () {
     $this->student = Student::create(['student_number' => '1202266001', 'name' => 'Mahasiswa Sintetis JSON 66',
         'academic_year' => 2022, 'study_program' => 'Informatika', 'status' => 'Aktif']);
@@ -330,4 +336,114 @@ test('json66_igracias_only_import_preserves_basila_until_photo_menu_is_explicitl
     ($this->import66)(academicJson66Row(['approval_foto_dosen_wali_basila' => 'N']), ['basila_foto']);
     expect($approval->fresh()->photo_approval)->toBeFalse();
     expect($approval->fresh()->status)->toBe('pending');
+});
+
+test('json73_finance_only_source_stores_official_period_and_does_not_overwrite_study_semester', function () {
+    $this->student->update(['active_semester' => 8]);
+    ($this->import66)(financeJson73Row(['semester' => '13']), ['keuangan']);
+    $profile = ($this->profile)();
+    expect($profile->groups['bpp']['period'])->toBe('2627/1');
+    expect($profile->groups['bpp']['source_semester'])->toBe('13');
+    expect($profile->bpp_periods['2627/1']['status'])->toBe('KREDIT');
+    expect((int) $this->student->fresh()->active_semester)->toBe(8);
+    expect((int) SyncLog::latest('id')->firstOrFail()->processed_records)->toBe(1);
+});
+
+test('json73_credit_to_paid_updates_the_same_confirmed_period_without_duplicate_profile', function () {
+    ($this->import66)(financeJson73Row(), ['keuangan']);
+    $id = ($this->profile)()->id;
+    ($this->import66)(financeJson73Row(['status_keuangan' => 'LUNAS']), ['keuangan']);
+    $profile = ($this->profile)();
+    expect($profile->id)->toBe($id);
+    expect($profile->bpp_periods)->toHaveCount(1);
+    expect($profile->bpp_periods['2627/1']['status'])->toBe('LUNAS');
+    expect(StudentAcademicProfile::where('student_number', $this->student->student_number)->count())->toBe(1);
+    expect(StudentBppPayment::where('student_number', $this->student->student_number)->value('status'))->toBe('LUNAS');
+});
+
+test('json73_new_finance_period_preserves_the_previous_periods_history', function () {
+    ($this->import66)(financeJson73Row(['status_keuangan' => 'LUNAS']), ['keuangan']);
+    ($this->import66)(financeJson73Row(['periode_keuangan' => '2627/2']), ['keuangan']);
+    $profile = ($this->profile)();
+    expect($profile->bpp_periods)->toHaveCount(2);
+    expect($profile->bpp_periods['2627/1']['status'])->toBe('LUNAS');
+    expect($profile->bpp_periods['2627/2']['status'])->toBe('KREDIT');
+    expect($profile->groups['bpp']['period'])->toBe('2627/2');
+});
+
+test('json73_finance_only_update_preserves_all_previously_imported_non_finance_groups', function () {
+    ($this->import66)(academicJson66Row(), null, '2627/1');
+    $before = ($this->profile)()->groups;
+    $studentBefore = $this->student->fresh()->only(['gpa', 'total_credits', 'active_semester']);
+    ($this->import66)(financeJson73Row(['semester' => '13', 'status_skpi' => null,
+        'nilai_bahasa' => null, 'total_tak' => 0]), ['keuangan']);
+    $after = ($this->profile)()->groups;
+    expect(array_diff_key($after, ['bpp' => true]))->toBe(array_diff_key($before, ['bpp' => true]));
+    expect($this->student->fresh()->only(['gpa', 'total_credits', 'active_semester']))->toBe($studentBefore);
+    expect($after['bpp']['status'])->toBe('KREDIT');
+});
+
+test('json73_invalid_official_period_preserves_bpp_while_other_selected_groups_can_update', function () {
+    ($this->import66)(academicJson66Row(), null, '2627/1');
+    $before = ($this->profile)();
+    $bppBefore = $before->groups['bpp'];
+    $periodsBefore = $before->bpp_periods;
+    ($this->import66)(financeJson73Row(['periode_keuangan' => '7', 'status_skpi' => 'Belum Disetujui']), ['keuangan', 'skpi']);
+    $after = ($this->profile)();
+    expect($after->groups['bpp'])->toBe($bppBefore);
+    expect($after->bpp_periods)->toBe($periodsBefore);
+    expect($after->groups['skpi']['status'])->toBe('Belum Disetujui');
+    expect(StudentBppPayment::where('student_number', $this->student->student_number)->value('status'))->toBe('LUNAS');
+    expect(SyncLog::latest('id')->firstOrFail()->error_message)->toContain('Periode BPP');
+});
+
+test('json73_conflicting_wrapper_period_does_not_replace_confirmed_bpp_data', function () {
+    ($this->import66)(financeJson73Row(['status_keuangan' => 'LUNAS']), ['keuangan']);
+    $before = ($this->profile)();
+    $groupsBefore = $before->groups;
+    $periodsBefore = $before->bpp_periods;
+    ($this->import66)(financeJson73Row(['periode_keuangan' => '2627/2']), ['keuangan'], '2627/1');
+    expect(($this->profile)()->groups)->toBe($groupsBefore);
+    expect(($this->profile)()->bpp_periods)->toBe($periodsBefore);
+    expect((int) SyncLog::latest('id')->firstOrFail()->skipped_records)->toBe(1);
+    expect(SyncLog::latest('id')->firstOrFail()->error_message)->not->toBeNull();
+});
+
+test('json73_finance_source_error_preserves_the_last_confirmed_payment', function () {
+    ($this->import66)(financeJson73Row(['status_keuangan' => 'LUNAS']), ['keuangan']);
+    $before = ($this->profile)()->bpp_periods;
+    ($this->import66)(financeJson73Row(['error' => 'keuangan: gagal mengambil data']), ['keuangan']);
+    expect(($this->profile)()->bpp_periods)->toBe($before);
+    expect(StudentBppPayment::where('student_number', $this->student->student_number)->value('status'))->toBe('LUNAS');
+    expect((int) SyncLog::latest('id')->firstOrFail()->skipped_records)->toBe(1);
+});
+
+test('json73_both_profile_upload_routes_read_native_per_row_finance_periods', function () {
+    foreach (['sync.import-json', 'sync.import-academic-profile'] as $routeName) {
+        ($this->postPayload)(['selected_menus' => ['keuangan'], 'total' => 1,
+            'data' => [financeJson73Row()]], $routeName)
+            ->assertRedirect(route('sync.index'))->assertSessionHasNoErrors()->assertSessionHas('success');
+        expect(($this->profile)()->groups['bpp']['period'])->toBe('2627/1');
+        expect(($this->profile)()->bpp_periods)->toHaveCount(1);
+    }
+});
+
+test('json73_finance_status_does_not_change_existing_academic_or_language_eligibility', function () {
+    ($this->import66)(academicJson66Row(), null, '2627/1');
+    \App\Models\AcademicPeriod::query()->update(['is_active' => false]);
+    $period = \App\Models\AcademicPeriod::create(['year' => '2026/2027', 'semester' => 1, 'label' => 'BPP 73',
+        'start_date' => '2026-08-01', 'end_date' => '2027-01-31', 'is_active' => true]);
+    \App\Models\StudentCourse::create(['student_number' => $this->student->student_number,
+        'course_code' => 'BPP73TA', 'course_name' => 'TUGAS AKHIR', 'course_class' => 'B73',
+        'academic_year' => '2026/2027', 'semester' => 7, 'academic_period_id' => $period->id]);
+    $facts = app(\App\Services\SidangTaAdmissionFacts::class);
+    $before = $facts->forStudent($this->student);
+    expect($before['academic']['academic_passed'])->toBeTrue();
+    foreach (['KREDIT', 'LUNAS'] as $status) {
+        ($this->import66)(financeJson73Row(['status_keuangan' => $status]), ['keuangan']);
+        $after = $facts->forStudent($this->student);
+        expect($after['academic'])->toBe($before['academic']);
+        expect($after['eprt'])->toBe($before['eprt']);
+        expect($after['krs_status'])->toBe('eligible');
+    }
 });

@@ -1,0 +1,24 @@
+{
+  "generated_at": "2026-11-06T12:00:00+07:00",
+  "source": "DUMMY DEMO TA 72 - struktur finance update, seluruh identitas sintetis",
+  "total": 2,
+  "selected_menus": ["keuangan"],
+  "data": [
+    {
+      "no": 1,
+      "nim": "1202200001",
+      "nama": "Krisna Mahasiswa",
+      "semester": "8",
+      "periode_keuangan": "2627/1",
+      "status_keuangan": "LUNAS"
+    },
+    {
+      "no": 2,
+      "nim": "1202299002",
+      "nama": "Mahasiswa Dummy TA 2",
+      "semester": "8",
+      "periode_keuangan": "2627/1",
+      "status_keuangan": "KREDIT"
+    }
+  ]
+}

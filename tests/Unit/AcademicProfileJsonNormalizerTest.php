@@ -216,3 +216,69 @@ test('json65_result_from_previous_call_is_not_kept_for_another_student', functio
     expect($normalizer->normalize(['status_skpi' => 'Disetujui'])['updates']['skpi']['approved'])->toBeTrue();
     expect($normalizer->normalize([]))->toBe(['updates' => [], 'skipped' => []]);
 });
+
+test('json73_bpp_reads_official_period_separately_from_the_study_semester', function () {
+    $bpp = (new Normalizer)->normalize(['status_keuangan' => 'KREDIT',
+        'periode_keuangan' => '2627/1', 'semester' => '13'], ['keuangan'])['updates']['bpp'];
+    expect($bpp['period'])->toBe('2627/1');
+    expect($bpp['source_semester'])->toBe('13');
+    expect($bpp['status'])->toBe('KREDIT');
+});
+
+test('json73_bpp_reads_and_trims_official_even_term_without_a_study_semester', function () {
+    $bpp = (new Normalizer)->normalize(['status_keuangan' => 'LUNAS',
+        'periode_keuangan' => ' 2627/2 '], ['keuangan'])['updates']['bpp'];
+    expect($bpp['period'])->toBe('2627/2');
+    expect($bpp['source_semester'])->toBeNull();
+});
+
+test('json73_malformed_explicit_period_skips_bpp_without_losing_successful_skpi', function () {
+    foreach ([null, '', ' ', '7', '2026/2027', '2627/3', '2627/0', 26271, true, []] as $period) {
+        $result = (new Normalizer)->normalize(['status_keuangan' => 'LUNAS',
+            'periode_keuangan' => $period, 'status_skpi' => 'Disetujui']);
+        expect($result['updates'])->not->toHaveKey('bpp');
+        expect($result['skipped'])->toHaveKey('bpp');
+        expect($result['updates']['skpi']['approved'])->toBeTrue();
+    }
+});
+
+test('json73_official_period_must_agree_with_confirmed_wrapper_context', function () {
+    $row = ['status_keuangan' => 'LUNAS', 'periode_keuangan' => '2627/1', 'semester' => '7'];
+    expect((new Normalizer)->normalize($row, ['keuangan'], '2627/1')['updates']['bpp']['period'])->toBe('2627/1');
+    $result = (new Normalizer)->normalize($row, ['keuangan'], '2627/2');
+    expect($result['updates'])->not->toHaveKey('bpp');
+    expect($result['skipped'])->toHaveKey('bpp');
+});
+
+test('json73_official_period_cannot_conflict_with_a_legacy_semester_period', function () {
+    $row = ['status_keuangan' => 'LUNAS', 'periode_keuangan' => '2627/1', 'semester' => '2627/2'];
+    expect((new Normalizer)->normalize($row)['skipped'])->toHaveKey('bpp');
+    $row['semester'] = '2627/1';
+    expect((new Normalizer)->normalize($row, null, '2627/1')['updates']['bpp']['period'])->toBe('2627/1');
+});
+
+test('json73_keuangan_not_selected_or_source_error_preserves_the_bpp_group', function () {
+    $row = ['status_keuangan' => 'LUNAS', 'periode_keuangan' => '2627/1', 'status_skpi' => 'Disetujui'];
+    expect((new Normalizer)->normalize($row, ['skpi'])['updates'])->not->toHaveKey('bpp');
+    $row['error'] = 'keuangan: gateway gagal';
+    $result = (new Normalizer)->normalize($row);
+    expect($result['skipped'])->toHaveKey('bpp');
+    expect($result['updates']['skpi']['approved'])->toBeTrue();
+});
+
+test('json73_rows_can_have_different_confirmed_periods_without_shared_state', function () {
+    $normalizer = new Normalizer;
+    foreach (['2627/1', '2627/2', '2728/1'] as $period) {
+        $result = $normalizer->normalize(['status_keuangan' => 'LUNAS', 'periode_keuangan' => $period]);
+        expect($result['updates']['bpp']['period'])->toBe($period);
+    }
+});
+
+test('json73_old_exports_remain_supported_without_inventing_a_finance_period', function () {
+    $normalizer = new Normalizer;
+    $row = ['status_keuangan' => 'LUNAS', 'semester' => 7];
+    expect($normalizer->normalize($row)['updates']['bpp']['period'])->toBeNull();
+    expect($normalizer->normalize($row, null, '2627/1')['updates']['bpp']['period'])->toBe('2627/1');
+    $row['semester'] = '2627/2';
+    expect($normalizer->normalize($row)['updates']['bpp']['period'])->toBe('2627/2');
+});

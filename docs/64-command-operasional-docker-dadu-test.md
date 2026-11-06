@@ -30,7 +30,7 @@ Seluruh command berikut dijalankan **di server dari folder ini**, kecuali bila d
 | db | MySQL DADU; database `dadu`, volume terpisah dari wedding |
 | scheduler | Menjalankan jadwal aplikasi, termasuk expiry revisi TA |
 | worker | Satu proses untuk job antrean Laravel |
-| setup | Bootstrap tiga akun staging; hanya dipakai secara eksplisit |
+| setup | Bootstrap dua akun tetap + 11 akun blackbox; hanya dipakai secara eksplisit, lihat75 |
 
 NPM, cloudflared, Portainer dan aplikasi lain berada di luar stack DADU. Command Compose di folder ini hanya mengelola stack DADU.
 
@@ -232,7 +232,7 @@ docker compose --env-file .env.docker run --rm --no-deps app php artisan migrate
 
 Command `run` memakai entrypoint sehingga CLI otomatis menjadi www-data. MySQL harus sehat karena `--no-deps` tidak menyalakan dependency otomatis.
 
-Untuk server ini, migrate rutin memakai `migrate --force` tanpa `--seed`. Jangan memakai `migrate:fresh`, `migrate:refresh` atau default DatabaseSeeder sebagai perintah update: data dapat hilang atau akun password default dibuat lagi. Rollback migration bukan langkah pemulihan otomatis; lihat migration spesifik dan backup sebelum memutuskan.
+Untuk server ini, migrate rutin memakai `migrate --force` tanpa `--seed`. Jangan memakai `migrate:fresh`, `migrate:refresh` atau default DatabaseSeeder sebagai perintah update rutin. Reset penuh yang sengaja diminta pengguna mempunyai panduan tersendiri di [75](75-reset-demo-lokal-docker-dan-urutan-impor.md), termasuk roster privat dan password sesuai lingkungan. Rollback migration bukan langkah pemulihan otomatis; lihat migration spesifik dan backup sebelum memutuskan.
 
 ## 10. Maintenance mode
 
@@ -284,6 +284,8 @@ Pakai ini setelah kode yang ingin dipasang sudah di-commit/push ke repo dadu-tes
 
 Blok ini berjalan sebagai satu script dan berhenti bila ada command gagal. Build dilakukan sebelum maintenance agar proses build tidak memperpanjang waktu503. Backup dilakukan sesudah proses background dihentikan, sebelum migration. Hentikan aktivitas penguji ketika memasuki maintenance.
 
+Karena script dibaca melalui heredoc, command container di bawah menonaktifkan input interaktif dengan `--interactive=false`; `-T` hanya menonaktifkan TTY. Backup juga memakai stdin kosong agar command `exec` di dalamnya tidak membaca sisa script. Tanpa penjagaan ini, command container yang membaca stdin dapat menghabiskan baris berikutnya, termasuk `artisan up`. Ini kemungkinan dari rescan, bukan penyebab insiden yang sudah terbukti karena output lengkap update belum tersedia. Referensi: [Compose exec](https://docs.docker.com/reference/cli/docker/compose/exec/) dan [Compose run](https://docs.docker.com/reference/cli/docker/compose/run/), diperiksa melalui Context7.
+
 ```bash
 bash <<'DADU_UPDATE'
 set -euo pipefail
@@ -297,14 +299,14 @@ git pull --ff-only origin main
 COMPOSE_PARALLEL_LIMIT=1 "${compose[@]}" build app
 COMPOSE_PARALLEL_LIMIT=1 "${compose[@]}" build web
 
-"${compose[@]}" exec -T --user www-data app php artisan down --retry=60
+"${compose[@]}" exec -T --interactive=false --user www-data app php artisan down --retry=60
 "${compose[@]}" stop scheduler worker
-bash docker/scripts/backup.sh
-"${compose[@]}" run --rm --no-deps app php artisan migrate --force
+bash docker/scripts/backup.sh </dev/null
+"${compose[@]}" run -T --interactive=false --rm --no-deps app php artisan migrate --force
 
 # /up is exempt from maintenance, allowing --wait to check the new FPM/web.
 "${compose[@]}" up -d --no-deps --force-recreate --wait --wait-timeout 240 app web
-"${compose[@]}" exec -T --user www-data app php artisan up
+"${compose[@]}" exec -T --interactive=false --user www-data app php artisan up
 "${compose[@]}" up -d --no-deps --force-recreate --wait --wait-timeout 240 scheduler worker
 "${compose[@]}" ps
 DADU_UPDATE
@@ -313,6 +315,98 @@ DADU_UPDATE
 Sesudah selesai, cek halaman login/upload di browser. Jangan menjalankan setup akun lagi pada update normal. Recreate web membuat Nginx me-resolve ulang alamat app; recreate worker/scheduler memastikan proses panjang memakai image baru.
 
 Jika script gagal sebelum maintenance, aplikasi lama biasanya masih berjalan. Jika gagal setelah maintenance/migration, simpan output, lihat status/log, dan periksa backup; jangan langsung menjalankan `migrate:fresh`, rollback schema, atau menghapus volume. Catat commit lama yang dicetak untuk rencana pemulihan kode yang sesuai dengan schema.
+
+### Pemulihan jika sesudah update tetap 503 Service Unavailable
+
+Script mengaktifkan `artisan down --retry=60` sebelum backup/migration. Nilai60 mengisi header `Retry-After`, **bukan** timer yang otomatis membuka aplikasi setelah60 detik. Jika script terhenti atau baris akhirnya tidak dijalankan, maintenance tetap aktif pada volume storage meskipun container di-recreate. Endpoint `/up` dapat tetap200 ketika `/login`503; healthcheck/container healthy saja belum membuktikan aplikasi terbuka bagi pengguna.
+
+Jalankan di **server**, dari `/opt/dadu-test`, untuk memeriksa status dan migration terlebih dahulu:
+
+```bash
+cd /opt/dadu-test
+docker compose --env-file .env.docker ps -a
+docker compose --env-file .env.docker exec --user www-data app php artisan migrate:status
+```
+
+Jika langkah migration berhasil, seluruh migration berstatus `Ran`, dan app/web berjalan, nonaktifkan maintenance lalu uji halaman pengguna:
+
+```bash
+docker compose --env-file .env.docker exec --user www-data app php artisan up
+curl --max-time 10 -sS -o /dev/null -w 'LOGIN HTTP %{http_code}\n' http://127.0.0.1:8091/login
+curl --connect-timeout 10 --max-time 20 -sS -o /dev/null \
+  -w 'PUBLIC LOGIN HTTP %{http_code}\n' https://dadu-test.gendhiramona.site/login
+```
+
+Harapan: `Application is now live.`, `LOGIN HTTP 200`, dan `PUBLIC LOGIN HTTP 200`. Jika migration masih `Pending`, gagal, atau app/web bermasalah, simpan output terakhir update dan periksa log bagian7 sebelum membuka maintenance. Jangan memasang trap yang selalu menjalankan `artisan up` saat gagal: schema dan image mungkin belum siap melayani request.
+
+Periksa juga scheduler/worker pada hasil `ps -a`: `artisan up` tidak menghidupkan container yang tadi dihentikan. Bila update/migration serta app/web sudah terverifikasi dan scheduler/worker masih berhenti, lanjutkan langkah akhir update:
+
+```bash
+docker compose --env-file .env.docker up -d --no-deps --force-recreate --wait --wait-timeout 240 scheduler worker
+docker compose --env-file .env.docker ps -a
+```
+
+**Bukti insiden:** pengguna melaporkan503 setelah menjalankan bagian12. Pemeriksaan asisten menemukan503 dengan `Retry-After: 60` dan `/up`200. Pengguna kemudian menjalankan `artisan up`, mendapat `Application is now live.`, dan login lokal200. Pemeriksaan ulang asisten pada URL login publik juga200. Ini membuktikan pemulihan HTTP dari maintenance; output lengkap script, status migration, dan status scheduler/worker saat insiden belum diberikan, sehingga langkah awal yang terhenti belum dapat dipastikan.
+
+### Pemulihan jika sinkronisasi lokal berhasil tetapi Docker tetap memakai data/tampilan lama
+
+Pada insiden berikutnya, SKPI lokal berubah menjadi Disetujui sesudah sinkronisasi, tetapi pada Docker data Krisna dan Dummy002 tetap belum tersedia. Pemeriksaan membuktikan source di host sudah baru, sedangkan container app masih memakai kode lama:
+
+| File | Source host | Container app saat insiden |
+| --- | --- | --- |
+| `app/Services/SidangTaAdmissionFacts.php` | Prefix SHA-256 `09fdc3b82618` | Prefix SHA-256 `a9f43164c0d1`, berbeda |
+| `app/Services/AcademicProfileJsonImportService.php` | File tersedia | `No such file or directory` |
+
+`artisan up` hanya membuka maintenance. `git pull` memperbarui source host, build menghasilkan image baru, dan recreate mengganti container agar memakai image itu. Source PHP tidak di-bind dari host pada stack ini, sehingga restart saja tidak memasang source/image baru. Status login200 belum membuktikan kode di container sudah sesuai.
+
+**1. Bandingkan file host dengan container sebelum memutuskan pemulihan.** Jalankan di server:
+
+```bash
+cd /opt/dadu-test
+sha256sum \
+  app/Services/SidangTaAdmissionFacts.php \
+  app/Services/AcademicProfileJsonImportService.php
+docker compose --env-file .env.docker exec -T --interactive=false --user www-data app \
+  sha256sum \
+  app/Services/SidangTaAdmissionFacts.php \
+  app/Services/AcademicProfileJsonImportService.php
+```
+
+Cocokkan hash berdasarkan nama file. Nilai hash mengikuti commit yang sedang dipasang, bukan harus sama dengan contoh insiden di atas. File yang ada di host tetapi hilang di container, atau hash yang berbeda, menunjukkan source runtime belum sesuai dengan host.
+
+**2. Jika source host sudah benar tetapi container masih lama, build dan terapkan image baru.** Untuk update kode dari main, gunakan blok update utama di awal bagian12. Jika source yang benar sudah tersedia di `/opt/dadu-test` seperti insiden ini, blok pemulihan berikut dapat langsung dipakai:
+
+```bash
+bash <<'DADU_FIX'
+set -euo pipefail
+cd /opt/dadu-test
+compose=(docker compose --env-file .env.docker)
+
+"${compose[@]}" config --quiet
+COMPOSE_PARALLEL_LIMIT=1 "${compose[@]}" build app
+COMPOSE_PARALLEL_LIMIT=1 "${compose[@]}" build web
+
+"${compose[@]}" exec -T --interactive=false --user www-data app php artisan down --retry=60
+"${compose[@]}" stop scheduler worker
+bash docker/scripts/backup.sh </dev/null
+"${compose[@]}" run -T --interactive=false --rm --no-deps app php artisan migrate --force
+
+"${compose[@]}" up -d --no-deps --force-recreate --wait --wait-timeout 240 app web
+"${compose[@]}" exec -T --interactive=false --user www-data app php artisan up
+"${compose[@]}" up -d --no-deps --force-recreate --wait --wait-timeout 240 scheduler worker
+"${compose[@]}" ps -a
+DADU_FIX
+```
+
+Script mengambil backup sebelum migration dan berhenti jika ada command gagal. Pemulihan ini memakai `migrate --force` untuk migration yang belum diterapkan; tidak memerlukan `migrate:fresh --seed` yang menghapus seluruh tabel. Jika script berhenti, simpan error terakhir dan tangani langkah yang gagal sebelum melanjutkan.
+
+**3. Verifikasi kode runtime, lalu impor ulang data yang sebelumnya diproses kode lama.** Ulangi pemeriksaan hash pada langkah1: kedua file harus tersedia dan hash host/container cocok. Cek login lokal/publik seperti langkah pemulihan503 di atas.
+
+Sesudah kode cocok, login superadmin dan impor ulang `67-03-profil-akademik-akun-demo.json` dengan tipe **Profil Akademik**, lalu buka ulang halaman mahasiswa. File ini berisi dua mahasiswa demo; untuk kedua baris yang berhasil, total baru+diperbarui diharapkan2 tanpa skipped/mismatch. Periksa ringkasan/log sinkronisasi karena status selesai sendiri belum menjamin semua baris diproses.
+
+Jika log melaporkan mahasiswa belum ada atau NIM-nama mismatch, cocokkan data Student dengan `67-01-mahasiswa-akun-demo.json` dan ikuti urutan impor pada67 bagian2.2. Impor ulang KRS hanya diperlukan sesuai kebutuhan data/periode, bukan untuk mengganti kode runtime. Keterangan periode BPP belum terkonfirmasi merupakan cakupan tampilan yang masih dicatat pada68; jangan menyamakan semua label yang belum berubah dengan kegagalan impor SKPI.
+
+**Hasil pemulihan:** setelah diberikan blok build/migration/recreate dan langkah verifikasi/impor ulang tersebut, pengguna mengonfirmasi aplikasi sudah berjalan dan berhasil. Bukti hash sebelum pemulihan membuktikan container lama; pengguna belum mengirim output hash sesudah pemulihan. Penanganan tidak membutuhkan reset database atau seed ulang akun. Ini tidak menetapkan command mana yang membuat update awal terhenti.
 
 ## 13. Mengubah environment atau konfigurasi deployment
 
@@ -436,13 +530,14 @@ Melihat password hosting untuk dibagikan ke penguji melalui jalur internal:
 grep '^DADU_TEST_PASSWORD=' .env.docker
 ```
 
-**Bootstrap ulang tiga akun** mengubah password/role sesuai file env dan menyetel ulang settings sinkronisasi:
+**Bootstrap ulang akun demo** mengubah password/role sesuai kebijakan75 dan menyetel ulang settings sinkronisasi. Siapkan roster privat serta izin baca menurut [75 bagian4](75-reset-demo-lokal-docker-dan-urutan-impor.md#4-reset-docker-dadu-test), lalu periksa dahulu:
 
 ```bash
-docker compose --env-file .env.docker run --rm --no-deps setup
+docker compose --env-file .env.docker run -T --interactive=false --rm --no-deps setup php docker/scripts/seed-test-accounts.php --check
+docker compose --env-file .env.docker run -T --interactive=false --rm --no-deps setup
 ```
 
-Gunakan ketika memang ingin bootstrap/reset ketiga akun, bukan tiap kali menyalakan aplikasi. Akunnya superadmin@example.test, krisna@mahasiswa.test dan dummy-ta-2@mahasiswa.test. Setup tidak mengimpor JSON atau membuat periode sidang TA terbuka. Flag demo periode akademik ada pada63 untuk bootstrap awal.
+Jalankan command kedua hanya jika preflight berhasil dan memang ingin memperbarui akun. Dua akun tetap adalah superadmin@example.test dan krisna@mahasiswa.test, memakai DADU_TEST_PASSWORD yang sudah ada. Sebelas akun dari roster memakai email nama lengkap huruf kecil tanpa spasi dan password `password`. Dummy002 tidak dibuat lagi. Setup tidak menghapus akun lama, tidak mengimpor JSON, dan tidak membuat periode sidang TA terbuka. Periode akademik Ganjil 2026/2027 dibuat bila belum tersedia; periode aktif yang sudah ada dipertahankan. Untuk jumlah akun persis13 sesudah reset penuh, gunakan prosedur fresh/seed pada75; bukan command rutin ini.
 
 **Pratinjau pembersihan data TA** (belum menghapus):
 

@@ -75,7 +75,8 @@ test('users can logout', function () {
 });
 
 test('sso login works for mock student and syncs to database', function () {
-    $this->seed();
+    // SSO must provision its own identity; the default demo accounts now use manual login.
+    $this->seed([\Database\Seeders\RoleSeeder::class, \Database\Seeders\RolePermissionSeeder::class]);
     ($this->fakeStudentGateway)();
 
     $response = $this->post('/auth/login-proses', [

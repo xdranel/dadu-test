@@ -88,24 +88,36 @@ class AcademicProfileJsonNormalizer
         $raw = $this->text($row['status_keuangan_asli'] ?? null);
         $semester = $row['semester'] ?? null;
         $semester = $this->text(is_int($semester) ? (string) $semester : $semester);
-        $rowPeriod = $semester !== null && preg_match('/^\d{4}\/[12]$/D', $semester) === 1 ? $semester : null;
-        if ($financePeriod !== null) {
-            $financePeriod = trim($financePeriod);
-            if (preg_match('/^\d{4}\/[12]$/D', $financePeriod) !== 1) {
+
+        $sources = [];
+        if (array_key_exists('periode_keuangan', $row)) $sources[] = $row['periode_keuangan'];
+        if ($financePeriod !== null) $sources[] = $financePeriod;
+        $periods = [];
+        foreach ($sources as $source) {
+            if (!is_string($source) || preg_match('/^\d{4}\/[12]$/D', trim($source)) !== 1) {
                 throw new InvalidArgumentException('Periode BPP harus berbentuk 2627/1 atau 2627/2.');
             }
-            if ($rowPeriod !== null && $rowPeriod !== $financePeriod) {
-                throw new InvalidArgumentException('Periode BPP pada baris berbeda dengan konteks impor.');
-            }
+            $periods[] = trim($source);
+        }
+        // Compatibility: old exports sometimes put an explicit period in semester.
+        // A study semester such as 7 or 13 is never converted into a payment period.
+        if ($semester !== null && preg_match('/^\d{4}\/[12]$/D', $semester) === 1) {
+            $periods[] = $semester;
+        }
+        if (count(array_unique($periods)) > 1) {
+            throw new InvalidArgumentException($financePeriod !== null
+                ? 'Periode BPP pada baris berbeda dengan konteks impor.'
+                : 'Sumber periode BPP saling bertentangan; data lama dipertahankan.');
         }
         return [
             'status' => $status === 'PERLU VERIFIKASI' && $raw === 'KREDIT' ? 'KREDIT' : $status,
             'source_status' => $status,
             'raw_status' => $raw,
             'source_semester' => $semester,
-            'period' => $financePeriod ?? $rowPeriod,
+            'period' => $periods[0] ?? null,
         ];
     }
+
 
     private function text(mixed $value): ?string
     {

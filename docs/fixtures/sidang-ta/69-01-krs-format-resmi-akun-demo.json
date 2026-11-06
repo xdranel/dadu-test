@@ -1,0 +1,42 @@
+{
+  "generated_at": "2026-11-06T10:00:00+07:00",
+  "source": "DUMMY DEMO TA 69 - struktur KRS resmi, seluruh identitas sintetis",
+  "total": 2,
+  "selected_menus": ["krs_mk"],
+  "data": [
+    {
+      "no": 1,
+      "nim": "1202200001",
+      "nama": "Krisna Mahasiswa",
+      "jumlah_mk_krs": 1,
+      "krs_mata_kuliah": [
+        {
+          "kode_mk": "DEMO67-TA",
+          "nama_mk": "TUGAS AKHIR",
+          "kelas": "DEMO67",
+          "kode_dosen": "DEMO69",
+          "tahun_ajaran": "2627",
+          "semester": "1",
+          "program_studi": "Informatika"
+        }
+      ]
+    },
+    {
+      "no": 2,
+      "nim": "1202299002",
+      "nama": "Mahasiswa Dummy TA 2",
+      "jumlah_mk_krs": 1,
+      "krs_mata_kuliah": [
+        {
+          "kode_mk": "DEMO67-TA2",
+          "nama_mk": "TUGAS AKHIR 2",
+          "kelas": "DEMO67",
+          "kode_dosen": "DEMO69",
+          "tahun_ajaran": "2627",
+          "semester": "1",
+          "program_studi": "Informatika"
+        }
+      ]
+    }
+  ]
+}
