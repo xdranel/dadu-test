@@ -11,13 +11,57 @@ class Student extends Model
         'profile_photo', 'faculty', 'study_program', 'academic_year',
         'active_semester', 'status', 'class_name', 'academic_advisor',
         'email', 'phone_number',
-        // Scraping columns (from iGracias portal)
         'parent_phone_number', 'high_school',
         'passed_tpb', 'passed_tkii', 'passed_tkiii', 'passed_tkiv',
         'total_credits', 'gpa',
     ];
 
     protected $hidden = ['phone_number'];
+
+    private ?User $ssoUserCache = null;
+    private bool $ssoUserResolved = false;
+
+    /**
+     * Akun user (hasil login SSO) yang terhubung ke mahasiswa ini.
+     * Dicocokkan lewat NIM: users.employee_id atau users.username.
+     */
+    public function getSsoUserAttribute(): ?User
+    {
+        if (!$this->ssoUserResolved) {
+            $this->ssoUserCache = $this->student_number
+                ? User::where('employee_id', $this->student_number)
+                    ->orWhere('username', $this->student_number)
+                    ->first()
+                : null;
+            $this->ssoUserResolved = true;
+        }
+
+        return $this->ssoUserCache;
+    }
+
+    /** Email institusi: dari SSO ('email'), fallback ke data mahasiswa. */
+    public function getInstitutionalEmailAttribute(): ?string
+    {
+        return $this->sso_user?->email ?: $this->email;
+    }
+
+    /** Nomor HP: dari SSO ('phone'), fallback ke data mahasiswa. */
+    public function getContactPhoneAttribute(): ?string
+    {
+        return $this->sso_user?->phone ?: $this->phone_number;
+    }
+
+    /** URL foto profil: dari SSO ('photo') berupa URL penuh, fallback ke file upload lokal. */
+    public function getPhotoUrlAttribute(): ?string
+    {
+        $photo = $this->sso_user?->photo ?: $this->profile_photo;
+
+        if (!$photo) {
+            return null;
+        }
+
+        return preg_match('#^https?://#i', $photo) ? $photo : \Illuminate\Support\Facades\Storage::url($photo);
+    }
 
     public function courses()
     {

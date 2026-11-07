@@ -1,13 +1,13 @@
 <?php
 use App\Models\User;
 use Illuminate\Support\Facades\Http;
-
-
 use Illuminate\Http\Client\Request as HttpRequest;
 
 beforeEach(function () {
+    config(['app.env' => 'testing']);
     config(['services.recaptcha.enabled' => true]);
     Http::preventStrayRequests();
+
     $this->fakeStudentGateway = function () {
         Http::fake([
             'https://www.google.com/recaptcha/api/siteverify' => Http::response(['success' => true]),
@@ -15,12 +15,15 @@ beforeEach(function () {
                 if ($request['username'] === '1202200001' && $request['password'] === 'password') {
                     return Http::response(['token' => 'test-student-token']);
                 }
-                return Http::response(['message' => 'Username atau password salah.'], 401);
+                return Http::response(['message' => 'Username atau password SSO tidak valid.'], 401);
             },
             '*/issueprofile' => Http::response([
-                'user' => '1202200001', 'fullname' => 'KRISNA MAHASISWA',
-                'email' => 'krisna@mahasiswa.test', 'phone' => '081234567890',
-                'numberid' => '1202200001', 'studyprogram' => 'Informatika',
+                'user' => '1202200001',
+                'fullname' => 'KRISNA MAHASISWA',
+                'email' => 'krisna@mahasiswa.test',
+                'phone' => '081234567890',
+                'numberid' => '1202200001',
+                'studyprogram' => 'Informatika',
             ]),
         ]);
     };
@@ -74,7 +77,30 @@ test('users can logout', function () {
     $response->assertRedirect('/login');
 });
 
+test('in local environment authentication uses local database directly', function () {
+    config(['app.env' => 'local']);
+    Http::fake([
+        'https://www.google.com/recaptcha/api/siteverify' => Http::response(['success' => true]),
+    ]);
+
+    $user = User::factory()->create([
+        'username' => 'testlocaluser',
+        'password' => bcrypt('password123'),
+        'status' => 'active',
+    ]);
+
+    $response = $this->post('/auth/login-proses', [
+        'username' => 'testlocaluser',
+        'password' => 'password123',
+        'g-recaptcha-response' => 'mock-token',
+    ]);
+
+    $this->assertAuthenticated();
+    $response->assertRedirect('/dashboard');
+});
+
 test('sso login works for mock student and syncs to database', function () {
+    config(['app.env' => 'testing']);
     // SSO must provision its own identity; the default demo accounts now use manual login.
     $this->seed([\Database\Seeders\RoleSeeder::class, \Database\Seeders\RolePermissionSeeder::class]);
     ($this->fakeStudentGateway)();
@@ -97,11 +123,11 @@ test('sso login works for mock student and syncs to database', function () {
         && $request['username'] === '1202200001' && $request['password'] === 'password');
     Http::assertSent(fn (HttpRequest $request) => str_ends_with($request->url(), '/issueprofile')
         && $request->hasHeader('Authorization', 'Bearer test-student-token'));
-
 });
 
 test('sso login works for mock dosen and syncs to database', function () {
-    $this->seed();
+    config(['app.env' => 'testing']);
+    $this->seed([\Database\Seeders\RoleSeeder::class, \Database\Seeders\RolePermissionSeeder::class]);
 
     Http::fake([
         'https://www.google.com/recaptcha/api/siteverify' => Http::response(['success' => true]),
@@ -133,7 +159,8 @@ test('sso login works for mock dosen and syncs to database', function () {
 });
 
 test('sso login fails with wrong password and returns expected error message', function () {
-    $this->seed();
+    config(['app.env' => 'testing']);
+    $this->seed([\Database\Seeders\RoleSeeder::class, \Database\Seeders\RolePermissionSeeder::class]);
     ($this->fakeStudentGateway)();
 
     $response = $this->post('/auth/login-proses', [
@@ -144,13 +171,14 @@ test('sso login fails with wrong password and returns expected error message', f
 
     $this->assertGuest();
     $response->assertSessionHasErrors([
-        'username' => 'Username atau password salah.',
+        'username' => 'Username atau password SSO tidak valid.',
     ]);
     Http::assertNotSent(fn (HttpRequest $request) => str_ends_with($request->url(), '/issueprofile'));
 });
 
 test('sso login fails with unknown username and returns expected error message', function () {
-    $this->seed();
+    config(['app.env' => 'testing']);
+    $this->seed([\Database\Seeders\RoleSeeder::class, \Database\Seeders\RolePermissionSeeder::class]);
     ($this->fakeStudentGateway)();
 
     $response = $this->post('/auth/login-proses', [
@@ -161,13 +189,14 @@ test('sso login fails with unknown username and returns expected error message',
 
     $this->assertGuest();
     $response->assertSessionHasErrors([
-        'username' => 'Username atau password salah.',
+        'username' => 'Username atau password SSO tidak valid.',
     ]);
     Http::assertNotSent(fn (HttpRequest $request) => str_ends_with($request->url(), '/issueprofile'));
 });
 
 test('sso login works when user inputs full campus email address', function () {
-    $this->seed();
+    config(['app.env' => 'testing']);
+    $this->seed([\Database\Seeders\RoleSeeder::class, \Database\Seeders\RolePermissionSeeder::class]);
     ($this->fakeStudentGateway)();
 
     $response = $this->post('/auth/login-proses', [

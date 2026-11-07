@@ -31,6 +31,8 @@ Schedule::call(function () {
                     'called_by' => $ticket->called_by ?? null,
                     'called_at' => $ticket->called_at,
                     'finished_at' => $ticket->finished_at,
+                    'skipped_at' => $ticket->skipped_at ?? null,
+                    'skipped_by' => $ticket->skipped_by ?? null,
                     'created_at' => $ticket->created_at,
                     'updated_at' => $ticket->updated_at,
                 ]
@@ -48,6 +50,13 @@ Schedule::call(function () {
         DB::table('queue_tickets')->delete();
     });
 })->dailyAt('08:00')->timezone('Asia/Jakarta');
+
+// Export otomatis arsip bulanan antrian pada tanggal 1 tiap bulan jam 01:00 WIB
+Schedule::command('queue:export-month')
+    ->monthlyOn(1, '01:00')
+    ->timezone('Asia/Jakarta')
+    ->withoutOverlapping()
+    ->onOneServer();
 
 Schedule::command('sidang-ta:expire-revisions')->everyMinute()->withoutOverlapping(10);
 

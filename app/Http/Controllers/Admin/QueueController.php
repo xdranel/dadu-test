@@ -39,6 +39,7 @@ class QueueController extends Controller
         $state = null;
         $currentCall = null;
         $isBackActive = false;
+        $hasCalledTicket = false;
 
         if ($selectedCounter) {
             $state = QueueState::firstOrCreate(
@@ -47,6 +48,7 @@ class QueueController extends Controller
             );
             $currentCall = $state->current_id ? QueueTicket::find($state->current_id) : null;
             $isBackActive = $state->last_id !== null;
+            $hasCalledTicket = $currentCall && $currentCall->status === 'called';
         }
 
         // Statistik per-loket hari ini
@@ -54,8 +56,16 @@ class QueueController extends Controller
         foreach ($counters as $c) {
             $counterStats[$c->id] = [
                 'finished_today' => QueueTicket::where('counter_id', $c->id)
-                    ->whereDate('created_at', $today)
-                    ->where('status', 'finished')
+                    ->where(function ($q) use ($today) {
+                        $q->where('queue_date', $today)->orWhereDate('created_at', $today);
+                    })
+                    ->whereIn('status', ['finished', 'skipped'])
+                    ->count(),
+                'skipped_today' => QueueTicket::where('counter_id', $c->id)
+                    ->where(function ($q) use ($today) {
+                        $q->where('queue_date', $today)->orWhereDate('created_at', $today);
+                    })
+                    ->where('status', 'skipped')
                     ->count(),
                 'avg_service_time' => $this->getCounterAvgServiceTime($c->id, $today),
             ];
@@ -65,21 +75,27 @@ class QueueController extends Controller
         $todayStats = $this->getTodayStats($today);
 
         // Ticket lists
-        $waitingTickets = QueueTicket::whereDate('created_at', $today)
+        $waitingTickets = QueueTicket::where(function ($q) use ($today) {
+                $q->where('queue_date', $today)->orWhereDate('created_at', $today);
+            })
             ->where('status', 'waiting')
             ->orderBy('id', 'asc')
             ->get();
 
         $calledTickets = QueueTicket::with(['counter', 'calledByUser'])
-            ->whereDate('created_at', $today)
+            ->where(function ($q) use ($today) {
+                $q->where('queue_date', $today)->orWhereDate('created_at', $today);
+            })
             ->where('status', 'called')
             ->orderBy('called_at', 'desc')
             ->get();
 
-        $finishedTickets = QueueTicket::with(['counter', 'calledByUser'])
-            ->whereDate('created_at', $today)
-            ->where('status', 'finished')
-            ->orderBy('finished_at', 'desc')
+        $finishedTickets = QueueTicket::with(['counter', 'calledByUser', 'skippedByUser'])
+            ->where(function ($q) use ($today) {
+                $q->where('queue_date', $today)->orWhereDate('created_at', $today);
+            })
+            ->whereIn('status', ['finished', 'skipped'])
+            ->orderByRaw('COALESCE(finished_at, skipped_at, updated_at) desc')
             ->get();
 
         // History statistics
@@ -92,6 +108,7 @@ class QueueController extends Controller
             'state',
             'currentCall',
             'isBackActive',
+            'hasCalledTicket',
             'todayStats',
             'historyStats',
             'waitingTickets',
@@ -167,10 +184,18 @@ class QueueController extends Controller
                 'active_user_name' => $c->activeUser?->name,
                 'is_current_user' => (int) $c->active_user_id === (int) $user->id,
                 'current_code' => $c->queueState?->currentTicket?->code ?? '-',
-                'called_at' => $c->queueState?->currentTicket?->called_at?->format('H:i') ?? '-',
+                'called_at' => $c->queueState?->currentTicket?->called_at?->timezone('Asia/Jakarta')->format('H:i') ?? '-',
                 'finished_today' => QueueTicket::where('counter_id', $c->id)
-                    ->whereDate('created_at', $today)
-                    ->where('status', 'finished')
+                    ->where(function ($q) use ($today) {
+                        $q->where('queue_date', $today)->orWhereDate('created_at', $today);
+                    })
+                    ->whereIn('status', ['finished', 'skipped'])
+                    ->count(),
+                'skipped_today' => QueueTicket::where('counter_id', $c->id)
+                    ->where(function ($q) use ($today) {
+                        $q->where('queue_date', $today)->orWhereDate('created_at', $today);
+                    })
+                    ->where('status', 'skipped')
                     ->count(),
                 'avg_service_time' => $this->getCounterAvgServiceTime($c->id, $today),
             ];
@@ -178,15 +203,11 @@ class QueueController extends Controller
 
         $todayStats = $this->getTodayStats($today);
 
-        $waitingTickets = QueueTicket::whereDate('created_at', $today)
+        $waitingTickets = QueueTicket::where(function ($q) use ($today) {
+                $q->where('queue_date', $today)->orWhereDate('created_at', $today);
+            })
             ->where('status', 'waiting')
             ->orderBy('id', 'asc')
-            ->get();
-
-        $calledTickets = QueueTicket::with(['counter', 'calledByUser'])
-            ->whereDate('created_at', $today)
-            ->where('status', 'called')
-            ->orderBy('called_at', 'desc')
             ->get()
             ->map(function ($t) {
                 return [
@@ -197,16 +218,45 @@ class QueueController extends Controller
                     'study_program' => $t->study_program,
                     'service_category' => $t->service_category,
                     'notes' => $t->notes,
-                    'called_at_formatted' => $t->called_at ? $t->called_at->format('H:i') : '-',
+                    'status' => $t->status,
+                    'created_at_formatted' => $t->created_at ? $t->created_at->timezone('Asia/Jakarta')->format('H:i') : '-',
+                    'created_at_iso' => $t->created_at ? $t->created_at->timezone('Asia/Jakarta')->toIso8601String() : null,
+                ];
+            });
+
+        $calledTickets = QueueTicket::with(['counter', 'calledByUser'])
+            ->where(function ($q) use ($today) {
+                $q->where('queue_date', $today)->orWhereDate('created_at', $today);
+            })
+            ->where('status', 'called')
+            ->orderBy('called_at', 'desc')
+            ->get()
+            ->map(function ($t) use ($selectedCounter) {
+                return [
+                    'id' => $t->id,
+                    'code' => $t->code,
+                    'nim' => $t->nim,
+                    'name' => $t->name,
+                    'study_program' => $t->study_program,
+                    'service_category' => $t->service_category,
+                    'notes' => $t->notes,
+                    'status' => $t->status,
+                    'counter_id' => $t->counter_id,
+                    'can_skip' => (bool) ($selectedCounter && (int) $t->counter_id === (int) $selectedCounter->id),
+                    'created_at_formatted' => $t->created_at ? $t->created_at->timezone('Asia/Jakarta')->format('H:i') : '-',
+                    'created_at_iso' => $t->created_at ? $t->created_at->timezone('Asia/Jakarta')->toIso8601String() : null,
+                    'called_at_formatted' => $t->called_at ? $t->called_at->timezone('Asia/Jakarta')->format('H:i') : '-',
                     'counter_name' => $t->counter?->name ?? '-',
                     'caller_name' => $t->calledByUser?->name ?? '-',
                 ];
             });
 
-        $finishedTickets = QueueTicket::with(['counter', 'calledByUser'])
-            ->whereDate('created_at', $today)
-            ->where('status', 'finished')
-            ->orderBy('finished_at', 'desc')
+        $finishedTickets = QueueTicket::with(['counter', 'calledByUser', 'skippedByUser'])
+            ->where(function ($q) use ($today) {
+                $q->where('queue_date', $today)->orWhereDate('created_at', $today);
+            })
+            ->whereIn('status', ['finished', 'skipped'])
+            ->orderByRaw('COALESCE(finished_at, skipped_at, updated_at) desc')
             ->get()
             ->map(function ($t) {
                 return [
@@ -217,9 +267,13 @@ class QueueController extends Controller
                     'study_program' => $t->study_program,
                     'service_category' => $t->service_category,
                     'notes' => $t->notes,
-                    'finished_at_formatted' => $t->finished_at ? $t->finished_at->format('H:i') : '-',
+                    'status' => $t->status,
+                    'created_at_formatted' => $t->created_at ? $t->created_at->timezone('Asia/Jakarta')->format('H:i') : '-',
+                    'created_at_iso' => $t->created_at ? $t->created_at->timezone('Asia/Jakarta')->toIso8601String() : null,
+                    'finished_at_formatted' => $t->finished_at ? $t->finished_at->timezone('Asia/Jakarta')->format('H:i') : '-',
+                    'skipped_at_formatted' => $t->skipped_at ? $t->skipped_at->timezone('Asia/Jakarta')->format('H:i') : '-',
                     'counter_name' => $t->counter?->name ?? '-',
-                    'caller_name' => $t->calledByUser?->name ?? '-',
+                    'caller_name' => $t->calledByUser?->name ?? ($t->skippedByUser?->name ?? '-'),
                 ];
             });
 
@@ -234,6 +288,7 @@ class QueueController extends Controller
                 'current_id' => $state?->current_id,
                 'last_id' => $state?->last_id,
                 'current_called_code' => $currentCall ? $currentCall->code : null,
+                'has_called_ticket' => (bool) ($currentCall && $currentCall->status === 'called'),
                 'current_called_ticket' => $currentCall ? [
                     'code' => $currentCall->code,
                     'nim' => $currentCall->nim,
@@ -274,25 +329,29 @@ class QueueController extends Controller
             ? 'AVG((strftime("%s", finished_at) - strftime("%s", called_at)) / 60.0) as avg_service'
             : 'AVG(TIMESTAMPDIFF(MINUTE, called_at, finished_at)) as avg_service';
 
-        $todayQuery = QueueTicket::whereDate('created_at', $today);
+        $todayQuery = QueueTicket::where(function ($q) use ($today) {
+            $q->where('queue_date', $today)->orWhereDate('created_at', $today);
+        });
 
         $totalToday = (clone $todayQuery)->count();
         $waitingToday = (clone $todayQuery)->where('status', 'waiting')->count();
         $calledToday = (clone $todayQuery)->where('status', 'called')->count();
-        $finishedToday = (clone $todayQuery)->where('status', 'finished')->count();
+        $finishedToday = (clone $todayQuery)->whereIn('status', ['finished', 'skipped'])->count();
+        $skippedToday = (clone $todayQuery)->where('status', 'skipped')->count();
 
-        $avgWaitTime = QueueTicket::whereDate('created_at', $today)
+        $avgWaitTime = (clone $todayQuery)
             ->whereNotNull('called_at')
             ->selectRaw($waitSql)
             ->value('avg_wait');
 
-        $avgServiceTime = QueueTicket::whereDate('created_at', $today)
+        $avgServiceTime = (clone $todayQuery)
+            ->where('status', 'finished')
             ->whereNotNull('finished_at')
             ->whereNotNull('called_at')
             ->selectRaw($serviceSql)
             ->value('avg_service');
 
-        $lastTicket = QueueTicket::whereDate('created_at', $today)
+        $lastTicket = (clone $todayQuery)
             ->orderBy('id', 'desc')
             ->first();
 
@@ -301,6 +360,7 @@ class QueueController extends Controller
             'waitingToday' => $waitingToday,
             'calledToday' => $calledToday,
             'finishedToday' => $finishedToday,
+            'skippedToday' => $skippedToday,
             'avgWaitTime' => $avgWaitTime !== null ? round((float)$avgWaitTime, 1) : null,
             'avgServiceTime' => $avgServiceTime !== null ? round((float)$avgServiceTime, 1) : null,
             'lastTicketCode' => $lastTicket ? $lastTicket->code : null,
@@ -318,7 +378,9 @@ class QueueController extends Controller
             : 'AVG(TIMESTAMPDIFF(MINUTE, called_at, finished_at)) as avg_service';
 
         $avg = QueueTicket::where('counter_id', $counterId)
-            ->whereDate('created_at', $today)
+            ->where(function ($q) use ($today) {
+                $q->where('queue_date', $today)->orWhereDate('created_at', $today);
+            })
             ->where('status', 'finished')
             ->whereNotNull('finished_at')
             ->whereNotNull('called_at')
@@ -342,20 +404,26 @@ class QueueController extends Controller
         $mondayThisWeek = now('Asia/Jakarta')->startOfWeek(Carbon::MONDAY)->toDateString();
         $today = now('Asia/Jakarta')->toDateString();
 
-        $yesterdayQuery = QueueTicketHistory::whereDate('created_at', $yesterday);
+        $yesterdayQuery = QueueTicketHistory::where(function ($q) use ($yesterday) {
+            $q->where('queue_date', $yesterday)->orWhereDate('created_at', $yesterday);
+        });
         $totalYesterday = (clone $yesterdayQuery)->count();
-        $finishedYesterday = (clone $yesterdayQuery)->where('status', 'finished')->count();
-        $avgWaitYesterday = QueueTicketHistory::whereDate('created_at', $yesterday)
+        $finishedYesterday = (clone $yesterdayQuery)->whereIn('status', ['finished', 'skipped'])->count();
+        $avgWaitYesterday = (clone $yesterdayQuery)
             ->whereNotNull('called_at')
             ->selectRaw($waitSql)
             ->value('avg_wait');
 
-        $weekQuery = QueueTicketHistory::whereDate('created_at', '>=', $mondayThisWeek)
-            ->whereDate('created_at', '<=', $today);
+        $weekQuery = QueueTicketHistory::where(function ($q) use ($mondayThisWeek, $today) {
+            $q->whereBetween('queue_date', [$mondayThisWeek, $today])
+                ->orWhere(function ($sub) use ($mondayThisWeek, $today) {
+                    $sub->whereDate('created_at', '>=', $mondayThisWeek)
+                        ->whereDate('created_at', '<=', $today);
+                });
+        });
         $totalWeek = (clone $weekQuery)->count();
-        $finishedWeek = (clone $weekQuery)->where('status', 'finished')->count();
-        $avgWaitWeek = QueueTicketHistory::whereDate('created_at', '>=', $mondayThisWeek)
-            ->whereDate('created_at', '<=', $today)
+        $finishedWeek = (clone $weekQuery)->whereIn('status', ['finished', 'skipped'])->count();
+        $avgWaitWeek = (clone $weekQuery)
             ->whereNotNull('called_at')
             ->selectRaw($waitSql)
             ->value('avg_wait');
@@ -391,7 +459,6 @@ class QueueController extends Controller
                 ->lockForUpdate()
                 ->firstOrCreate(['counter_id' => $selectedCounter->id]);
 
-            // Selesaikan tiket called milik loket ini jika ada
             if ($state->current_id) {
                 $currentTicket = QueueTicket::lockForUpdate()->find($state->current_id);
                 if ($currentTicket && $currentTicket->status === 'called' && (int) $currentTicket->counter_id === (int) $selectedCounter->id) {
@@ -427,6 +494,7 @@ class QueueController extends Controller
                 ]);
 
                 $state->current_id = $nextTicket->id;
+                $state->call_seq = ($state->call_seq ?? 0) + 1;
                 $state->save();
 
                 return [
@@ -456,6 +524,76 @@ class QueueController extends Controller
         }
 
         return redirect()->back()->with($result['status'], $result['message']);
+    }
+
+    /**
+     * Lewati tiket yang sedang berstatus 'called' di loket petugas ini
+     */
+    public function skip(Request $request)
+    {
+        $user = $request->user();
+        $selectedCounter = $this->counterService->selectedFor($request, $user);
+
+        if (!$selectedCounter) {
+            $msg = 'Silakan pilih loket terlebih dahulu sebelum melewati antrian.';
+            if ($request->wantsJson() || $request->ajax()) {
+                return response()->json(['success' => false, 'message' => $msg], 403);
+            }
+            return redirect()->back()->with('error', $msg);
+        }
+
+        $result = DB::transaction(function () use ($selectedCounter, $user) {
+            $state = QueueState::where('counter_id', $selectedCounter->id)
+                ->lockForUpdate()
+                ->first();
+
+            if (!$state || !$state->current_id) {
+                return [
+                    'status' => 'error',
+                    'code' => 422,
+                    'message' => 'Tidak ada tiket yang sedang dipanggil di ' . $selectedCounter->name . '.',
+                ];
+            }
+
+            $currentTicket = QueueTicket::lockForUpdate()->find($state->current_id);
+            if (!$currentTicket || $currentTicket->status !== 'called' || (int) $currentTicket->counter_id !== (int) $selectedCounter->id) {
+                return [
+                    'status' => 'error',
+                    'code' => 422,
+                    'message' => 'Tiket sudah tidak berstatus dipanggil di ' . $selectedCounter->name . '.',
+                ];
+            }
+
+            $ticketCode = $currentTicket->code;
+
+            $currentTicket->update([
+                'status' => 'skipped',
+                'skipped_at' => now('Asia/Jakarta'),
+                'skipped_by' => $user->id,
+            ]);
+
+            $state->current_id = null;
+            $state->last_id = null;
+            $state->save();
+
+            return [
+                'status' => 'success',
+                'code' => 200,
+                'message' => 'Nomor antrian ' . $ticketCode . ' berhasil dilewati.',
+            ];
+        });
+
+        if ($result['status'] === 'success') {
+            if ($request->wantsJson() || $request->ajax()) {
+                return response()->json(['success' => true, 'message' => $result['message']]);
+            }
+            return redirect()->back()->with('success', $result['message']);
+        }
+
+        if ($request->wantsJson() || $request->ajax()) {
+            return response()->json(['success' => false, 'message' => $result['message']], $result['code'] ?? 422);
+        }
+        return redirect()->back()->with('error', $result['message']);
     }
 
     /**

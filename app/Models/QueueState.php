@@ -16,6 +16,11 @@ class QueueState extends Model
         'counter_id',
         'current_id',
         'last_id',
+        'call_seq',
+    ];
+
+    protected $casts = [
+        'call_seq' => 'integer',
     ];
 
     public function counter(): BelongsTo

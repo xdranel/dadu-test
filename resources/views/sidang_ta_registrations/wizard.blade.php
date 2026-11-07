@@ -150,7 +150,7 @@
                         <input type="hidden" name="version" value="{{ old('version', $draft->version) }}">
                     @endif
                     <header class="space-y-1.5 border-b border-slate-100 pb-4">
-                        <h2 class="text-lg font-bold text-slate-900">Tahap {{ $step }} — {{ $titles[$step] }}</h2>
+                        <h2 class="text-lg font-bold text-slate-900">Tahap {{ $step }} - {{ $titles[$step] }}</h2>
                         <p class="text-xs text-slate-500">
                             Tanda * menunjukkan isian atau unggahan wajib. Draft boleh disimpan sebelum lengkap.
                         </p>

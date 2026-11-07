@@ -103,9 +103,21 @@ Route::middleware(['auth', 'password.changed'])->group(function () {
     Route::prefix('dashboard')->group(function () {
         Route::get('sidang-ta-guides/{guide}/media', [SidangTaFormGuideController::class, 'media'])
             ->name('sidang-ta-guides.media');
-        Route::prefix('admin')->name('admin.')->middleware('role:Akademik')->group(function () {
-            Route::resource('sidang-ta-guides', SidangTaFormGuideController::class)
-                ->parameters(['sidang-ta-guides' => 'guide'])->except('show');
+        Route::prefix('admin')->name('admin.')->group(function () {
+            Route::get('sidang-ta-guides', [SidangTaFormGuideController::class, 'index'])
+                ->middleware('permission:sidang_ta_form_guide_read')->name('sidang-ta-guides.index');
+            Route::get('sidang-ta-guides/create', [SidangTaFormGuideController::class, 'create'])
+                ->middleware('permission:sidang_ta_form_guide_create')->name('sidang-ta-guides.create');
+            Route::post('sidang-ta-guides', [SidangTaFormGuideController::class, 'store'])
+                ->middleware('permission:sidang_ta_form_guide_create')->name('sidang-ta-guides.store');
+            Route::get('sidang-ta-guides/{guide}/edit', [SidangTaFormGuideController::class, 'edit'])
+                ->middleware('permission:sidang_ta_form_guide_update')->name('sidang-ta-guides.edit');
+            Route::put('sidang-ta-guides/{guide}', [SidangTaFormGuideController::class, 'update'])
+                ->middleware('permission:sidang_ta_form_guide_update')->name('sidang-ta-guides.update');
+            Route::patch('sidang-ta-guides/{guide}', [SidangTaFormGuideController::class, 'update'])
+                ->middleware('permission:sidang_ta_form_guide_update');
+            Route::delete('sidang-ta-guides/{guide}', [SidangTaFormGuideController::class, 'destroy'])
+                ->middleware('permission:sidang_ta_form_guide_delete')->name('sidang-ta-guides.destroy');
         });
 
         Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
@@ -611,7 +623,26 @@ Route::middleware(['auth'])->prefix('admin/queue')->name('admin.queue.')->group(
     Route::post('/claim', [\App\Http\Controllers\Admin\QueueController::class, 'claim'])->middleware('permission:queue_ticket_update')->name('claim');
     Route::post('/release', [\App\Http\Controllers\Admin\QueueController::class, 'release'])->middleware('permission:queue_ticket_update')->name('release');
     Route::post('/next', [\App\Http\Controllers\Admin\QueueController::class, 'next'])->middleware('permission:queue_ticket_update')->name('next');
+    Route::post('/skip', [\App\Http\Controllers\Admin\QueueController::class, 'skip'])->middleware('permission:queue_ticket_update')->name('skip');
     Route::post('/back', [\App\Http\Controllers\Admin\QueueController::class, 'back'])->middleware('permission:queue_ticket_update')->name('back');
+
+    // Riwayat, Detail, dan Export Antrian
+    Route::get('/history', [\App\Http\Controllers\Admin\QueueHistoryController::class, 'index'])->middleware('permission:queue_ticket_read')->name('history');
+    Route::get('/history/export', [\App\Http\Controllers\Admin\QueueHistoryController::class, 'exportCsv'])->middleware(['permission:queue_ticket_read', 'throttle:10,1'])->name('history.export');
+    Route::get('/history/exports/{filename}', [\App\Http\Controllers\Admin\QueueHistoryController::class, 'downloadExport'])->middleware('permission:queue_ticket_read')->name('history.download-export');
+    Route::get('/history/{id}', [\App\Http\Controllers\Admin\QueueHistoryController::class, 'show'])->middleware('permission:queue_ticket_read')->name('history.show');
 });
+
+// Alias matching /dashboard/admin/queue/
+Route::post('/dashboard/admin/queue/skip', [\App\Http\Controllers\Admin\QueueController::class, 'skip'])
+    ->middleware(['auth', 'permission:queue_ticket_update']);
+Route::get('/dashboard/admin/queue/history', [\App\Http\Controllers\Admin\QueueHistoryController::class, 'index'])
+    ->middleware(['auth', 'permission:queue_ticket_read']);
+Route::get('/dashboard/admin/queue/history/export', [\App\Http\Controllers\Admin\QueueHistoryController::class, 'exportCsv'])
+    ->middleware(['auth', 'permission:queue_ticket_read', 'throttle:10,1']);
+Route::get('/dashboard/admin/queue/history/exports/{filename}', [\App\Http\Controllers\Admin\QueueHistoryController::class, 'downloadExport'])
+    ->middleware(['auth', 'permission:queue_ticket_read']);
+Route::get('/dashboard/admin/queue/history/{id}', [\App\Http\Controllers\Admin\QueueHistoryController::class, 'show'])
+    ->middleware(['auth', 'permission:queue_ticket_read']);
 
 require __DIR__ . '/auth.php';

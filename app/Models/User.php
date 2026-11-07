@@ -73,6 +73,26 @@ class User extends Authenticatable
         return $this->auth_source === 'sso';
     }
 
+    /**
+     * Profil user
+     */
+    public function toProfileArray(): array
+    {
+        $roleName = $this->getRoleNames()->first();
+
+        return [
+            'id'       => $this->id,
+            'fullname' => $this->name,
+            'username' => $this->username,
+            'email'    => $this->email,
+            'phone'    => $this->phone,
+            'photo'    => $this->photo,
+            'nim'      => $this->employee_id,
+            'role_id'  => self::ROLE_ID_MAP[$roleName] ?? null,
+            'unit_id'  => $this->unit_id,
+        ];
+    }
+
     // 101 → mahasiswa  (Pengguna: pengaju layanan / mahasiswa)
     // 102 → Petugas    (Front Desk / operator loket SSO auto-assign)
     // 103 → Pelaksana  (Staf unit kerja teknis)
@@ -102,7 +122,7 @@ class User extends Authenticatable
     ];
 
     /**
-     * Urutan prioritas role (tertinggi → terendah). Dipakai untuk menentukan
+     * Urutan prioritas role (tertinggi → terendah).
      */
     public const ROLE_PRIORITY = ['Akademik', 'admin', 'Pelaksana', 'Pemimpin', 'Pengamat', 'Petugas', 'mahasiswa'];
 

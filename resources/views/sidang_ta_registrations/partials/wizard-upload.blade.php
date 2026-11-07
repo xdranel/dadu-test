@@ -19,7 +19,7 @@
     </label>
     <p id="help-{{ $type }}" class="mt-1.5 text-xs leading-relaxed text-slate-500">
         {{ \App\Models\SidangTaRegistration::DOCUMENT_DESCRIPTIONS[$type] ?? '' }}
-        PDF, maksimal 10 MB per file.
+    
     </p>
     @include('sidang_ta_guides.partials.guides', ['guides' => $guides, 'slot' => $type, 'preview' => true])
     @if($available)

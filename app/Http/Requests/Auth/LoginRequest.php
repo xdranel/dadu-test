@@ -67,6 +67,12 @@ class LoginRequest extends FormRequest
 
         $loginInput = $this->username;
         $isEmail = str_contains($loginInput, '@');
+
+        if (config('app.env') === 'local' && !config('services.sso.use_in_local')) {
+            $this->authenticateLocalUser($loginInput, $isEmail);
+            return;
+        }
+
         $manualUser = User::where('auth_source', 'manual')
             ->where(function ($query) use ($loginInput) {
                 $query->where('username', $loginInput)
@@ -79,6 +85,77 @@ class LoginRequest extends FormRequest
             return;
         }
         $this->authenticateSsoUser();
+    }
+
+    /**
+     * Autentikasi untuk environment LOCAL (hanya menggunakan database lokal tanpa SSO gateway)
+     *
+     * @param string $loginInput
+     * @param bool $isEmail
+     * @throws ValidationException
+     */
+    private function authenticateLocalUser(string $loginInput, bool $isEmail): void
+    {
+        $usernameWithoutDomain = explode('@', $loginInput)[0];
+
+        $user = User::where(function ($query) use ($loginInput, $usernameWithoutDomain) {
+            $query->where('username', $loginInput)
+                  ->orWhere('username', $usernameWithoutDomain)
+                  ->orWhere('email', $loginInput);
+        })->first();
+
+        if (!$user) {
+            Log::info('Login lokal gagal - akun tidak ditemukan di database lokal', [
+                'username' => $loginInput,
+                'ip' => $this->ip(),
+            ]);
+
+            RateLimiter::hit($this->throttleKey());
+
+            throw ValidationException::withMessages([
+                'username' => 'Akun tidak ditemukan di database lokal. Pastikan user sudah terdaftar di seeder/database lokal.',
+            ]);
+        }
+
+        if ($user->status !== 'active') {
+            Log::warning('Login lokal ditolak - akun non-aktif', [
+                'user_id' => $user->id,
+                'username' => $user->username,
+            ]);
+
+            RateLimiter::hit($this->throttleKey());
+
+            throw ValidationException::withMessages([
+                'username' => 'Akun Anda sedang tidak aktif. Silakan hubungi administrator.',
+            ]);
+        }
+
+        $credentials = [
+            'username' => $user->username,
+            'password' => $this->password,
+        ];
+
+        if (!Auth::attempt($credentials, $this->boolean('remember'))) {
+            Log::info('Login lokal gagal - password salah', [
+                'username' => $loginInput,
+                'ip' => $this->ip(),
+            ]);
+
+            RateLimiter::hit($this->throttleKey());
+
+            throw ValidationException::withMessages([
+                'username' => 'Username atau password salah.',
+            ]);
+        }
+
+        Log::info('Login lokal berhasil', [
+            'user_id' => $user->id,
+            'username' => $user->username,
+            'role' => $user->getRoleNames()->first() ?? 'none',
+            'ip' => $this->ip(),
+        ]);
+
+        RateLimiter::clear($this->throttleKey());
     }
 
     /**
@@ -249,7 +326,8 @@ class LoginRequest extends FormRequest
                 'email'               => $profile->email ?? $user->email,
                 'phone'               => $profile->phone ?? $user->phone,
                 'employee_id'         => $profile->numberid ?? $user->employee_id,
-                'password'            => Hash::make($profile->numberid ?? Str::random(32)),
+                'photo'               => $profile->photo ?? $user->photo,
+                'password'            => Hash::make(Str::random(32)),
                 'must_change_password'=> false,
             ]);
 
@@ -264,7 +342,8 @@ class LoginRequest extends FormRequest
                 'email'               => $profile->email ?? ($profile->user . '@telkomuniversity.ac.id'),
                 'phone'               => $profile->phone ?? null,
                 'employee_id'         => $profile->numberid ?? null,
-                'password'            => Hash::make($profile->numberid ?? Str::random(32)),
+                'photo'               => $profile->photo ?? null,
+                'password'            => Hash::make(Str::random(32)),
                 'auth_source'         => 'sso',
                 'sso_role'            => $defaultSsoRole,
                 'status'              => 'active',
@@ -273,6 +352,8 @@ class LoginRequest extends FormRequest
 
             $user->assignRole($defaultSsoRole);
         }
+
+        $this->syncStudentFromProfile($profile);
 
         Log::info('Login SSO berhasil', [
             'user_id'    => $user->id,
@@ -286,6 +367,34 @@ class LoginRequest extends FormRequest
         Auth::login($user, $this->boolean('remember'));
         RateLimiter::clear($this->throttleKey());
     }
+    /**
+     * Sinkronkan data mahasiswa (foto, prodi, fakultas) dari profil SSO ke tabel students.
+     * Kegagalan sinkronisasi tidak boleh menggagalkan login.
+     */
+    private function syncStudentFromProfile(object $profile): void
+    {
+        if (empty($profile->studyprogram) || empty($profile->numberid)) {
+            return;
+        }
+
+        try {
+            $student = \App\Models\Student::firstOrNew(['student_number' => $profile->numberid]);
+            $student->name = $profile->fullname ?? $student->name;
+            $student->email = $profile->email ?? $student->email;
+            $student->study_program = $profile->studyprogram;
+            $student->faculty = $profile->faculty ?? $student->faculty;
+            if (!$student->exists) {
+                $student->status = 'Aktif';
+            }
+            $student->save();
+        } catch (\Throwable $e) {
+            Log::warning('Sinkronisasi data mahasiswa dari SSO gagal', [
+                'numberid' => $profile->numberid,
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
+
     /**
      * Ensure the login request is not rate limited.
      *

@@ -167,7 +167,7 @@ class QueueController extends Controller
 
                     $code = str_pad($counter->last_number, 3, '0', STR_PAD_LEFT);
 
-                    return QueueTicket::create([
+                    $newTicket = QueueTicket::create([
                         'code' => $code,
                         'nim' => $validated['nim'],
                         'name' => trim($validated['name']),
@@ -178,6 +178,10 @@ class QueueController extends Controller
                         'status' => 'waiting',
                         'device_token' => $deviceToken,
                     ]);
+
+                    \App\Models\QueueTicketEvent::record('created', $newTicket);
+
+                    return $newTicket;
                 });
 
                 break; // Berhasil
@@ -247,10 +251,17 @@ class QueueController extends Controller
 
         $queueData = $this->getTicketQueueData($ticket);
 
+        $message = null;
+        if ($ticket->status === 'skipped') {
+            $message = 'Nomor Anda dilewati karena tidak hadir saat dipanggil';
+        }
+
         return response()->json([
             'success' => true,
             'code' => $ticket->code,
             'status' => $ticket->status,
+            'message' => $message,
+            'take_url' => route('queue.take'),
             'queue_ahead' => $queueData['queueAhead'],
             'counter_name' => $queueData['counterName'],
             'current_called_summary' => $queueData['currentCallSummary'] ?: '-',
@@ -309,10 +320,14 @@ class QueueController extends Controller
         $counters = QueueCounter::with(['queueState.currentTicket'])->orderBy('id')->get();
 
         $data = $counters->map(function ($c) {
+            $ticket = $c->queueState?->currentTicket;
+            $code = $ticket?->code;
             return [
-                'id'          => $c->id,
-                'name'        => $c->name,
-                'current_number' => $c->queueState?->currentTicket?->code ?? null,
+                'id'             => $c->id,
+                'name'           => $c->name,
+                'current_number' => $code ?? null,
+                'number'         => $code ? (int) $code : null,
+                'call_seq'       => (int) ($c->queueState?->call_seq ?? 0),
             ];
         });
 

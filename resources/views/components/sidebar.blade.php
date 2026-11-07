@@ -53,10 +53,20 @@
         <div x-data="{ roleMenuOpen: false }" @if($hasMultipleRoles) id="role-switcher" data-testid="role-switcher" @endif @click.outside="roleMenuOpen = false" class="relative">
             <div class="flex items-center gap-3">
                 <div @if($hasMultipleRoles) @click="roleMenuOpen = !roleMenuOpen" title="Ganti Peran" @endif
-                     class="w-9 h-9 rounded-full bg-[#DA2D3B] flex items-center justify-center flex-shrink-0 ring-2 ring-slate-200 transition-all {{ $hasMultipleRoles ? 'cursor-pointer hover:ring-[#DA2D3B]' : '' }}">
-                    <span class="text-white text-xs font-bold">
-                        {{ strtoupper(substr(auth()->user()->name, 0, 1)) }}
-                    </span>
+                     class="w-9 h-9 rounded-full overflow-hidden bg-[#DA2D3B] flex items-center justify-center flex-shrink-0 ring-2 ring-slate-200 transition-all {{ $hasMultipleRoles ? 'cursor-pointer hover:ring-[#DA2D3B]' : '' }}">
+                    @if(auth()->user()->photo)
+                        <img src="{{ auth()->user()->photo }}" alt="{{ auth()->user()->name }}"
+                             class="w-9 h-9 rounded-full object-cover"
+                             referrerpolicy="no-referrer"
+                             onerror="this.style.display='none'; this.nextElementSibling.style.display='inline';">
+                        <span class="text-white text-xs font-bold" style="display:none;">
+                            {{ strtoupper(substr(auth()->user()->name, 0, 1)) }}
+                        </span>
+                    @else
+                        <span class="text-white text-xs font-bold">
+                            {{ strtoupper(substr(auth()->user()->name, 0, 1)) }}
+                        </span>
+                    @endif
                 </div>
                 <div x-show="sidebarOpen" class="flex-1 min-w-0">
                     <p class="text-sm font-semibold text-slate-800 truncate">{{ auth()->user()->name }}</p>

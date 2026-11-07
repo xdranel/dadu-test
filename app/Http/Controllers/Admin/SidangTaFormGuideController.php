@@ -53,7 +53,11 @@ class SidangTaFormGuideController extends Controller
     public function media(Request $request, SidangTaFormGuide $guide)
     {
         $academic = $request->user()->hasRole('Akademik');
-        abort_unless($academic || $request->user()->canAny(['sidang_ta_registration_read', 'sidang_ta_registration_review']), 403);
+        abort_unless($academic || $request->user()->canAny([
+            'sidang_ta_form_guide_read',
+            'sidang_ta_registration_read',
+            'sidang_ta_registration_review',
+        ]), 403);
         abort_unless($academic || $guide->is_active, 404);
         abort_unless($guide->file_path && Storage::disk('local')->exists($guide->file_path), 404);
 

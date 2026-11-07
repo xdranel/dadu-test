@@ -26,12 +26,15 @@ class QueueTicket extends Model
         'called_by',
         'called_at',
         'finished_at',
+        'skipped_at',
+        'skipped_by',
     ];
 
     protected $casts = [
         'queue_date' => 'string',
         'called_at' => 'datetime',
         'finished_at' => 'datetime',
+        'skipped_at' => 'datetime',
     ];
 
     public function counter(): BelongsTo
@@ -42,5 +45,10 @@ class QueueTicket extends Model
     public function calledByUser(): BelongsTo
     {
         return $this->belongsTo(User::class, 'called_by');
+    }
+
+    public function skippedByUser(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'skipped_by');
     }
 }

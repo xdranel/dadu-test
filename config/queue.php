@@ -13,6 +13,14 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Masa Retensi Riwayat Antrian (Bulan)
+    |--------------------------------------------------------------------------
+    | Lama data disimpan sebelum dapat diprune (default: 24 bulan).
+    */
+    'history_retention_months' => (int) env('QUEUE_HISTORY_RETENTION_MONTHS', 24),
+
+    /*
+    |--------------------------------------------------------------------------
     | Toleransi Buka Tiket Sebelum Sesi Layanan (Menit)
     |--------------------------------------------------------------------------
     | Tiket dapat mulai diambil N menit sebelum sesi layanan dimulai.

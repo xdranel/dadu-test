@@ -54,7 +54,8 @@ return [
         'timeout' => env('SSO_TIMEOUT', 10), // seconds
         'enabled' => env('SSO_ENABLED', true),
         'mock' => (bool) env('SSO_MOCK', false),
-        // Allowed roles from SSO that can login to DADU
+        // login SSO asli (untuk testing). Default: false
+        'use_in_local' => (bool) env('SSO_IN_LOCAL', false),
         'allowed_roles' => ['mahasiswa', 'dosen'],
     ],
 ];

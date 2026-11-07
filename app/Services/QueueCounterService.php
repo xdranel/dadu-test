@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\QueueCounter;
 use App\Models\QueueState;
 use App\Models\QueueTicket;
+use App\Models\QueueTicketEvent;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -152,6 +153,7 @@ class QueueCounterService
                     'status' => 'finished',
                     'finished_at' => now(),
                 ]);
+                QueueTicketEvent::record('finished', $current, $counter->id, $user->id);
             }
 
             if ($state) {
@@ -195,6 +197,7 @@ class QueueCounterService
                         'status' => 'finished',
                         'finished_at' => now(),
                     ]);
+                    QueueTicketEvent::record('finished', $current, $counter->id, $user->id);
                 }
                 $state->update([
                     'current_id' => null,

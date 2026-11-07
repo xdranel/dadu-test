@@ -10,9 +10,10 @@
 
                     <!-- Pas Foto -->
                     <div class="flex-shrink-0">
-                        @if($student->profile_photo)
-                            <img src="{{ Storage::url($student->profile_photo) }}"
+                        @if($student->photo_url)
+                            <img src="{{ $student->photo_url }}"
                                  alt="Foto {{ $student->name }}"
+                                 referrerpolicy="no-referrer"
                                  class="w-24 h-28 object-cover rounded-lg border-2 border-white/30 shadow-lg">
                         @else
                             <div class="w-24 h-28 rounded-lg border-2 border-white/30 shadow-lg bg-white/10 backdrop-blur-sm flex items-center justify-center text-white/60">
@@ -100,8 +101,8 @@
                             'Nama Mahasiswa'   => $student->name,
                             'Jenis Kelamin'    => $student->gender ?? '-',
                             'Agama'            => $student->religion ?? '-',
-                            'Email Institusi'  => '-',
-                            'No. HP'           => $student->phone_number ?? '-',
+                            'Email Institusi'  => $student->institutional_email ?? '-',
+                            'No. HP'           => $student->contact_phone ?? '-',
                         ];
                     @endphp
                     @foreach ($fields as $label => $value)

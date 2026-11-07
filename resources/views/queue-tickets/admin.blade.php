@@ -12,16 +12,17 @@
         <!-- Header Controls: Tab Buttons + Pilih Loket & Tampilkan QR (Sejajar) -->
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
             <div class="flex items-center gap-2">
-                <button type="button" @click="activeTab = 'dashboard'"
-                        :class="activeTab === 'dashboard' ? 'bg-[#DA2D3B] text-white shadow-md shadow-red-100' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'"
-                        class="px-5 py-2 text-xs font-bold rounded-xl transition-all duration-200">
+                <button type="button"
+                        class="px-5 py-2 text-xs font-bold rounded-xl bg-[#DA2D3B] text-white shadow-md shadow-red-100 transition-all duration-200">
                     Dashboard
                 </button>
-                <button type="button" @click="activeTab = 'history'"
-                        :class="activeTab === 'history' ? 'bg-[#DA2D3B] text-white shadow-md shadow-red-100' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'"
-                        class="px-5 py-2 text-xs font-bold rounded-xl transition-all duration-200">
+                <a href="{{ route('admin.queue.history') }}"
+                   class="px-4 py-2 text-xs font-bold text-slate-700 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 hover:text-[#DA2D3B] transition-all duration-200 shadow-sm inline-flex items-center gap-1.5">
+                    <svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
                     Histori
-                </button>
+                </a>
             </div>
             
             <div class="flex items-center gap-2 flex-wrap">
@@ -219,7 +220,7 @@
                         <button type="button" @click="listTab = 'finished'"
                                 :class="listTab === 'finished' ? 'bg-white shadow text-emerald-600 font-bold' : 'text-slate-500'"
                                 class="flex-1 text-center py-2 text-xs rounded-lg transition-all">
-                            Selesai (<span id="tab-count-finished">{{ count($finishedTickets) }}</span>)
+                            Selesai (<span id="tab-count-finished">{{ $todayStats['finishedToday'] }}</span>)
                         </button>
                     </div>
 
@@ -238,7 +239,7 @@
                                     <div class="p-3 bg-slate-50 border border-slate-100 rounded-xl space-y-1">
                                         <div class="flex items-center justify-between">
                                             <span class="font-bold text-slate-800 font-mono text-sm">{{ $ticket->code }}</span>
-                                            <span class="text-[9px] text-slate-400 font-medium">{{ $ticket->created_at ? $ticket->created_at->format('H:i') : '' }}</span>
+                                            <span class="text-[9px] text-slate-400 font-medium">Ambil: {{ $ticket->created_at ? $ticket->created_at->timezone('Asia/Jakarta')->format('H:i') : '' }}</span>
                                         </div>
                                         @if($ticket->name)
                                             <div class="flex items-center justify-between text-xs pt-1 border-t border-slate-200/50">
@@ -278,7 +279,7 @@
                                                 @if($ticket->counter)
                                                     <span class="text-[10px] font-bold px-2 py-0.5 rounded bg-red-100/70 text-red-800">{{ $ticket->counter->name }}</span>
                                                 @endif
-                                                <span class="text-[9px] text-slate-400 font-medium">Dipanggil: {{ $ticket->called_at ? $ticket->called_at->format('H:i') : '-' }}</span>
+                                                <span class="text-[9px] text-slate-400 font-medium">Ambil: {{ $ticket->created_at ? $ticket->created_at->timezone('Asia/Jakarta')->format('H:i') : '-' }}</span>
                                             </div>
                                         </div>
                                         @if($ticket->name)
@@ -301,6 +302,15 @@
                                                 </div>
                                             @endif
                                         @endif
+                                        @if($selectedCounter && (int) $ticket->counter_id === (int) $selectedCounter->id)
+                                            <div class="pt-1.5 flex justify-end">
+                                                <button type="button"
+                                                        onclick="confirmSkip('{{ $ticket->code }}')"
+                                                        class="btn-skip-card inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-bold text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200/80 rounded-lg transition-all active:scale-[0.97]">
+                                                    Lewati
+                                                </button>
+                                            </div>
+                                        @endif
                                     </div>
                                 @empty
                                     <div class="text-center py-8 text-slate-400 text-xs">Tidak ada antrian dipanggil</div>
@@ -313,18 +323,20 @@
                              class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col h-[480px]">
                             <div class="p-4 border-b border-slate-100 flex items-center justify-between bg-emerald-50/30">
                                 <span class="font-bold text-xs uppercase tracking-wider text-emerald-700">Selesai Hari Ini</span>
-                                <span id="badge-finished" class="text-xs font-bold font-mono px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">{{ count($finishedTickets) }}</span>
+                                <span id="badge-finished" class="text-xs font-bold font-mono px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">{{ $todayStats['finishedToday'] }}</span>
                             </div>
                             <div id="list-finished" class="p-3 space-y-2 overflow-y-auto flex-1 bg-white">
                                 @forelse($finishedTickets as $ticket)
                                     <div class="p-3 bg-emerald-50/10 border border-emerald-100/30 rounded-xl space-y-1">
                                         <div class="flex items-center justify-between">
-                                            <span class="font-bold text-emerald-600 font-mono text-sm">{{ $ticket->code }}</span>
+                                            <span class="font-bold {{ $ticket->status === 'skipped' ? 'text-amber-600' : 'text-emerald-600' }} font-mono text-sm">{{ $ticket->code }}</span>
                                             <div class="flex items-center gap-1.5">
-                                                @if($ticket->counter)
+                                                @if($ticket->status === 'skipped')
+                                                    <span class="text-[10px] font-bold px-2 py-0.5 rounded bg-amber-100 text-amber-800 border border-amber-200">Dilewati</span>
+                                                @elseif($ticket->counter)
                                                     <span class="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-100/70 text-emerald-800">{{ $ticket->counter->name }}</span>
                                                 @endif
-                                                <span class="text-[9px] text-slate-400 font-medium">Selesai: {{ $ticket->finished_at ? $ticket->finished_at->format('H:i') : '-' }}</span>
+                                                <span class="text-[9px] text-slate-400 font-medium">Ambil: {{ $ticket->created_at ? $ticket->created_at->timezone('Asia/Jakarta')->format('H:i') : '-' }}</span>
                                             </div>
                                         </div>
                                         @if($ticket->name)
@@ -360,84 +372,7 @@
 
         </div>
 
-        <!-- ===== TAB 2: HISTORI & PERFORMA ===== -->
-        <div x-show="activeTab === 'history'" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 translate-y-2" x-transition:enter-end="opacity-100 translate-y-0">
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-                <!-- Waktu Tunggu Rata-rata Hari Ini -->
-                <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
-                    <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-2">Rata-rata Waktu Tunggu Hari Ini</span>
-                    <div id="stat-avg-wait" class="text-3xl font-black text-slate-900 font-mono">
-                        {{ $todayStats['avgWaitTime'] !== null ? $todayStats['avgWaitTime'] . ' menit' : '-' }}
-                    </div>
-                    <span class="text-[11px] text-slate-400 mt-2 block">Sejak tiket dibuat hingga dipanggil</span>
-                </div>
 
-                <!-- Waktu Layanan Rata-rata Hari Ini -->
-                <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
-                    <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-2">Rata-rata Durasi Layanan Hari Ini</span>
-                    <div id="stat-avg-service" class="text-3xl font-black text-slate-900 font-mono">
-                        {{ $todayStats['avgServiceTime'] !== null ? $todayStats['avgServiceTime'] . ' menit' : '-' }}
-                    </div>
-                    <span class="text-[11px] text-slate-400 mt-2 block">Sejak dipanggil hingga selesai</span>
-                </div>
-
-                <!-- Nomor Tiket Terakhir Hari Ini -->
-                <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
-                    <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-2">Nomor Terakhir Hari Ini</span>
-                    <div id="stat-last-ticket" class="text-3xl font-black text-slate-900 font-mono">
-                        {{ $todayStats['lastTicketCode'] ?? '-' }}
-                    </div>
-                    <span class="text-[11px] text-slate-400 mt-2 block">Tiket paling baru dibuat</span>
-                </div>
-            </div>
-
-            <!-- Perbandingan Historis -->
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <!-- Kemarin -->
-                <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
-                    <div class="flex items-center justify-between mb-4">
-                        <h3 class="text-sm font-bold text-slate-800">Kemarin</h3>
-                        <span class="text-xs text-slate-400">{{ now('Asia/Jakarta')->subDay()->format('d M Y') }}</span>
-                    </div>
-                    <div class="space-y-3">
-                        <div class="flex justify-between items-center text-xs">
-                            <span class="text-slate-500">Total Tiket:</span>
-                            <span class="font-bold font-mono">{{ $historyStats['yesterday']['total'] }}</span>
-                        </div>
-                        <div class="flex justify-between items-center text-xs">
-                            <span class="text-slate-500">Selesai Dilayani:</span>
-                            <span class="font-bold font-mono">{{ $historyStats['yesterday']['finished'] }}</span>
-                        </div>
-                        <div class="flex justify-between items-center text-xs">
-                            <span class="text-slate-500">Rata-rata Waktu Tunggu:</span>
-                            <span class="font-bold font-mono">{{ $historyStats['yesterday']['avgWaitTime'] !== null ? $historyStats['yesterday']['avgWaitTime'] . ' mnt' : '-' }}</span>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Minggu Ini -->
-                <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
-                    <div class="flex items-center justify-between mb-4">
-                        <h3 class="text-sm font-bold text-slate-800">Minggu Ini</h3>
-                        <span class="text-xs text-slate-400">Senin s/d Hari Ini</span>
-                    </div>
-                    <div class="space-y-3">
-                        <div class="flex justify-between items-center text-xs">
-                            <span class="text-slate-500">Total Tiket:</span>
-                            <span class="font-bold font-mono">{{ $historyStats['thisWeek']['total'] }}</span>
-                        </div>
-                        <div class="flex justify-between items-center text-xs">
-                            <span class="text-slate-500">Selesai Dilayani:</span>
-                            <span class="font-bold font-mono">{{ $historyStats['thisWeek']['finished'] }}</span>
-                        </div>
-                        <div class="flex justify-between items-center text-xs">
-                            <span class="text-slate-500">Rata-rata Waktu Tunggu:</span>
-                            <span class="font-bold font-mono">{{ $historyStats['thisWeek']['avgWaitTime'] !== null ? $historyStats['thisWeek']['avgWaitTime'] . ' mnt' : '-' }}</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
 
         <!-- ===== MODALS ===== -->
 
@@ -656,9 +591,6 @@
         const statWaiting = document.getElementById('stat-waiting');
         const statCalled = document.getElementById('stat-called');
         const statFinished = document.getElementById('stat-finished');
-        const statAvgWait = document.getElementById('stat-avg-wait');
-        const statAvgService = document.getElementById('stat-avg-service');
-        const statLastTicket = document.getElementById('stat-last-ticket');
 
         // List elements
         const badgeWaiting = document.getElementById('badge-waiting');
@@ -735,19 +667,12 @@
                             }
                         }
 
-
-
                         // Update stats cards
                         const s = data.todayStats;
                         if (statTotal) statTotal.innerText = s.totalToday;
                         if (statWaiting) statWaiting.innerText = s.waitingToday;
                         if (statCalled) statCalled.innerText = s.calledToday;
                         if (statFinished) statFinished.innerText = s.finishedToday;
-
-                        // Update performance stats (in history tab)
-                        if (statAvgWait) statAvgWait.innerText = s.avgWaitTime !== null ? s.avgWaitTime + ' menit' : '-';
-                        if (statAvgService) statAvgService.innerText = s.avgServiceTime !== null ? s.avgServiceTime + ' menit' : '-';
-                        if (statLastTicket) statLastTicket.innerText = s.lastTicketCode || '-';
 
                         // Update list badges & tab counters
                         const waitingLen = data.tickets.waiting.length;
@@ -758,14 +683,14 @@
                         if (tabCountWaiting) tabCountWaiting.innerText = waitingLen;
                         if (badgeCalled) badgeCalled.innerText = calledLen;
                         if (tabCountCalled) tabCountCalled.innerText = calledLen;
-                        if (badgeFinished) badgeFinished.innerText = finishedLen;
-                        if (tabCountFinished) tabCountFinished.innerText = finishedLen;
+                        if (badgeFinished) badgeFinished.innerText = s.finishedToday;
+                        if (tabCountFinished) tabCountFinished.innerText = s.finishedToday;
 
                         // Render lists with student details & counter name
                         if (listWaiting) {
                             if (waitingLen > 0) {
                                 listWaiting.innerHTML = data.tickets.waiting.map(ticket => {
-                                    const timeStr = ticket.created_at ? new Date(ticket.created_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : '';
+                                    const timeStr = ticket.created_at_formatted || '-';
                                     const detailsHtml = ticket.name ? `
                                         <div class="flex items-center justify-between text-xs pt-1 border-t border-slate-200/50">
                                             <span class="font-semibold text-slate-800 truncate max-w-[150px]">${escapeHtml(ticket.name)}</span>
@@ -781,7 +706,7 @@
                                         <div class="p-3 bg-slate-50 border border-slate-100 rounded-xl space-y-1">
                                             <div class="flex items-center justify-between">
                                                 <span class="font-bold text-slate-800 font-mono text-sm">${escapeHtml(ticket.code)}</span>
-                                                <span class="text-[9px] text-slate-400 font-medium">${timeStr}</span>
+                                                <span class="text-[9px] text-slate-400 font-medium">Ambil: ${timeStr}</span>
                                             </div>
                                             ${detailsHtml}
                                         </div>
@@ -811,6 +736,15 @@
                                         ` : ''}
                                         ${ticket.notes ? `<div class="text-[10px] text-slate-500 italic bg-white p-1.5 rounded border border-slate-100 break-words">${escapeHtml(ticket.notes)}</div>` : ''}
                                     ` : '';
+                                    const skipBtnHtml = ticket.can_skip ? `
+                                        <div class="pt-1.5 flex justify-end">
+                                            <button type="button"
+                                                    onclick="confirmSkip('${escapeHtml(ticket.code)}')"
+                                                    class="btn-skip-card inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-bold text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200/80 rounded-lg transition-all active:scale-[0.97]">  
+                                                Lewati
+                                            </button>
+                                        </div>
+                                    ` : '';
                                     return `
                                         <div class="p-3 bg-red-50/20 border border-red-100/50 rounded-xl space-y-1">
                                             <div class="flex items-center justify-between">
@@ -819,10 +753,11 @@
                                                     ${ticket.counter_name && ticket.counter_name !== '-' ? `
                                                         <span class="text-[10px] font-bold px-2 py-0.5 rounded bg-red-100/70 text-red-800">${escapeHtml(ticket.counter_name)}</span>
                                                     ` : ''}
-                                                    <span class="text-[9px] text-slate-400 font-medium">Dipanggil: ${ticket.called_at_formatted || '-'}</span>
+                                                    <span class="text-[9px] text-slate-400 font-medium">Ambil: ${ticket.created_at_formatted || '-'}</span>
                                                 </div>
                                             </div>
                                             ${detailsHtml}
+                                            ${skipBtnHtml}
                                         </div>
                                     `;
                                 }).join('');
@@ -850,15 +785,20 @@
                                         ` : ''}
                                         ${ticket.notes ? `<div class="text-[10px] text-slate-500 italic bg-white p-1.5 rounded border border-slate-100 break-words">${escapeHtml(ticket.notes)}</div>` : ''}
                                     ` : '';
+                                    const isSkipped = ticket.status === 'skipped';
+                                    const badgeHtml = isSkipped
+                                        ? `<span class="text-[10px] font-bold px-2 py-0.5 rounded bg-amber-100 text-amber-800 border border-amber-200">Dilewati</span>`
+                                        : (ticket.counter_name && ticket.counter_name !== '-'
+                                            ? `<span class="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-100/70 text-emerald-800">${escapeHtml(ticket.counter_name)}</span>`
+                                            : '');
+                                    const codeColor = isSkipped ? 'text-amber-600' : 'text-emerald-600';
                                     return `
                                         <div class="p-3 bg-emerald-50/10 border border-emerald-100/30 rounded-xl space-y-1">
                                             <div class="flex items-center justify-between">
-                                                <span class="font-bold text-emerald-600 font-mono text-sm">${escapeHtml(ticket.code)}</span>
+                                                <span class="font-bold ${codeColor} font-mono text-sm">${escapeHtml(ticket.code)}</span>
                                                 <div class="flex items-center gap-1.5">
-                                                    ${ticket.counter_name && ticket.counter_name !== '-' ? `
-                                                        <span class="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-100/70 text-emerald-800">${escapeHtml(ticket.counter_name)}</span>
-                                                    ` : ''}
-                                                    <span class="text-[9px] text-slate-400 font-medium">Selesai: ${ticket.finished_at_formatted || '-'}</span>
+                                                    ${badgeHtml}
+                                                    <span class="text-[9px] text-slate-400 font-medium">Ambil: ${ticket.created_at_formatted || '-'}</span>
                                                 </div>
                                             </div>
                                             ${detailsHtml}
@@ -873,6 +813,47 @@
                 }
             } catch (error) {
                 console.error('Error fetching dashboard stats:', error);
+            }
+        }
+
+        async function confirmSkip(code) {
+            if (!confirm(`Lewati nomor ${code}? Nomor ini akan tercatat sebagai Dilewati.`)) {
+                return;
+            }
+
+            const activeBtn = event ? (event.currentTarget || event.target) : null;
+            if (activeBtn) {
+                activeBtn.setAttribute('disabled', 'disabled');
+                activeBtn.innerText = 'Memproses...';
+            }
+
+            try {
+                const response = await fetch('{{ route("admin.queue.skip") }}', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                        'X-Requested-With': 'XMLHttpRequest'
+                    }
+                });
+
+                const resData = await response.json();
+                if (response.ok && resData.success) {
+                    await fetchDashboardStats();
+                } else {
+                    alert(resData.message || 'Gagal melewati antrian.');
+                    if (activeBtn) {
+                        activeBtn.removeAttribute('disabled');
+                        activeBtn.innerText = 'Lewati';
+                    }
+                }
+            } catch (e) {
+                alert('Terjadi kesalahan jaringan.');
+                if (activeBtn) {
+                    activeBtn.removeAttribute('disabled');
+                    activeBtn.innerText = 'Lewati';
+                }
             }
         }
 

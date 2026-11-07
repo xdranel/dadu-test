@@ -118,6 +118,19 @@
                         Ambil Tiket Baru
                     </a>
                 </div>
+
+                <!-- State: skipped -->
+                <div id="state-skipped" class="hidden transition-all duration-300">
+                    <div class="bg-amber-50 border border-amber-200/70 rounded-2xl p-4 md:p-5 mb-4">
+                        <p class="text-base md:text-lg font-bold text-amber-800 mb-2">Nomor Dilewati</p>
+                        <p class="text-xs md:text-sm text-slate-600">
+                            Nomor Anda dilewati karena tidak hadir saat dipanggil
+                        </p>
+                    </div>
+                    <a href="{{ route('queue.take') }}" class="inline-flex w-full justify-center items-center gap-2 px-5 py-3 rounded-xl bg-[#DA2D3B] hover:bg-[#b82430] text-white font-semibold text-xs md:text-sm transition-all duration-300 shadow-md shadow-red-100">
+                        Ambil Nomor Baru
+                    </a>
+                </div>
             </div>
         </div>
 
@@ -134,6 +147,7 @@
         const stateWaiting = document.getElementById('state-waiting');
         const stateCalled = document.getElementById('state-called');
         const stateFinished = document.getElementById('state-finished');
+        const stateSkipped = document.getElementById('state-skipped');
 
         function updateUI(data) {
             if (data.status === 'waiting') {
@@ -145,6 +159,7 @@
                 stateWaiting.classList.remove('hidden');
                 stateCalled.classList.add('hidden');
                 stateFinished.classList.add('hidden');
+                if (stateSkipped) stateSkipped.classList.add('hidden');
 
             } else if (data.status === 'called') {
                 statusText.innerText = 'Sedang Dipanggil';
@@ -159,6 +174,7 @@
                 stateWaiting.classList.add('hidden');
                 stateCalled.classList.remove('hidden');
                 stateFinished.classList.add('hidden');
+                if (stateSkipped) stateSkipped.classList.add('hidden');
 
             } else if (data.status === 'finished') {
                 statusText.innerText = 'Selesai';
@@ -169,6 +185,18 @@
                 stateWaiting.classList.add('hidden');
                 stateCalled.classList.add('hidden');
                 stateFinished.classList.remove('hidden');
+                if (stateSkipped) stateSkipped.classList.add('hidden');
+
+            } else if (data.status === 'skipped') {
+                statusText.innerText = 'Dilewati';
+                statusDot.className = 'hidden';
+                statusBadge.className = 'inline-flex items-center px-3 py-1 rounded-full text-[10px] md:text-xs font-semibold uppercase tracking-wider mb-6 bg-amber-100 border border-amber-300 text-amber-800';
+                ticketCard.className = 'bg-white border border-amber-300 rounded-3xl p-6 md:p-8 text-center transition-all duration-500 custom-glow';
+
+                stateWaiting.classList.add('hidden');
+                stateCalled.classList.add('hidden');
+                stateFinished.classList.add('hidden');
+                if (stateSkipped) stateSkipped.classList.remove('hidden');
             }
         }
 
