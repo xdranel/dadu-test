@@ -12,6 +12,11 @@ class SidangTaRegistrationLog extends Model
 
     protected $casts = ['performed_at' => 'datetime'];
 
+    public function actor()
+    {
+        return $this->belongsTo(User::class, 'performed_by');
+    }
+
     public function registration()
     {
         return $this->belongsTo(SidangTaRegistration::class, 'sidang_ta_registration_id');

@@ -76,7 +76,18 @@ Command fresh menghapus tabel pada database yang dikonfigurasi. Setelah selesai,
 
 ### 4.1. Kirim roster privat dari laptop
 
-Kode/Compose baru harus sudah dikirim ke `/opt/dadu-test` melalui alur deployment biasa. JSON privat tidak ikut Git sehingga perlu dikirim terpisah. Dari laptop:
+Kode/Compose baru harus sudah dikirim ke `/opt/dadu-test` melalui alur deployment biasa. Build mengambil berkas pada server; build tidak mengirim perubahan dari laptop. Jika belum memakai commit/pull yang memuat perubahan75, salin kelima berkas berikut **dari repo Docker di laptop**, karena skrip setup/Compose merupakan bagian repo ini:
+
+```bash
+cd /home/xdranel/Code/Project/secret/dadu-test
+scp compose.yaml xdranel@100.100.208.106:/opt/dadu-test/
+scp docker/scripts/seed-test-accounts.php xdranel@100.100.208.106:/opt/dadu-test/docker/scripts/
+scp app/Support/DemoAccountPlan.php xdranel@100.100.208.106:/opt/dadu-test/app/Support/
+scp database/seeders/DemoAccountSeeder.php database/seeders/DatabaseSeeder.php \
+  xdranel@100.100.208.106:/opt/dadu-test/database/seeders/
+```
+
+Ini melengkapi pengiriman kode aplikasi KRS/BPP yang telah dilakukan sebelumnya, bukan menggantikan pengiriman seluruh aplikasi bila server belum diperbarui. JSON privat tidak ikut Git sehingga perlu dikirim terpisah. Dari laptop:
 
 ```bash
 ssh xdranel@100.100.208.106 'mkdir -p /opt/dadu-test/private-import'
@@ -101,11 +112,26 @@ docker compose --env-file .env.docker config --quiet
 COMPOSE_PARALLEL_LIMIT=1 docker compose --env-file .env.docker build app
 COMPOSE_PARALLEL_LIMIT=1 docker compose --env-file .env.docker build web
 docker compose --env-file .env.docker up -d --wait db
+```
+
+Pastikan kedua build selesai sukses. Sebelum menjalankan skrip, bandingkan versi host dan image dengan pemeriksaan berkas saja; override entrypoint ini tidak menjalankan bootstrap Laravel/seeder:
+
+```bash
+sha256sum docker/scripts/seed-test-accounts.php
+docker compose --env-file .env.docker run -T --interactive=false --rm --no-deps --pull never \
+  --entrypoint sha256sum setup /var/www/html/docker/scripts/seed-test-accounts.php
+```
+
+Untuk versi75 saat panduan ini diperbarui, kedua hash harus `f3a1cab01df25c8ea36ff51bef2e888889c5084f013da5250e718fa14e90931e`. Jika host berbeda, berkas server belum sesuai. Jika host benar tetapi image berbeda, periksa kegagalan build, Compose/build context atau tag image yang dipakai setup; jangan lanjut ke skrip sampai sesuai. Setelah itu:
+
+```bash
 docker compose --env-file .env.docker run -T --interactive=false --rm --no-deps setup \
   php docker/scripts/seed-test-accounts.php --check
 ```
 
 Lanjutkan hanya bila keluar `Preflight OK: 13 akun staging`. Pemeriksaan ini tidak membuat akun atau mengubah database; ia memastikan roster terbaca/valid dan password dua akun tetap tersedia. Pemeriksaan di DatabaseSeeder sendiri terlambat untuk melindungi tabel dari `migrate:fresh`, sehingga preflight terpisah ini harus dilakukan **sebelum** fresh.
+
+Jika output justru `Prepared superadmin...`, `Prepared krisna...`, `Prepared dummy-ta-2...` dan `Test accounts are ready`, image masih menjalankan skrip setup lama. Skrip lama mengabaikan argumen `--check` dan menjalankan bootstrap tiga akun, termasuk perubahan role/password/settings. Output itu tidak membuktikan fresh pernah dijalankan. Hentikan langkah reset; perbarui kelima berkas dan ulangi build serta pemeriksaan hash di atas.
 
 ### 4.3. Backup, fresh/seed, dan hidupkan aplikasi
 
@@ -159,6 +185,69 @@ Enam berkas dalam `sumber` disimpan untuk referensi/audit. Ekspor umum 277 mahas
 Setelah impor, buka periode pendaftaran Sidang TA melalui akun Petugas/Krisna bila ingin menguji pengajuan. Periode akademik Ganjil 2026/2027 yang dibuat seeder berbeda dari periode pendaftaran Sidang TA. Periksa hasil sinkronisasi/log setiap impor sebelum lanjut ke langkah berikutnya.
 
 Matriks adalah acuan skenario, bukan pernyataan bahwa semua label UI sudah disesuaikan. Tampilan BPP, label bahasa EPRT/ECCT, dan kartu persetujuan yang sebelumnya tercatat masih perlu ditinjau terpisah. BPP tidak menjadi penghalang utama kelayakan Sidang TA.
+
+### 5.1. Docker melewati seluruh 12 baris KRS
+
+Gejala yang dilaporkan: lokal berhasil memakai `75-02b-krs-demo-skenario-ta.json`, tetapi Docker menampilkan `Import KRS Mahasiswa selesai: 0 data berhasil diimpor, 12 data dilewati.` Teks itu berasal dari jalur importer lama. Untuk fixture ini, kode terbaru harus memilih importer resmi dan menampilkan `Import KRS resmi selesai`.
+
+Reproduksi pada database khusus `dadu_testing`: upload master75-01 lalu KRS75-02b melalui route aplikasi berhasil memproses 12 mahasiswa dan menyimpan 95 KRS, tanpa skip/mismatch; 1 tes lulus dengan 11 assertion. Jika baris yang sama langsung diberikan kepada importer lama, seluruh 12 baris ditolak sebelum akses database karena kode mata kuliah berada dalam `krs_mata_kuliah`, bukan pada objek mahasiswa. Ini menjelaskan pola 0/12; jangan mengubah JSON menjadi format lama atau menjalankan fresh ulang untuk mengatasinya.
+
+Bandingkan kode host dan container aplikasi yang benar-benar melayani website. Di server:
+
+```bash
+cd /opt/dadu-test
+sha256sum app/Http/Controllers/SyncController.php \
+  app/Support/OfficialKrsJsonNormalizer.php app/Services/OfficialKrsJsonImportService.php
+docker compose --env-file .env.docker exec -T --interactive=false --user www-data app \
+  sha256sum app/Http/Controllers/SyncController.php \
+  app/Support/OfficialKrsJsonNormalizer.php app/Services/OfficialKrsJsonImportService.php
+```
+
+Hash versi yang diverifikasi untuk panduan ini:
+
+| Berkas | SHA-256 |
+| --- | --- |
+| SyncController.php | `9f54cc8540b39211190b7ba3e09827b4c0079f88e3b46529d059e101e72c3aca` |
+| OfficialKrsJsonNormalizer.php | `4d12392772a92b8512345785342e0cba56be7c5408a79960d8b56293b28abcd0` |
+| OfficialKrsJsonImportService.php | `26dcca239abbe3c095cc44c176b6ba8e0047915b37800bedfde72851bb6a182e` |
+
+Jika image baru sudah memuat kode yang sesuai tetapi container app berbeda, container belum diganti dengan image hasil build. Jika host pun belum sesuai, kirim kode terlebih dahulu. Untuk memastikan seluruh dukungan KRS tersedia, dari laptop:
+
+```bash
+cd /home/xdranel/Code/Project/secret/dadu-test
+scp app/Http/Controllers/SyncController.php \
+  xdranel@100.100.208.106:/opt/dadu-test/app/Http/Controllers/
+scp app/Support/OfficialKrsJsonNormalizer.php \
+  xdranel@100.100.208.106:/opt/dadu-test/app/Support/
+scp app/Services/OfficialKrsJsonImportService.php \
+  xdranel@100.100.208.106:/opt/dadu-test/app/Services/
+scp database/migrations/2026_11_06_053632_expand_student_course_class_for_official_krs.php \
+  xdranel@100.100.208.106:/opt/dadu-test/database/migrations/
+```
+
+Kelima berkas setup pada bagian4.1 sebelumnya hanya memperbarui akun dan Compose. Kode aplikasi KRS di atas juga harus ada pada build context server. Update ini memakai migration biasa; akun dan data impor yang telah berhasil dipertahankan. Di server, saat penguji tidak aktif:
+
+```bash
+bash <<'UPDATE_KRS75'
+set -euo pipefail
+cd /opt/dadu-test
+compose=(docker compose --env-file .env.docker)
+"${compose[@]}" config --quiet
+COMPOSE_PARALLEL_LIMIT=1 "${compose[@]}" build app
+"${compose[@]}" exec -T --interactive=false --user www-data app php artisan down --retry=60
+"${compose[@]}" stop scheduler worker
+bash docker/scripts/backup.sh </dev/null
+"${compose[@]}" run -T --interactive=false --rm --no-deps app php artisan migrate --force
+"${compose[@]}" up -d --no-deps --force-recreate --wait --wait-timeout 240 app web
+"${compose[@]}" exec -T --interactive=false --user www-data app php artisan up
+"${compose[@]}" up -d --no-deps --force-recreate --wait --wait-timeout 240 scheduler worker
+curl --max-time 10 -sS -o /dev/null -w 'LOGIN HTTP %{http_code}\n' http://127.0.0.1:8091/login
+UPDATE_KRS75
+```
+
+Kode yang berubah hanya PHP/migration, sehingga build app cukup; web tetap direcreate agar alamat upstream app diperbarui. Migration dijalankan melalui one-off app dari image baru; perintah ini tidak menjalankan seeder akun. Jika blok gagal setelah masuk maintenance, ikuti pemulihan `artisan up` pada bagian4.3 setelah penyebab gagal ditangani.
+
+Ulangi pemeriksaan hash host/container, lalu impor ulang **75-02b** dengan tipe KRS. Hasil yang dituju: `12 mahasiswa diproses, 95 entri mata kuliah disimpan, 0 dilewati, 0 NIM-nama mismatch`. Jika pesan sudah resmi tetapi masih ada skip, ambil catatan pada log sinkronisasi terbaru untuk memeriksa sebab data/periode/penyimpanan. Jangan mengulang fresh sebagai langkah diagnosis.
 
 ## 6. Cakupan verifikasi
 

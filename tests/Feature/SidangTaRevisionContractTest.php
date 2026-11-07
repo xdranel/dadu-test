@@ -19,6 +19,11 @@ beforeEach(function () {
         'student_phone' => '081234567890', 'parent_phone' => '081234567891',
         'graduation_payment_date' => today()->toDateString(), 'diploma_biodata_accurate' => true,
         'academic_snapshot' => ['admission' => ['eprt' => ['mode' => 'waiver']]], 'status' => 'needs_review'])->fresh();
+    \App\Models\Student::create(['student_number' => $this->source->student_number, 'name' => 'Contract', 'academic_year' => 2022, 'study_program' => 'Informatika', 'status' => 'Aktif']);
+    foreach (range(1, 3) as $attempt) {
+        \App\Models\StudentEprt::create(['student_number' => $this->source->student_number,
+            'total_score' => 440, 'attempt_number' => $attempt, 'test_date' => today()->subDays($attempt)]);
+    }
     $this->payload = ['student_phone' => $this->source->student_phone, 'parent_phone' => $this->source->parent_phone,
         'graduation_payment_date' => today()->toDateString(), 'diploma_biodata_accurate' => true];
     $this->draft = SidangTaRegistrationDraft::create(['owner_user_id' => $this->owner->id,
@@ -44,10 +49,10 @@ beforeEach(function () {
     };
 });
 
-test('revision_contract_freezes_document_groups_to_the_stored_waiver_mode', function () {
+test('revision_contract_resolves_live_document_groups_and_keeps_unrelated_verified_files_locked', function () {
     expect(Contract::isTargeted($this->draft))->toBeTrue();
-    expect(Contract::typesForStep($this->draft, 2))->toBe(['ta_data_capture', 'online_supervision_capture']);
-    expect(Contract::typesForStep($this->draft, 3))->toContain('eprt_waiver_letter')->toHaveCount(4);
+    expect(Contract::typesForStep($this->draft, 2))->toBe(['ta_data_capture', 'online_supervision_capture', 'ta_supervisor_sk', 'thesis_draft']);
+    expect(Contract::typesForStep($this->draft, 3))->toContain('eprt_waiver_letter')->toHaveCount(2);
     expect(Contract::editableTypes($this->draft))->toBe(['ta_data_capture']);
 });
 
@@ -74,8 +79,7 @@ test('revision_contract_borrowed_rejected_file_does_not_count_as_a_replacement',
 
 test('revision_contract_frozen_payload_accepts_equivalent_html_boolean_but_rejects_changes', function () {
     Contract::assertPayloadUnchanged($this->draft, array_replace($this->payload, ['diploma_biodata_accurate' => '1']));
-    foreach (['student_phone' => '089999999999', 'parent_phone' => '088888888888',
-                 'graduation_payment_date' => today()->subDay()->toDateString(), 'diploma_biodata_accurate' => false] as $key => $value) {
+    foreach (['graduation_payment_date' => today()->subDay()->toDateString(), 'diploma_biodata_accurate' => false] as $key => $value) {
         expect(fn () => Contract::assertPayloadUnchanged($this->draft, array_replace($this->payload, [$key => $value])))
             ->toThrow(ValidationException::class);
     }

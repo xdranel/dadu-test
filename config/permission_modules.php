@@ -51,6 +51,10 @@ return [
         'grade_appeal'            => ['label' => 'Form Banding Nilai',   'group' => 'Layanan & Form', 'actions' => ['create' => [], 'read' => [], 'update' => [], 'review' => []]],
 
         // ── IT PANEL (hanya Akademik yang boleh mendelegasikan) ──────────
+        'sidang_ta_form_guide' => [
+            'label' => 'Panduan Form Sidang TA', 'group' => 'IT Panel', 'sensitive' => true,
+            'actions' => ['create' => [], 'read' => [], 'update' => [], 'delete' => []],
+        ],
         'sync' => [
             'label' => 'Sinkronisasi', 'group' => 'IT Panel', 'sensitive' => true,
             'actions' => [

@@ -70,7 +70,7 @@ test('separate_capture_saves_complete_stage_without_reuploading_previous_files',
     ($this->savePartial)(2, ['documents' => array_slice($files, 0, 1, true)])->assertOk();
     $first = $this->draft->documents()->where('document_type', Requirements::CAPTURES[0])->firstOrFail();
     ($this->savePartial)(2, ['documents' => array_slice($files, 1, null, true)])
-        ->assertOk()->assertJsonCount(2, 'data.documents')->assertJsonPath('data.version', 3)
+        ->assertOk()->assertJsonCount(4, 'data.documents')->assertJsonPath('data.version', 3)
         ->assertJsonPath('data.first_incomplete_step', 3);
     expect($first->fresh()->file_path)->toBe($first->file_path);
     Storage::disk('local')->assertExists($first->file_path);
@@ -80,7 +80,7 @@ test('separate_capture_saves_complete_stage_without_reuploading_previous_files',
 test('payment_file_saves_without_date_but_stage_four_stays_locked', function () {
     ($this->savePartial)(2, ['documents' => ($this->filesFor)(2)])->assertOk();
     ($this->savePartial)(3, ['documents' => array_slice(($this->filesFor)(3), 0, 1, true)])
-        ->assertOk()->assertJsonCount(3, 'data.documents')->assertJsonPath('data.first_incomplete_step', 3);
+        ->assertOk()->assertJsonCount(5, 'data.documents')->assertJsonPath('data.first_incomplete_step', 3);
     $progress = Requirements::progress($this->draft->fresh(), 3);
     expect($progress['stored_documents'])->toBe(1);
     expect($progress['missing'])->toContain('Tanggal pembayaran wisuda');
@@ -146,7 +146,7 @@ test('partial_draft_cannot_bypass_review_or_final_submission', function () {
     $this->postJson(route('sidang-ta-drafts.review', $this->draft), ['version' => $version])
         ->assertUnprocessable();
     $this->postJson(route('sidang-ta-registrations.store'), [
-        'draft_id' => $this->draft->id, 'version' => $version, 'action' => 'submit',
+        'draft_id' => $this->draft->id, 'version' => $version, 'action' => 'submit', 'declaration_accepted' => true,
     ])->assertStatus(409);
     expect(SidangTaRegistration::count())->toBe(0);
     expect($this->draft->fresh()->status)->toBe('active');
@@ -225,7 +225,7 @@ test('html_save_stays_on_current_step_and_continue_requires_saved_complete_stage
     $this->post($url, ['version' => 1, 'documents' => array_slice($files, 0, 1, true)])
         ->assertRedirect($edit)->assertSessionHasNoErrors();
     $crawler = new Crawler($this->get($edit)->assertOk()->getContent());
-    expect($crawler->filter('[data-step-progress]')->text(null, true))->toContain('1 dari 2 dokumen tersimpan.');
+    expect($crawler->filter('[data-step-progress]')->text(null, true))->toContain('1 dari 4 dokumen tersimpan.');
     expect($crawler->filter('button[data-next-step][disabled]')->count())->toBe(1);
     expect($crawler->filter('a[data-next-step]')->count())->toBe(0);
     $this->post($url, ['version' => 2, 'documents' => array_slice($files, 1, null, true)])

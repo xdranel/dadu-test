@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Auth\SsoController;
+use App\Http\Controllers\Admin\SidangTaFormGuideController;
 use App\Http\Controllers\CourseController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DocumentCategoryController;
@@ -100,6 +101,13 @@ Route::middleware(['auth', 'password.changed'])->group(function () {
 
     // All dashboard routes
     Route::prefix('dashboard')->group(function () {
+        Route::get('sidang-ta-guides/{guide}/media', [SidangTaFormGuideController::class, 'media'])
+            ->name('sidang-ta-guides.media');
+        Route::prefix('admin')->name('admin.')->middleware('role:Akademik')->group(function () {
+            Route::resource('sidang-ta-guides', SidangTaFormGuideController::class)
+                ->parameters(['sidang-ta-guides' => 'guide'])->except('show');
+        });
+
         Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
 
         // Mahasiswa (Students)
@@ -321,6 +329,8 @@ Route::middleware(['auth', 'password.changed'])->group(function () {
             ->middleware('permission:sidang_ta_registration_update')->name('sidang-ta-registrations.edit');
         Route::put('sidang-ta-registrations/{sidang_ta_registration}', [SidangTaRegistrationController::class, 'update'])
             ->middleware('permission:sidang_ta_registration_update')->name('sidang-ta-registrations.update');
+        Route::get('sidang-ta-registrations/{sidang_ta_registration}/history', [SidangTaRegistrationController::class, 'history'])
+            ->middleware('permission:sidang_ta_registration_read')->name('sidang-ta-registrations.history');
         Route::get('sidang-ta-registrations/{sidang_ta_registration}', [SidangTaRegistrationController::class, 'show'])
             ->middleware('permission:sidang_ta_registration_read')->name('sidang-ta-registrations.show');
         Route::get('sidang-ta-registration-documents/{document}/download', [SidangTaRegistrationController::class, 'downloadDocument'])

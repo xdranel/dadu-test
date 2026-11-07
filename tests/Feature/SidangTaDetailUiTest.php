@@ -44,7 +44,7 @@ beforeEach(function () {
             'student_name' => 'Nama Saat Diajukan', 'study_program' => 'Informatika Historis',
             'student_phone' => '081234567890', 'parent_phone' => '081234567891',
             'graduation_payment_date' => today()->toDateString(), 'diploma_biodata_accurate' => true,
-            'requirements_version' => 2, 'status' => 'needs_review', 'submitted_at' => now(), 'academic_snapshot' => $this->snapshot,
+            'requirements_version' => 2, 'status' => 'submitted', 'submitted_at' => now(), 'academic_snapshot' => $this->snapshot,
         ], $overrides))->fresh();
     };
     $this->actingAs($this->user);
@@ -98,21 +98,19 @@ test('current_registration_with_null_snapshot_fails_closed_without_live_student_
     expect($registration->fresh()->academic_snapshot)->toBeNull();
 });
 
-test('owner_can_see_revise_button_through_email_and_username_fallback', function () {
-    $registration = ($this->makeRegistration)();
-    $url = route('sidang-ta-registrations.show', $registration);
-    $crawler = new Crawler($this->get($url)->assertOk()->getContent());
-    expect($crawler->filter('[data-revise-registration]')->attr('href'))
-        ->toBe(route('sidang-ta-registrations.edit', $registration));
-    $this->user->update(['email' => 'alias-detail@mahasiswa.test']);
+test('owner_goes_directly_to_revision_recap_through_email_and_username_fallback', function () {
+    $registration=($this->makeRegistration)(['status'=>'needs_review']);
+    $url=route('sidang-ta-registrations.show',$registration);
+    $this->get($url)->assertRedirect(route('sidang-ta-registrations.edit',$registration));
+    $this->user->update(['email'=>'alias-detail@mahasiswa.test']);
     $this->actingAs($this->user->fresh());
-    $crawler = new Crawler($this->get($url)->assertOk()->getContent());
-    expect($crawler->filter('[data-revise-registration]')->count())->toBe(1);
-    $this->get(route('sidang-ta-registrations.edit', $registration))->assertOk();
+    $this->get($url)->assertRedirect(route('sidang-ta-registrations.edit',$registration));
+    $this->get(route('sidang-ta-registrations.edit',$registration))->assertOk()->assertSee('Perbaikan Pengajuan Anda');
+    expect(\App\Models\SidangTaRegistrationDraft::count())->toBe(0);
 });
 
 test('owner_without_update_permission_sees_no_revise_button_and_edit_is_forbidden', function () {
-    $registration = ($this->makeRegistration)();
+    $registration = ($this->makeRegistration)(['status'=>'needs_review']);
     $this->user->revokePermissionTo('sidang_ta_registration_update');
     app(PermissionRegistrar::class)->forgetCachedPermissions();
     $this->actingAs($this->user->fresh());
@@ -120,6 +118,17 @@ test('owner_without_update_permission_sees_no_revise_button_and_edit_is_forbidde
         ->assertDontSee(route('sidang-ta-registrations.edit', $registration), false);
     $crawler = new Crawler($response->getContent());
     expect($crawler->filter('[data-revise-registration]')->count())->toBe(0);
+    $index = new Crawler($this->get(route('sidang-ta-registrations.index'))->assertOk()->getContent());
+    $active = $index->filter('[data-registration-active]');
+    $detail = $index->filter('table tbody tr td:last-child a:not([data-registration-history])');
+    expect($active->count())->toBe(1);
+    expect($detail->count())->toBe(1);
+    expect($detail->text(null, true))->toBe('Detail');
+    expect($index->filter('[data-registration-revise]')->count())->toBe(0);
+    foreach ([$active, $detail] as $link) {
+        expect($link->attr('href'))->toBe(route('sidang-ta-registrations.show', $registration));
+        $this->get($link->attr('href'))->assertOk()->assertSee('Detail Pendaftaran Sidang TA');
+    }
     $this->get(route('sidang-ta-registrations.edit', $registration))->assertForbidden();
 });
 

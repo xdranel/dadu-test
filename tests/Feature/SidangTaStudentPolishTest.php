@@ -91,7 +91,7 @@ test('s2_pdm_review_requires_saved_pdm_after_switching_branch', function () {
     $crawler = new Crawler($this->get($url)->assertOk()->getContent());
     expect($crawler->filter('[data-review-submit]')->getNode(0)->hasAttribute('disabled'))->toBeTrue();
     expect($crawler->filter('[data-step-progress]')->text(null, true))->toContain('0 dari 1 dokumen tersimpan.');
-    $this->postJson($save, ['version' => $draft->fresh()->version, 'documents' => [
+    $this->postJson($save, ['version' => $draft->fresh()->version, 'pdm_submission_date' => today()->toDateString(), 'documents' => [
         'pdm_submission_proof' => UploadedFile::fake()->create('pdm.pdf', 100, 'application/pdf'),
     ]])->assertOk()->assertJsonPath('data.first_incomplete_step', null);
     $crawler = new Crawler($this->get($url)->assertOk()->getContent());
@@ -166,7 +166,7 @@ test('s2_index_active_registration_hides_start_and_respects_revision_permission'
     $header = $crawler->filter('[data-registration-header]');
     expect($header->filter('[data-registration-start]')->count())->toBe(0);
     expect($header->filter('[data-registration-active]')->attr('href'))
-        ->toBe(route('sidang-ta-registrations.show', $registration));
+        ->toBe(route('sidang-ta-registrations.edit', $registration));
     expect($header->filter('[data-registration-revise]')->attr('href'))
         ->toBe(route('sidang-ta-registrations.edit', $registration));
     $this->user->revokePermissionTo('sidang_ta_registration_update');

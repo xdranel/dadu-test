@@ -130,6 +130,7 @@ return [
                 'M15 12a3 3 0 11-6 0 3 3 0 016 0z',
             ],
             'items' => [
+                ['label' => 'Panduan Form Sidang TA', 'route' => 'admin.sidang-ta-guides.index', 'active' => 'admin.sidang-ta-guides.*', 'roles' => ['Akademik']],
                 ['label' => 'Sinkronisasi',        'route' => 'sync.index',          'active' => 'sync.*',          'permission' => 'sync_read'],
                 ['label' => 'Pengaturan Role',    'route' => 'role.index',          'active' => 'role.*',          'permission' => 'role_read'],
                 ['label' => 'Kelola Akun Manual', 'route' => 'manual-users.index',  'active' => 'manual-users.*',  'permission' => 'manual_user_read'],

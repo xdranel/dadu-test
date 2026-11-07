@@ -15,21 +15,6 @@
                     Tinjau pengajuan dan kelengkapan berkas mahasiswa.
                 </p>
             </div>
-            <div class="flex flex-wrap items-center gap-2">
-                @if($canReview)
-                    @if($counts['total'] > 0)
-                        <a data-ta-export href="{{ route('admin.sidang-ta-registrations.export', $filters) }}" class="btn btn-success">
-                            <svg aria-hidden="true" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-width="1.7" stroke-linejoin="round" d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6zm0 0v6h6M8 12l5 6m0-6l-5 6"/></svg>
-                            Ekspor Excel
-                        </a>
-                    @else
-                        <button data-ta-export-empty type="button" disabled class="btn btn-success cursor-not-allowed opacity-50" title="Tidak ada pengajuan untuk diekspor">Ekspor Excel</button>
-                    @endif
-                @endif
-                @can('sidang_ta_period_read')
-                    <a data-manage-ta-periods href="{{ route('admin.sidang-ta-periods.index') }}" class="btn btn-secondary">Kelola Periode</a>
-                @endcan
-            </div>
         </header>
         @if(session('success'))
             <div role="status"
@@ -45,27 +30,35 @@
         @endif
         @if($canReview)
             <div data-ta-review-data class="space-y-5">
-                <section class="space-y-3">
+                <section data-ta-period-card class="campus-card space-y-3 p-4">
                     <h3 class="text-sm font-bold text-slate-800">{{ isset($filters['period']) ? 'Periode terpilih' : 'Periode aktif' }}</h3>
+                    @can('sidang_ta_period_read')
+                        <a data-manage-ta-periods href="{{ route('admin.sidang-ta-periods.index') }}" class="btn btn-secondary">Kelola Periode</a>
+                    @endcan
                     <div class="grid gap-3 lg:grid-cols-2">
                         @forelse($periodCards as $period)
                             @php
                                 $state = match (true) { !$period->is_active => 'Tidak aktif', $at->lt($period->open_at) => 'Belum dibuka', $at->gt($period->close_at) => 'Ditutup', default => 'Sedang terbuka' };
                             @endphp
                             <article data-ta-period-banner="{{ $period->id }}"
+                                     @if($period->is_active) x-data="sidangTaPeriodCountdown(@js($period->open_at->getTimestampMs()), @js($period->close_at->getTimestampMs()))" @endif
                                      class="rounded-xl border border-slate-200 bg-white p-4">
                                 <div class="flex flex-wrap items-start justify-between gap-2">
                                     <h4 class="break-words font-bold text-slate-800">
                                         {{ $period->name }}
                                     </h4>
-                                    <span class="rounded-full bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700">
+                                    <span data-period-status @if($period->is_active) x-text="status" @endif class="rounded-full bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700">
                                         {{ $state }}
                                     </span>
                                 </div>
                                 <p class="mt-2 text-xs leading-relaxed text-slate-500">
-                                    Dibuka {{ $period->open_at->format('d/m/Y H:i') }} ·
-                                    Tenggat {{ $period->close_at->format('d/m/Y H:i') }}
+                                    Dibuka {{ $period->open_at->timezone('Asia/Jakarta')->format('d/m/Y H:i').' WIB' }} ·
+                                    Tenggat {{ $period->close_at->timezone('Asia/Jakarta')->format('d/m/Y H:i').' WIB' }}
                                 </p>
+                                @if($period->is_active)
+                                    <p data-period-countdown class="mt-3 text-sm font-semibold text-rose-800"
+                                       x-text="label" aria-live="off">{{ $state }}</p>
+                                @endif
                             </article>
                         @empty
                             <p data-ta-no-period
@@ -140,6 +133,16 @@
                         <a data-ta-reset href="{{ route('admin.sidang-ta-registrations.index') }}" class="btn btn-secondary">
                             Reset
                         </a>
+                    </div>
+                    <div class="flex flex-wrap items-center gap-2 md:col-span-2 xl:col-span-5">
+                        @if($counts['total'] > 0)
+                            <a data-ta-export href="{{ route('admin.sidang-ta-registrations.export', $filters) }}" class="btn btn-success">
+                                <svg aria-hidden="true" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-width="1.7" stroke-linejoin="round" d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6zm0 0v6h6M8 12l5 6m0-6l-5 6"/></svg>
+                                Ekspor Excel
+                            </a>
+                        @else
+                            <button data-ta-export-empty type="button" disabled class="btn btn-success cursor-not-allowed opacity-50" title="Tidak ada pengajuan untuk diekspor">Ekspor Excel</button>
+                        @endif
                     </div>
                 </form>
                 <p class="text-xs leading-relaxed text-slate-500">
@@ -228,7 +231,10 @@
                 </section>
             </div>
         @else
-            <section data-ta-period-only class="campus-card space-y-2 p-5">
+            <section data-ta-period-card data-ta-period-only class="campus-card space-y-2 p-5">
+                @can('sidang_ta_period_read')
+                    <a data-manage-ta-periods href="{{ route('admin.sidang-ta-periods.index') }}" class="btn btn-secondary">Kelola Periode</a>
+                @endcan
                 <h3 class="font-bold text-slate-800">
                     Pengaturan periode pendaftaran
                 </h3>

@@ -50,3 +50,5 @@ Schedule::call(function () {
 })->dailyAt('08:00')->timezone('Asia/Jakarta');
 
 Schedule::command('sidang-ta:expire-revisions')->everyMinute()->withoutOverlapping(10);
+
+Schedule::command('sidang-ta:purge-expired-drafts')->everyMinute()->withoutOverlapping(10);

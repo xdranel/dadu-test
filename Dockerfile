@@ -18,7 +18,9 @@ RUN mkdir -p app database/factories database/seeders \
 
 FROM php-base AS source
 COPY . .
-RUN mkdir -p storage/app/public storage/framework/cache/data storage/framework/sessions \
+RUN chmod -R a+rX app bootstrap config database public resources routes docker \
+    && chmod a+r artisan composer.json composer.lock \
+    && mkdir -p storage/app/public storage/framework/cache/data storage/framework/sessions \
         storage/framework/views storage/logs bootstrap/cache \
     && composer dump-autoload --no-dev --optimize --no-scripts \
     && php artisan package:discover --ansi \
@@ -41,12 +43,14 @@ COPY --from=assets /build/public/build ./public/build
 COPY docker/php/app.ini /usr/local/etc/php/conf.d/zz-dadu.ini
 COPY docker/php/pool.conf /usr/local/etc/php-fpm.d/zz-dadu.conf
 COPY docker/scripts/entrypoint.sh /usr/local/bin/dadu-entrypoint
-RUN chmod 755 /usr/local/bin/dadu-entrypoint
+RUN chmod 755 /usr/local/bin/dadu-entrypoint \
+    && chmod 644 /usr/local/etc/php/conf.d/zz-dadu.ini /usr/local/etc/php-fpm.d/zz-dadu.conf
 ENTRYPOINT ["dadu-entrypoint"]
 CMD ["php-fpm", "-F"]
 
 FROM nginx:stable-alpine AS web
 COPY --from=app /var/www/html/public /var/www/html/public
 COPY docker/nginx/default.conf /etc/nginx/conf.d/default.conf
-RUN ln -sfn /var/www/html/storage/app/public /var/www/html/public/storage
+RUN chmod 644 /etc/nginx/conf.d/default.conf \
+    && ln -sfn /var/www/html/storage/app/public /var/www/html/public/storage
 EXPOSE 8080

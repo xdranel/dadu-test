@@ -26,8 +26,8 @@
             'periodHint' => $selected ? $windowFor($selected) : ''];
         $reviewReady = $draft && $completedThrough === 4 && !$revisionExpired;
         $permission = $draft?->source_registration_id ? 'sidang_ta_registration_update' : 'sidang_ta_registration_create';
-        $titles = [1 => 'Data dasar & kontak', 2 => 'Verifikasi iGracias & akademik',
-            3 => 'Pembayaran & dokumen', 4 => 'Biodata ijazah'];
+        $titles = [1 => 'Data Mahasiswa', 2 => 'Data TA di Igracias',
+            3 => 'Pembayaran & Nilai Bahasa', 4 => 'Pernyataan Biodata Dummy Ijazah'];
     @endphp
     <div class="mx-auto max-w-7xl space-y-5" data-current-step="{{ $step }}"
          x-data="sidangTaWizard(@js($initial))" @sidang-ta-file-changed="dirty = true"
@@ -144,7 +144,7 @@
                       class="campus-card space-y-5 p-5 sm:p-6"
                       action="{{ $draft ? route('sidang-ta-drafts.steps.store', ['draft' => $draft, 'step' => $step]) : route('sidang-ta-drafts.store') }}"
                       @input="dirty = true" @change="dirty = true"
-                      @submit="if (busy || {{ $revisionExpired ? 'true' : 'false' }}) { $event.preventDefault(); } else { busy = true; }">
+                      @submit="if (!validateContacts($el) || busy || {{ $revisionExpired ? 'true' : 'false' }}) { $event.preventDefault(); } else { busy = true; }">
                     @csrf
                     @if($draft)
                         <input type="hidden" name="version" value="{{ old('version', $draft->version) }}">
@@ -152,7 +152,7 @@
                     <header class="space-y-1.5 border-b border-slate-100 pb-4">
                         <h2 class="text-lg font-bold text-slate-900">Tahap {{ $step }} — {{ $titles[$step] }}</h2>
                         <p class="text-xs text-slate-500">
-                            Tanda * menunjukkan unggahan wajib. Draft boleh disimpan sebelum lengkap.
+                            Tanda * menunjukkan isian atau unggahan wajib. Draft boleh disimpan sebelum lengkap.
                         </p>
                     </header>
                     @if($draft && !$stepProgress['complete'])
@@ -180,7 +180,7 @@
                     @if($step === 1)
                         <div class="max-w-lg">
                             <label for="sidang-ta-period-id" class="mb-1.5 block text-sm font-semibold text-slate-700">
-                                Periode Sidang TA
+                                Periode Sidang TA *
                             </label>
                             @if($draft?->source_registration_id)
                                 <input type="hidden" name="sidang_ta_period_id"
@@ -213,28 +213,28 @@
                         <div class="grid max-w-xl gap-4 sm:grid-cols-2">
                             <div class="min-w-0">
                                 <label for="student-phone" class="mb-1.5 block text-sm font-semibold text-slate-700">
-                                    Nomor HP mahasiswa
+                                    Nomor WA Aktif Mahasiswa *
                                 </label>
                                 <input id="student-phone"
                                        class="campus-input w-full {{ $errors->has('student_phone') ? '!border-rose-500' : '' }}"
-                                       name="student_phone" @readonly($targetedRevision) inputmode="tel" maxlength="30" required
+                                       name="student_phone" inputmode="numeric" pattern="[0-9]{8,15}" minlength="8" maxlength="15" required @input="validateWhatsapp($event.target)"
                                        placeholder="08xxxxxxxxxx"
                                        aria-invalid="{{ $errors->has('student_phone') ? 'true' : 'false' }}"
                                        aria-describedby="error-student_phone"
-                                       value="{{ $targetedRevision ? ($payload['student_phone'] ?? '') : old('student_phone', $payload['student_phone'] ?? $student->phone_number) }}">
+                                       value="{{ old('student_phone', $payload['student_phone'] ?? $student->phone_number) }}">
                                 @include('sidang_ta_registrations.partials.wizard-error', ['field' => 'student_phone'])
                             </div>
                             <div class="min-w-0">
                                 <label for="parent-phone" class="mb-1.5 block text-sm font-semibold text-slate-700">
-                                    Nomor HP orang tua/wali
+                                    Nomor WA Aktif Orang Tua/Wali *
                                 </label>
                                 <input id="parent-phone"
                                        class="campus-input w-full {{ $errors->has('parent_phone') ? '!border-rose-500' : '' }}"
-                                       name="parent_phone" @readonly($targetedRevision) inputmode="tel" maxlength="30" required
+                                       name="parent_phone" inputmode="numeric" pattern="[0-9]{8,15}" minlength="8" maxlength="15" required @input="validateWhatsapp($event.target)"
                                        placeholder="08xxxxxxxxxx"
                                        aria-invalid="{{ $errors->has('parent_phone') ? 'true' : 'false' }}"
                                        aria-describedby="error-parent_phone"
-                                       value="{{ $targetedRevision ? ($payload['parent_phone'] ?? '') : old('parent_phone', $payload['parent_phone'] ?? $student->parent_phone_number) }}">
+                                       value="{{ old('parent_phone', $payload['parent_phone'] ?? $student->parent_phone_number) }}">
                                 @include('sidang_ta_registrations.partials.wizard-error', ['field' => 'parent_phone'])
                             </div>
                         </div>
@@ -243,7 +243,7 @@
                             <div class="max-w-xs">
                                 <label for="graduation-payment-date"
                                        class="mb-1.5 block text-sm font-semibold text-slate-700">
-                                    Tanggal pembayaran wisuda
+                                    Tanggal pembayaran wisuda *
                                 </label>
                                 <input id="graduation-payment-date"
                                        class="campus-input w-full {{ $errors->has('graduation_payment_date') ? '!border-rose-500' : '' }}"
@@ -255,13 +255,16 @@
                                 @include('sidang_ta_registrations.partials.wizard-error', ['field' => 'graduation_payment_date'])
                             </div>
                         @endif
-                        @include('sidang_ta_registrations.partials.meet-automatic-cards', ['items' => $meetContext['automatic'][$step] ?? []])
+                        @if($step === 3)
+                            @include('sidang_ta_registrations.partials.language-history', ['history' => $meetContext['admission']['eprt_facts']['history']])
+                        @endif
                         <div class="grid gap-4 sm:grid-cols-2">
                             @foreach($meetContext['types'][$step] as $type)
                                 @include('sidang_ta_registrations.partials.wizard-upload', ['type' => $type, 'conditional' => null])
                             @endforeach
                         </div>
                     @else
+                        @include('sidang_ta_guides.partials.guides', ['guides' => $guides, 'slot' => 'diploma_biodata', 'preview' => true])
                         @if($targetedRevision)
                             <input type="hidden" name="diploma_biodata_accurate" value="{{ $accurate }}">
                         @endif
@@ -269,7 +272,7 @@
                                   aria-invalid="{{ $errors->has('diploma_biodata_accurate') ? 'true' : 'false' }}"
                                   aria-describedby="error-diploma_biodata_accurate">
                             <legend class="text-sm font-semibold text-slate-700">
-                                Apakah biodata dummy ijazah sudah sesuai?
+                                Apakah biodata dummy ijazah sudah sesuai? *
                             </legend>
                             <div class="mt-3 grid gap-3 sm:grid-cols-2">
                                 @foreach(['1' => 'Sudah sesuai', '0' => 'Belum sesuai, sudah mengajukan PDM'] as $value => $label)
@@ -294,7 +297,18 @@
                                 @include('sidang_ta_registrations.partials.wizard-upload', ['type' => $type, 'conditional' => '1'])
                             @endforeach
                         </div>
-                        <div x-show="accurate === '0'" x-cloak>
+                        <div x-show="accurate === '0'" x-cloak class="space-y-4">
+                            <div>
+                                <label for="pdm-submission-date" class="mb-1.5 block text-sm font-semibold text-slate-700">Tanggal pengajuan PDM *</label>
+                                <input id="pdm-submission-date" type="date" name="pdm_submission_date"
+                                       class="campus-input {{ $errors->has('pdm_submission_date') ? '!border-rose-500' : '' }}"
+                                       max="{{ today()->toDateString() }}" value="{{ old('pdm_submission_date', $payload['pdm_submission_date'] ?? '') }}"
+                                       @disabled($accurate !== '0') :disabled="accurate !== '0'"
+                                       @required($accurate === '0') :required="accurate === '0'"
+                                       aria-invalid="{{ $errors->has('pdm_submission_date') ? 'true' : 'false' }}"
+                                       aria-describedby="error-pdm_submission_date">
+                                @include('sidang_ta_registrations.partials.wizard-error', ['field' => 'pdm_submission_date'])
+                            </div>
                             @include('sidang_ta_registrations.partials.wizard-upload', ['type' => 'pdm_submission_proof', 'conditional' => '0'])
                         </div>
                     @endif

@@ -23,7 +23,8 @@ class SidangTaRegistration extends Model
     protected $fillable = [
         'requirements_version',
         'sidang_ta_period_id', 'student_number', 'student_name', 'study_program',
-        'student_phone', 'parent_phone', 'graduation_payment_date',
+        'student_phone', 'parent_phone', 'graduation_payment_date', 'pdm_submission_date',
+        'declaration_accepted_at', 'declaration_version',
         'diploma_biodata_accurate', 'academic_snapshot', 'status',
         'submitted_by', 'reviewed_by', 'submitted_at', 'reviewed_at', 'review_notes',
     ];
@@ -36,6 +37,9 @@ class SidangTaRegistration extends Model
         'requirements_version' => 'integer',
         'academic_snapshot' => 'array',
         'graduation_payment_date' => 'date',
+        'pdm_submission_date' => 'date',
+        'declaration_accepted_at' => 'datetime',
+        'declaration_version' => 'integer',
         'diploma_biodata_accurate' => 'boolean',
         'submitted_at' => 'datetime',
         'reviewed_at' => 'datetime',

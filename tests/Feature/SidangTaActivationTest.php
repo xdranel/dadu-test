@@ -52,7 +52,8 @@ beforeEach(function () {
         $draft = SidangTaRegistrationDraft::create(['owner_user_id' => $this->user->id,
             'student_number' => $this->student->student_number, 'sidang_ta_period_id' => $this->period->id,
             'requirements_version' => 2, 'payload' => ['student_phone' => '081234567890', 'parent_phone' => '081234567891',
-                'graduation_payment_date' => today()->toDateString(), 'diploma_biodata_accurate' => $accurate]]);
+                'graduation_payment_date' => today()->toDateString(), 'diploma_biodata_accurate' => $accurate,
+                'pdm_submission_date' => $accurate ? null : today()->toDateString()]]);
         if ($complete) {
             foreach (Meet::allTypes($accurate, $mode) as $type) {
                 $path = 'sidang_ta/drafts/'.$draft->id.'/'.$type.'.pdf';
@@ -69,7 +70,7 @@ beforeEach(function () {
     };
     $this->submitMeet = function ($draft, ?int $version = null) {
         return $this->postJson(route('sidang-ta-registrations.store'), [
-            'draft_id' => $draft->id, 'version' => $version ?? $draft->fresh()->version, 'action' => 'submit',
+            'draft_id' => $draft->id, 'version' => $version ?? $draft->fresh()->version, 'action' => 'submit', 'declaration_accepted' => true,
         ]);
     };
     $this->asReviewer = function () {
@@ -110,7 +111,7 @@ beforeEach(function () {
     };
     $this->submitRevision = function ($source, $draft) {
         return $this->putJson(route('sidang-ta-registrations.update', $source), [
-            'draft_id' => $draft->id, 'version' => $draft->fresh()->version, 'action' => 'submit',
+            'draft_id' => $draft->id, 'version' => $draft->fresh()->version, 'action' => 'submit', 'declaration_accepted' => true,
         ]);
     };
 });
@@ -182,7 +183,7 @@ test('single_finalization_database_failure_rolls_back_metadata_without_removing_
         if (++$writes === 2) throw new RuntimeException('single finalization rollback');
     });
     try {
-        expect(fn () => app(\App\Services\SidangTaDraftFinalizer::class)->submit($this->user, $draft, $draft->version))
+        expect(fn () => app(\App\Services\SidangTaDraftFinalizer::class)->submit($this->user, $draft, $draft->version, null, true))
             ->toThrow(RuntimeException::class, 'single finalization rollback');
     } finally { \Illuminate\Support\Facades\Event::forget($event); }
     expect(SidangTaRegistration::count())->toBe(0);
@@ -251,7 +252,7 @@ test('single_stale_and_consumed_revision_drafts_cannot_be_discarded_or_delete_fi
     $ownedPath = $draft->documents()->whereNull('source_document_id')->value('file_path');
     $draft = ($this->markReviewed)($draft);
     $this->putJson(route('sidang-ta-registrations.update', $source), [
-        'draft_id' => $draft->id, 'version' => $draft->version, 'action' => 'submit',
+        'draft_id' => $draft->id, 'version' => $draft->version, 'action' => 'submit', 'declaration_accepted' => true,
     ])->assertOk();
     $consumed = $draft->fresh();
     expect($consumed->status)->toBe('consumed');
@@ -270,14 +271,14 @@ test('single_revision_draft_rejects_initial_submit_and_wrong_source_without_muta
     $before = [$draft->fresh()->getAttributes(), $draft->documents()->orderBy('id')->get()->toArray(),
         Storage::disk('local')->allFiles(), $source->fresh()->getAttributes()];
     $this->postJson(route('sidang-ta-registrations.store'), [
-        'draft_id' => $draft->id, 'version' => $draft->version, 'action' => 'submit',
+        'draft_id' => $draft->id, 'version' => $draft->version, 'action' => 'submit', 'declaration_accepted' => true,
     ])->assertConflict();
     $wrongSource = $source->replicate();
     $wrongSource->status = 'needs_review';
     $wrongSource->lock_version = 1;
     $wrongSource->save();
     $this->putJson(route('sidang-ta-registrations.update', $wrongSource), [
-        'draft_id' => $draft->id, 'version' => $draft->version, 'action' => 'submit',
+        'draft_id' => $draft->id, 'version' => $draft->version, 'action' => 'submit', 'declaration_accepted' => true,
     ])->assertConflict();
     expect([$draft->fresh()->getAttributes(), $draft->documents()->orderBy('id')->get()->toArray(),
         Storage::disk('local')->allFiles(), $source->fresh()->getAttributes()])->toBe($before);
@@ -294,11 +295,11 @@ test('single_saved_and_final_requests_cannot_replace_the_server_contract_or_uplo
             ->assertUnprocessable()->assertJsonValidationErrors('requirements_version');
         ($this->submitMeet)($draft)->assertConflict();
         $this->postJson(route('sidang-ta-registrations.store'), ['draft_id' => $draft->id,
-            'version' => $draft->version, 'action' => 'submit', 'requirements_version' => $marker])
+            'version' => $draft->version, 'action' => 'submit', 'declaration_accepted' => true, 'requirements_version' => $marker])
             ->assertUnprocessable()->assertJsonValidationErrors('requirements_version');
     }
     $this->postJson(route('sidang-ta-registrations.store'), ['draft_id' => $draft->id,
-        'version' => $draft->version, 'action' => 'submit', 'unexpected_file' => UploadedFile::fake()->create('x.pdf', 10, 'application/pdf')])
+        'version' => $draft->version, 'action' => 'submit', 'declaration_accepted' => true, 'unexpected_file' => UploadedFile::fake()->create('x.pdf', 10, 'application/pdf')])
         ->assertUnprocessable()->assertJsonValidationErrors('documents');
     expect($draft->fresh()->version)->toBe(1);
     expect($draft->documents()->count())->toBe(0);

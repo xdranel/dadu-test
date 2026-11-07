@@ -1,6 +1,6 @@
 import test, { before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import sidangTaWizard, { sidangTaUpload } from '../../resources/js/sidang-ta-wizard.js';
+import sidangTaWizard, { sidangTaUpload, validWhatsapp, periodCountdown, sidangTaPeriodCountdown } from '../../resources/js/sidang-ta-wizard.js';
 
 const originalDataTransfer = globalThis.DataTransfer;
 before(() => {
@@ -132,4 +132,51 @@ test('leaving unsaved changes requires one confirmation before navigation', () =
         if (originalWindow === undefined) delete globalThis.window;
         else globalThis.window = originalWindow;
     }
+});
+
+
+test('PDF upload rejects image and oversize selections and drops', () => {
+    const {state,input}=uploadState();
+    input.files=[{name:'capture.png',type:'image/png',size:100}]; state.picked();
+    assert.match(state.localError,/PDF/); assert.equal(input.files.length,0);
+    state.drop({dataTransfer:{files:[{name:'large.pdf',type:'application/pdf',size:11*1024*1024}]}});
+    assert.match(state.localError,/10 MB/); assert.equal(input.files.length,0);
+});
+
+test('WA validation preserves digit strings and rejects punctuation letters and invalid lengths', () => {
+    assert.equal(validWhatsapp('081234567890'),true);
+    for (const value of ['+628123456789','08abc12345','1234567','1234567890123456','08 12345678','1e12345678']) assert.equal(validWhatsapp(value),false);
+});
+
+test('period countdown follows actual schedule and has no invented empty deadline', () => {
+    assert.equal(periodCountdown(null,null,0),null);
+    assert.deepEqual(periodCountdown(1000,61000,0),{status:'Belum dibuka',seconds:1});
+    assert.deepEqual(periodCountdown(1000,61000,1000),{status:'Aktif',seconds:60});
+    assert.deepEqual(periodCountdown(1000,61000,61001),{status:'Ditutup',seconds:0});
+});
+
+
+test('WA submission helper blocks invalid string even when form uses novalidate', () => {
+    let reported=0;
+    const field={value:'08abc12345',setCustomValidity(value){this.error=value;},reportValidity(){reported++;}};
+    const state=sidangTaWizard();
+    assert.equal(state.validateContacts({querySelectorAll:()=>[field]}),false);
+    assert.match(field.error,/8–15/); assert.equal(reported,1);
+    field.value='081234567890';
+    assert.equal(state.validateContacts({querySelectorAll:()=>[field]}),true);
+    assert.equal(field.error,'');
+});
+
+
+test('live period badge and timer use the same state across open and close transitions', () => {
+    const originalNow=Date.now;
+    try {
+        const state=sidangTaPeriodCountdown(1000,61000);
+        Date.now=()=>0; state.tick();
+        assert.equal(state.status,'Belum dibuka'); assert.match(state.label,/Belum dibuka/);
+        Date.now=()=>1000; state.tick();
+        assert.equal(state.status,'Aktif'); assert.match(state.label,/Aktif/);
+        Date.now=()=>61001; state.tick();
+        assert.equal(state.status,'Ditutup'); assert.equal(state.label,'Ditutup');
+    } finally { Date.now=originalNow; }
 });

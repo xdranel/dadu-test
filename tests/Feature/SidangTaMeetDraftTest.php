@@ -59,7 +59,7 @@ beforeEach(function () {
         ($this->uploadStep)($draft, 3, Meet::typesForStep(3, $accurate, $mode),
             ['graduation_payment_date' => today()->toDateString()])->assertOk();
         ($this->uploadStep)($draft, 4, Meet::typesForStep(4, $accurate, $mode),
-            ['diploma_biodata_accurate' => $accurate])->assertOk();
+            ['diploma_biodata_accurate' => $accurate, 'pdm_submission_date' => $accurate ? null : today()->toDateString()])->assertOk();
         return $draft->fresh();
     };
 });
@@ -70,12 +70,12 @@ test('meet_v2_partial_stage_two_upload_is_saved_and_next_stage_is_locked', funct
     $draft = ($this->newMeetDraft)();
     ($this->uploadStep)($draft, 2, ['ta_data_capture'])->assertOk();
     $progress = Requirements::progress($draft->fresh(), 2);
-    expect($progress['required_documents'])->toBe(2);
+    expect($progress['required_documents'])->toBe(4);
     expect($progress['stored_documents'])->toBe(1);
     expect($progress['complete'])->toBeFalse();
     expect($draft->fresh()->version)->toBe(2);
     expect($draft->documents()->count())->toBe(1);
-    ($this->uploadStep)($draft, 3, ['thesis_draft'])->assertConflict();
+    ($this->uploadStep)($draft, 3, ['graduation_payment_proof'])->assertConflict();
     expect($draft->documents()->count())->toBe(1);
 });
 
@@ -94,7 +94,7 @@ test('meet_v2_stage_three_can_save_partial_pdf_with_missing_payment_date', funct
     ($this->uploadStep)($draft, 2, Meet::CAPTURES)->assertOk();
     ($this->uploadStep)($draft, 3, ['graduation_payment_proof'])->assertOk();
     $progress = Requirements::progress($draft->fresh(), 3);
-    expect($progress['required_documents'])->toBe(3);
+    expect($progress['required_documents'])->toBe(1);
     expect($progress['stored_documents'])->toBe(1);
     expect($progress['complete'])->toBeFalse();
     expect($draft->documents()->where('document_type', 'graduation_payment_proof')->exists())->toBeTrue();
@@ -105,8 +105,8 @@ test('meet_v2_waiver_mode_requires_the_fourth_stage_three_pdf', function () {
     ($this->uploadStep)($draft, 2, Meet::CAPTURES)->assertOk();
     ($this->uploadStep)($draft, 3, Meet::PAYMENT, ['graduation_payment_date' => today()->toDateString()])->assertOk();
     $progress = Requirements::progress($draft->fresh(), 3);
-    expect($progress['required_documents'])->toBe(4);
-    expect($progress['stored_documents'])->toBe(3);
+    expect($progress['required_documents'])->toBe(2);
+    expect($progress['stored_documents'])->toBe(1);
     expect($progress['complete'])->toBeFalse();
     expect($progress['missing'])->toContain('Surat Permakluman EPRT');
     ($this->uploadStep)($draft, 3, [Meet::WAIVER])->assertOk();
@@ -124,7 +124,7 @@ test('meet_v2_waiver_is_pdf_only_and_removed_stage_three_uploads_are_rejected', 
         ($this->uploadStep)($draft, 3, [$type])->assertUnprocessable()->assertJsonValidationErrors('documents');
     }
     expect($draft->fresh()->version)->toBe($version);
-    expect($draft->documents()->count())->toBe(2);
+    expect($draft->documents()->count())->toBe(4);
 });
 
 test('meet_v2_retest_or_unknown_academics_do_not_lock_draft_or_review', function () {
@@ -208,8 +208,8 @@ test('meet_v2_missing_saved_capture_keeps_the_stage_incomplete_without_losing_ot
     $document = $draft->documents()->where('document_type', 'ta_data_capture')->firstOrFail();
     Storage::disk('local')->delete($document->file_path);
     $progress = Requirements::progress($draft->fresh(), 2);
-    expect($progress['required_documents'])->toBe(2);
-    expect($progress['stored_documents'])->toBe(1);
+    expect($progress['required_documents'])->toBe(4);
+    expect($progress['stored_documents'])->toBe(3);
     expect($progress['complete'])->toBeFalse();
     expect(Requirements::firstIncompleteStep($draft->fresh()))->toBe(2);
     expect($draft->documents()->count())->toBe(7);
@@ -220,7 +220,7 @@ test('meet_v2_missing_academic_facts_block_submit_without_consuming_the_saved_re
     $this->postJson(route('sidang-ta-drafts.review', $draft), ['version' => $draft->version])->assertOk();
     $paths = Storage::disk('local')->allFiles();
     $this->postJson(route('sidang-ta-registrations.store'), ['draft_id' => $draft->id,
-        'version' => $draft->version, 'action' => 'submit'])->assertUnprocessable()
+        'version' => $draft->version, 'action' => 'submit', 'declaration_accepted' => true])->assertUnprocessable()
         ->assertJsonValidationErrors(['eligibility.level_2_passed', 'eligibility.ta2_registered',
             'eligibility.skpi_approved', 'eligibility.tak_score', 'eligibility.passed_credits']);
     expect($draft->fresh()->status)->toBe('active');
@@ -239,7 +239,7 @@ test('meet_v2_current_consumed_replay_returns_saved_registration_before_fresh_ad
     $draft->update(['requirements_version' => 2, 'status' => 'consumed', 'submitted_registration_id' => $registration->id]);
     $paths = Storage::disk('local')->allFiles();
     $this->postJson(route('sidang-ta-registrations.store'), ['draft_id' => $draft->id,
-        'version' => $draft->version, 'action' => 'submit'])->assertOk()
+        'version' => $draft->version, 'action' => 'submit', 'declaration_accepted' => true])->assertOk()
         ->assertJsonPath('data.id', $registration->id)->assertJsonPath('data.status', 'approved');
     expect($registration->logs()->count())->toBe(0);
     expect($registration->fresh()->requirements_version)->toBe(2);

@@ -7,7 +7,7 @@
     @endphp
     <section class="campus-card space-y-4 p-5">
         <h2 class="font-bold">
-            Perbaiki pengajuan Anda
+            Perbaikan Pengajuan Anda
         </h2>
         <p>
             {{ $registration->review_notes ?: 'Periksa kembali data dan dokumen pengajuan.' }}
@@ -15,6 +15,7 @@
         <p>
             Pengajuan yang sudah dikirim tetap tersimpan selama Anda mengerjakan draft revisi
         </p>
+        <h3 class="text-base font-bold text-slate-800">Detail Revisi</h3>
         @include('sidang_ta_registrations.partials.revision-feedback')
         @if($revisionExpired)
             <p data-revision-deadline-expired role="alert" class="rounded-lg bg-amber-50 p-3 text-sm text-amber-900">

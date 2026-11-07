@@ -4,6 +4,8 @@ Referensi untuk server `xdranel@100.100.208.106`, folder `/opt/dadu-test`, Compo
 
 **Pilih bagian sesuai kebutuhan. Dokumen ini bukan script yang seluruh command-nya dijalankan berurutan.** Deployment sudah berhasil mencapai login publik200 dan pengguna mengonfirmasi dapat login melalui browser. Instalasi pertama ada di63; perbaikan FPM ada di63b.
 
+**Untuk kondisi server sesudah pengiriman berkas lewat SCP:** mulai dari bagian 12.1 sekali, lalu 12.2 untuk memasang main ke container. Update rutin berikutnya memakai 12.2. Reset akun dan urutan impor lokal/Docker ada pada [75](75-reset-demo-lokal-docker-dan-urutan-impor.md).
+
 ## 1. Masuk server dan folder aplikasi
 
 Dari laptop:
@@ -280,21 +282,143 @@ Jalankan satu per satu dan pastikan backup berhasil sebelum melanjutkan perubaha
 
 ## 12. Update aplikasi dari branch main
 
-Pakai ini setelah kode yang ingin dipasang sudah di-commit/push ke repo dadu-test. Tidak menjalankan script deploy.sh lama di root repo.
+Alur update: **working tree bersih → fetch/fast-forward main → build → maintenance → backup → migrate → recreate → artisan up → verifikasi**. Source PHP berada di image; pull saja memperbarui host, sedangkan container yang melayani website baru berubah setelah build dan recreate.
 
-Blok ini berjalan sebagai satu script dan berhenti bila ada command gagal. Build dilakukan sebelum maintenance agar proses build tidak memperpanjang waktu503. Backup dilakukan sesudah proses background dihentikan, sebelum migration. Hentikan aktivitas penguji ketika memasuki maintenance.
+Pilih langkah sesuai keadaan:
 
-Karena script dibaca melalui heredoc, command container di bawah menonaktifkan input interaktif dengan `--interactive=false`; `-T` hanya menonaktifkan TTY. Backup juga memakai stdin kosong agar command `exec` di dalamnya tidak membaca sisa script. Tanpa penjagaan ini, command container yang membaca stdin dapat menghabiskan baris berikutnya, termasuk `artisan up`. Ini kemungkinan dari rescan, bukan penyebab insiden yang sudah terbukti karena output lengkap update belum tersedia. Referensi: [Compose exec](https://docs.docker.com/reference/cli/docker/compose/exec/) dan [Compose run](https://docs.docker.com/reference/cli/docker/compose/run/), diperiksa melalui Context7.
+| Keadaan server | Mulai dari |
+| --- | --- |
+| Pull ditolak karena berkas hasil SCP, termasuk file KRS/seeder yang untracked | 12.1 sekali, kemudian 12.2 |
+| Working tree bersih dan ingin memasang main terbaru | 12.2 |
+| Source host sudah baru tetapi kode container berbeda/hilang | 12.3 |
+| Update terhenti setelah maintenance dan login 503 | 12.4 |
+| Halaman sinkronisasi500 dan log menyebut SyncController.php Permission denied | 12.5 |
+
+Update rutin tidak menjalankan seeder akun atau fresh database. Reset penuh serta urutan impor demo mempunyai panduan [75](75-reset-demo-lokal-docker-dan-urutan-impor.md).
+
+### 12.1. Sekali: selaraskan berkas hasil SCP dengan main
+
+Pada kasus yang dilaporkan, host masih pada `a107e00` dan main sudah memuat perubahan pada `0b3ce80`. Empat berkas tracked berubah lewat SCP dan lima berkas kode baru belum tracked. Git menolak menimpa berkas tersebut saat fast-forward. Blok update lama berhenti pada pull, **sebelum** build, `artisan down`, migration, atau recreate.
+
+Blok berikut menyimpan salinan berkas di `$HOME/dadu-test-recovery/`, memasukkan **hanya sembilan berkas kode terkait** ke stash, lalu mengambil main. `.env.docker` dan `private-import` disalin sebagai backup privat di luar repo dan tidak dimasukkan ke stash. Aturan ignore lokal ditambahkan melalui `.git/info/exclude`, sehingga roster yang belum diabaikan oleh commit lama tidak menghalangi pemeriksaan working tree.
+
+Jalankan di server. Aplikasi yang sedang berjalan tidak dihentikan oleh langkah penyelarasan Git ini:
+
+```bash
+bash <<'DADU_ALIGN'
+set -euo pipefail
+umask 022
+cd /opt/dadu-test
+
+if [ "$(git branch --show-current)" != main ]; then
+    printf 'Berhenti: branch server harus main.\n' >&2
+    exit 1
+fi
+test -f .env.docker
+git fetch origin main
+if ! git merge-base --is-ancestor HEAD origin/main; then
+    printf 'Berhenti: histori server bercabang dari main; tinjau commit lokal dahulu.\n' >&2
+    exit 1
+fi
+
+task_recovery_dir="$HOME/dadu-test-recovery/$(date -u +%Y%m%dT%H%M%SZ)-$$"
+mkdir -m 0700 -p "$task_recovery_dir"
+mkdir -p "$task_recovery_dir/source"
+printf 'Backup berkas: %s\n' "$task_recovery_dir"
+git rev-parse HEAD > "$task_recovery_dir/head-before.txt"
+git status --short > "$task_recovery_dir/status-before.txt"
+cp -p -- .env.docker "$task_recovery_dir/.env.docker"
+if [ -d private-import ]; then
+    cp -a -- private-import "$task_recovery_dir/private-import"
+fi
+
+task_exclude_file="$(git rev-parse --git-path info/exclude)"
+printf '\n# Runtime privat DADU server\n/private-import/\n/.env.docker*\n/backups/\n' >> "$task_exclude_file"
+
+task_scp_files=(
+    app/Http/Controllers/SyncController.php
+    compose.yaml
+    database/seeders/DatabaseSeeder.php
+    docker/scripts/seed-test-accounts.php
+    app/Services/OfficialKrsJsonImportService.php
+    app/Support/DemoAccountPlan.php
+    app/Support/OfficialKrsJsonNormalizer.php
+    database/migrations/2026_11_06_053632_expand_student_course_class_for_official_krs.php
+    database/seeders/DemoAccountSeeder.php
+)
+for task_file in "${task_scp_files[@]}"; do
+    if [ -f "$task_file" ]; then
+        mkdir -p "$task_recovery_dir/source/$(dirname -- "$task_file")"
+        cp -p -- "$task_file" "$task_recovery_dir/source/$task_file"
+    fi
+done
+git diff --binary HEAD -- "${task_scp_files[@]}" > "$task_recovery_dir/tracked-changes.patch"
+
+if [ -n "$(git status --porcelain -- "${task_scp_files[@]}")" ]; then
+    git -c user.name="DADU server backup" -c user.email="dadu-server@localhost" \
+      stash push --include-untracked -m "dadu-scp-before-main-$(date -u +%Y%m%dT%H%M%SZ)" -- "${task_scp_files[@]}"
+    git rev-parse refs/stash > "$task_recovery_dir/stash-oid.txt"
+fi
+
+if [ -n "$(git status --porcelain)" ]; then
+    git status --short
+    printf 'Berhenti: ada perubahan lain di luar sembilan berkas SCP. Backup tercatat di atas; tinjau dahulu.\n' >&2
+    exit 1
+fi
+git merge --ff-only origin/main
+cmp -- .env.docker "$task_recovery_dir/.env.docker"
+if [ -d "$task_recovery_dir/private-import" ]; then
+    diff -qr -- "$task_recovery_dir/private-import" private-import
+fi
+git status --short
+git log -1 --oneline
+printf 'Penyelarasan selesai. Backup: %s\nLanjutkan bagian 12.2.\n' "$task_recovery_dir"
+DADU_ALIGN
+```
+
+Harapan: fast-forward berhasil, `git status --short` kosong, env/roster tetap sama, dan lokasi backup tercetak. Backup ini menyimpan berkas, bukan isi database; backup database/upload dilakukan pada 12.2. Folder backup dibuat0700 secara khusus; checkout Git memakai umask022 agar source baru tetap terbaca oleh www-data. Jangan memakai umask077 untuk seluruh blok checkout.
+
+Identitas `DADU server backup` hanya dipakai pada command stash tersebut agar tetap dapat berjalan bila server belum mempunyai konfigurasi nama/email Git. Konfigurasi Git pengguna tidak diubah.
+
+**Biarkan stash tersimpan.** Main sudah membawa implementasi KRS/seeder yang tadi dikirim lewat SCP; `git stash pop` dapat memasukkan kode lama kembali atau menimbulkan konflik. Untuk melihat daftar dan ringkasan simpanan:
+
+```bash
+git stash list
+git stash show --include-untracked --stat 'stash@{0}'
+```
+
+Gunakan entri berlabel `dadu-scp-before-main-...` yang sesuai, karena `stash@{0}` berarti stash terbaru. OID tepatnya juga tersimpan di `stash-oid.txt` pada folder backup. Salinan source dapat dibandingkan dengan main bila ada perubahan server yang ingin dipertahankan. Jangan menghapus stash/backup sebelum perbandingan selesai. Tidak memakai `git reset --hard`, `git clean`, stash seluruh repo, atau commit berkas privat untuk menyelesaikan kasus ini.
+
+Jika langkah penyelarasan berhenti karena perubahan lain atau histori bercabang, simpan outputnya. Jangan lanjut build dari working tree yang belum jelas. Sembilan berkas yang sudah masuk stash tetap dapat ditemukan dari OID dan salinan backup; langkah ini tidak menjalankan maintenance atau mengubah database.
+
+### 12.2. Update rutin setelah working tree bersih
+
+Kode yang ingin dipasang harus sudah di-commit/push ke main. Sesudah penyelarasan 12.1, jalankan blok ini untuk memasang kode main ke container. Pada update berikutnya, cukup mulai dari blok ini selama working tree bersih. Jangan menjalankan script deploy.sh lama di root repo.
+
+Blok berhenti sebelum fetch/build jika ditemukan perubahan lokal atau file untracked yang belum diabaikan. Build dilakukan sebelum maintenance. `--interactive=false` menjaga command container agar tidak membaca sisa heredoc; `-T` saja hanya menonaktifkan TTY. Backup memakai stdin kosong untuk alasan yang sama. Referensi: [Compose exec](https://docs.docker.com/reference/cli/docker/compose/exec/) dan [Compose run](https://docs.docker.com/reference/cli/docker/compose/run/).
 
 ```bash
 bash <<'DADU_UPDATE'
 set -euo pipefail
+umask 022
 cd /opt/dadu-test
 compose=(docker compose --env-file .env.docker)
 
-git status --short
+if [ "$(git branch --show-current)" != main ]; then
+    printf 'Berhenti: branch server harus main.\n' >&2
+    exit 1
+fi
+if [ -n "$(git status --porcelain)" ]; then
+    git status --short
+    printf 'Berhenti: working tree belum bersih. Untuk berkas SCP yang dilaporkan, ikuti64 bagian 12.1.\n' >&2
+    exit 1
+fi
+printf 'Commit sebelum update: '
 git rev-parse HEAD
-git pull --ff-only origin main
+git fetch origin main
+git merge --ff-only origin/main
+printf 'Commit yang akan dipasang: '
+git rev-parse HEAD
 "${compose[@]}" config --quiet
 COMPOSE_PARALLEL_LIMIT=1 "${compose[@]}" build app
 COMPOSE_PARALLEL_LIMIT=1 "${compose[@]}" build web
@@ -304,109 +428,113 @@ COMPOSE_PARALLEL_LIMIT=1 "${compose[@]}" build web
 bash docker/scripts/backup.sh </dev/null
 "${compose[@]}" run -T --interactive=false --rm --no-deps app php artisan migrate --force
 
-# /up is exempt from maintenance, allowing --wait to check the new FPM/web.
-"${compose[@]}" up -d --no-deps --force-recreate --wait --wait-timeout 240 app web
-"${compose[@]}" exec -T --interactive=false --user www-data app php artisan up
-"${compose[@]}" up -d --no-deps --force-recreate --wait --wait-timeout 240 scheduler worker
-"${compose[@]}" ps
-DADU_UPDATE
-```
-
-Sesudah selesai, cek halaman login/upload di browser. Jangan menjalankan setup akun lagi pada update normal. Recreate web membuat Nginx me-resolve ulang alamat app; recreate worker/scheduler memastikan proses panjang memakai image baru.
-
-Jika script gagal sebelum maintenance, aplikasi lama biasanya masih berjalan. Jika gagal setelah maintenance/migration, simpan output, lihat status/log, dan periksa backup; jangan langsung menjalankan `migrate:fresh`, rollback schema, atau menghapus volume. Catat commit lama yang dicetak untuk rencana pemulihan kode yang sesuai dengan schema.
-
-### Pemulihan jika sesudah update tetap 503 Service Unavailable
-
-Script mengaktifkan `artisan down --retry=60` sebelum backup/migration. Nilai60 mengisi header `Retry-After`, **bukan** timer yang otomatis membuka aplikasi setelah60 detik. Jika script terhenti atau baris akhirnya tidak dijalankan, maintenance tetap aktif pada volume storage meskipun container di-recreate. Endpoint `/up` dapat tetap200 ketika `/login`503; healthcheck/container healthy saja belum membuktikan aplikasi terbuka bagi pengguna.
-
-Jalankan di **server**, dari `/opt/dadu-test`, untuk memeriksa status dan migration terlebih dahulu:
-
-```bash
-cd /opt/dadu-test
-docker compose --env-file .env.docker ps -a
-docker compose --env-file .env.docker exec --user www-data app php artisan migrate:status
-```
-
-Jika langkah migration berhasil, seluruh migration berstatus `Ran`, dan app/web berjalan, nonaktifkan maintenance lalu uji halaman pengguna:
-
-```bash
-docker compose --env-file .env.docker exec --user www-data app php artisan up
-curl --max-time 10 -sS -o /dev/null -w 'LOGIN HTTP %{http_code}\n' http://127.0.0.1:8091/login
-curl --connect-timeout 10 --max-time 20 -sS -o /dev/null \
-  -w 'PUBLIC LOGIN HTTP %{http_code}\n' https://dadu-test.gendhiramona.site/login
-```
-
-Harapan: `Application is now live.`, `LOGIN HTTP 200`, dan `PUBLIC LOGIN HTTP 200`. Jika migration masih `Pending`, gagal, atau app/web bermasalah, simpan output terakhir update dan periksa log bagian7 sebelum membuka maintenance. Jangan memasang trap yang selalu menjalankan `artisan up` saat gagal: schema dan image mungkin belum siap melayani request.
-
-Periksa juga scheduler/worker pada hasil `ps -a`: `artisan up` tidak menghidupkan container yang tadi dihentikan. Bila update/migration serta app/web sudah terverifikasi dan scheduler/worker masih berhenti, lanjutkan langkah akhir update:
-
-```bash
-docker compose --env-file .env.docker up -d --no-deps --force-recreate --wait --wait-timeout 240 scheduler worker
-docker compose --env-file .env.docker ps -a
-```
-
-**Bukti insiden:** pengguna melaporkan503 setelah menjalankan bagian12. Pemeriksaan asisten menemukan503 dengan `Retry-After: 60` dan `/up`200. Pengguna kemudian menjalankan `artisan up`, mendapat `Application is now live.`, dan login lokal200. Pemeriksaan ulang asisten pada URL login publik juga200. Ini membuktikan pemulihan HTTP dari maintenance; output lengkap script, status migration, dan status scheduler/worker saat insiden belum diberikan, sehingga langkah awal yang terhenti belum dapat dipastikan.
-
-### Pemulihan jika sinkronisasi lokal berhasil tetapi Docker tetap memakai data/tampilan lama
-
-Pada insiden berikutnya, SKPI lokal berubah menjadi Disetujui sesudah sinkronisasi, tetapi pada Docker data Krisna dan Dummy002 tetap belum tersedia. Pemeriksaan membuktikan source di host sudah baru, sedangkan container app masih memakai kode lama:
-
-| File | Source host | Container app saat insiden |
-| --- | --- | --- |
-| `app/Services/SidangTaAdmissionFacts.php` | Prefix SHA-256 `09fdc3b82618` | Prefix SHA-256 `a9f43164c0d1`, berbeda |
-| `app/Services/AcademicProfileJsonImportService.php` | File tersedia | `No such file or directory` |
-
-`artisan up` hanya membuka maintenance. `git pull` memperbarui source host, build menghasilkan image baru, dan recreate mengganti container agar memakai image itu. Source PHP tidak di-bind dari host pada stack ini, sehingga restart saja tidak memasang source/image baru. Status login200 belum membuktikan kode di container sudah sesuai.
-
-**1. Bandingkan file host dengan container sebelum memutuskan pemulihan.** Jalankan di server:
-
-```bash
-cd /opt/dadu-test
-sha256sum \
-  app/Services/SidangTaAdmissionFacts.php \
-  app/Services/AcademicProfileJsonImportService.php
-docker compose --env-file .env.docker exec -T --interactive=false --user www-data app \
-  sha256sum \
-  app/Services/SidangTaAdmissionFacts.php \
-  app/Services/AcademicProfileJsonImportService.php
-```
-
-Cocokkan hash berdasarkan nama file. Nilai hash mengikuti commit yang sedang dipasang, bukan harus sama dengan contoh insiden di atas. File yang ada di host tetapi hilang di container, atau hash yang berbeda, menunjukkan source runtime belum sesuai dengan host.
-
-**2. Jika source host sudah benar tetapi container masih lama, build dan terapkan image baru.** Untuk update kode dari main, gunakan blok update utama di awal bagian12. Jika source yang benar sudah tersedia di `/opt/dadu-test` seperti insiden ini, blok pemulihan berikut dapat langsung dipakai:
-
-```bash
-bash <<'DADU_FIX'
-set -euo pipefail
-cd /opt/dadu-test
-compose=(docker compose --env-file .env.docker)
-
-"${compose[@]}" config --quiet
-COMPOSE_PARALLEL_LIMIT=1 "${compose[@]}" build app
-COMPOSE_PARALLEL_LIMIT=1 "${compose[@]}" build web
-
-"${compose[@]}" exec -T --interactive=false --user www-data app php artisan down --retry=60
-"${compose[@]}" stop scheduler worker
-bash docker/scripts/backup.sh </dev/null
-"${compose[@]}" run -T --interactive=false --rm --no-deps app php artisan migrate --force
-
+# Route /up dikecualikan dari maintenance; --wait dapat memeriksa web.
 "${compose[@]}" up -d --no-deps --force-recreate --wait --wait-timeout 240 app web
 "${compose[@]}" exec -T --interactive=false --user www-data app php artisan up
 "${compose[@]}" up -d --no-deps --force-recreate --wait --wait-timeout 240 scheduler worker
 "${compose[@]}" ps -a
-DADU_FIX
+curl --fail --max-time 10 -sS -o /dev/null -w 'LOGIN HTTP %{http_code}\n' http://127.0.0.1:8091/login
+curl --fail --connect-timeout 10 --max-time 20 -sS -o /dev/null \
+  -w 'PUBLIC LOGIN HTTP %{http_code}\n' https://dadu-test.gendhiramona.site/login
+DADU_UPDATE
 ```
 
-Script mengambil backup sebelum migration dan berhenti jika ada command gagal. Pemulihan ini memakai `migrate --force` untuk migration yang belum diterapkan; tidak memerlukan `migrate:fresh --seed` yang menghapus seluruh tabel. Jika script berhenti, simpan error terakhir dan tangani langkah yang gagal sebelum melanjutkan.
+Harapan: migration berhasil, app/web siap, scheduler/worker berjalan, login lokal/publik 200. Recreate web membuat Nginx memakai alamat app yang baru; recreate worker/scheduler memasang image baru pada proses background. Akun, roster privat, password env, serta data impor yang sudah tersimpan tidak direset. Seed akun tidak menjadi bagian update rutin.
 
-**3. Verifikasi kode runtime, lalu impor ulang data yang sebelumnya diproses kode lama.** Ulangi pemeriksaan hash pada langkah1: kedua file harus tersedia dan hash host/container cocok. Cek login lokal/publik seperti langkah pemulihan503 di atas.
+Jika blok gagal pada Git/build, maintenance belum dijalankan dan container lama belum diganti oleh blok ini. Jika gagal setelah `artisan down`, ikuti 12.4. Jangan memasang trap yang selalu menjalankan `artisan up` saat gagal karena image/schema mungkin belum siap.
 
-Sesudah kode cocok, login superadmin dan impor ulang `67-03-profil-akademik-akun-demo.json` dengan tipe **Profil Akademik**, lalu buka ulang halaman mahasiswa. File ini berisi dua mahasiswa demo; untuk kedua baris yang berhasil, total baru+diperbarui diharapkan2 tanpa skipped/mismatch. Periksa ringkasan/log sinkronisasi karena status selesai sendiri belum menjamin semua baris diproses.
+### 12.3. Verifikasi source host dan kode container
 
-Jika log melaporkan mahasiswa belum ada atau NIM-nama mismatch, cocokkan data Student dengan `67-01-mahasiswa-akun-demo.json` dan ikuti urutan impor pada67 bagian2.2. Impor ulang KRS hanya diperlukan sesuai kebutuhan data/periode, bukan untuk mengganti kode runtime. Keterangan periode BPP belum terkonfirmasi merupakan cakupan tampilan yang masih dicatat pada68; jangan menyamakan semua label yang belum berubah dengan kegagalan impor SKPI.
+Login 200 membuktikan endpoint merespons; untuk memastikan kode KRS/profil terbaru terpasang, bandingkan hash berdasarkan nama file:
 
-**Hasil pemulihan:** setelah diberikan blok build/migration/recreate dan langkah verifikasi/impor ulang tersebut, pengguna mengonfirmasi aplikasi sudah berjalan dan berhasil. Bukti hash sebelum pemulihan membuktikan container lama; pengguna belum mengirim output hash sesudah pemulihan. Penanganan tidak membutuhkan reset database atau seed ulang akun. Ini tidak menetapkan command mana yang membuat update awal terhenti.
+```bash
+cd /opt/dadu-test
+sha256sum \
+  app/Http/Controllers/SyncController.php \
+  app/Support/OfficialKrsJsonNormalizer.php \
+  app/Services/OfficialKrsJsonImportService.php \
+  app/Services/AcademicProfileJsonImportService.php
+docker compose --env-file .env.docker exec -T --interactive=false --user www-data app \
+  sha256sum \
+  app/Http/Controllers/SyncController.php \
+  app/Support/OfficialKrsJsonNormalizer.php \
+  app/Services/OfficialKrsJsonImportService.php \
+  app/Services/AcademicProfileJsonImportService.php
+```
+
+Hash mengikuti commit yang dipasang; cocokkan host/container, bukan hash historis dari chat. File yang hilang di host berarti source belum lengkap. Host baru tetapi container berbeda/hilang berarti image belum sesuai atau container belum direcreate. Untuk source main yang sudah bersih, ulangi 12.2 dan pastikan build/recreate sukses. Restart atau `artisan up` saja tidak memasukkan source baru ke image.
+
+Insiden KRS telah direproduksi: fixture 75-02b dikirim ke jalur lama menghasilkan 0 berhasil/12 dilewati; upload melalui kode resmi berhasil 12 mahasiswa/95 KRS. Pengguna kemudian mengonfirmasi Docker dapat mengimpor sesudah source dikirim, build/migration dijalankan, dan container direcreate. Pemulihan tidak membutuhkan fresh/seed ulang. Panduan khusus KRS dan pilihan fixture ada pada [75 bagian5.1](75-reset-demo-lokal-docker-dan-urutan-impor.md#51-docker-melewati-seluruh-12-baris-krs).
+
+### 12.4. Pemulihan 503 setelah maintenance
+
+`artisan down --retry=60` mengisi header Retry-After; 60 bukan timer untuk membuka aplikasi otomatis. Maintenance tersimpan pada volume storage dan bertahan sesudah recreate. Route `/up` dapat 200 saat `/login` 503, sehingga healthy saja belum membuktikan aplikasi terbuka.
+
+Periksa status, log error terakhir, dan migration:
+
+```bash
+cd /opt/dadu-test
+docker compose --env-file .env.docker ps -a
+docker compose --env-file .env.docker exec -T --interactive=false --user www-data app php artisan migrate:status
+docker compose --env-file .env.docker logs --tail 100 app web
+```
+
+Sesudah penyebab kegagalan ditangani, migration selesai, dan app/web memakai image yang sesuai, hidupkan kembali akses pengguna dan proses background:
+
+```bash
+docker compose --env-file .env.docker exec -T --interactive=false --user www-data app php artisan up
+docker compose --env-file .env.docker up -d --no-deps --force-recreate --wait --wait-timeout 240 scheduler worker
+curl --fail --max-time 10 -sS -o /dev/null -w 'LOGIN HTTP %{http_code}\n' http://127.0.0.1:8091/login
+curl --fail --connect-timeout 10 --max-time 20 -sS -o /dev/null \
+  -w 'PUBLIC LOGIN HTTP %{http_code}\n' https://dadu-test.gendhiramona.site/login
+```
+
+Target: `Application is now live.` dan login lokal/publik 200. `artisan up` tidak menghidupkan container worker/scheduler yang dihentikan, sehingga langkah up kedua tetap diperlukan. Pengguna sebelumnya telah memulihkan503 dengan `artisan up` dan mendapatkan login200. Bila migration masih gagal/pending, tangani error sebelum membuka maintenance; jangan menjalankan fresh atau rollback schema sebagai pemulihan otomatis.
+
+
+### 12.5. Sinkronisasi500: source PHP tidak terbaca oleh www-data
+
+Log server membuktikan `include(/var/www/html/app/Http/Controllers/SyncController.php): Failed to open stream: Permission denied`. Error `Cannot modify header information` yang menyertainya merupakan error lanjutan. Pada pengujian aplikasi lokal, halaman sinkronisasi dapat dibuka setelah seluruh fixture demo diimpor;19 assertion lulus.
+
+Penyebab berhasil direproduksi pada script penyelarasan versi awal panduan ini: `umask 077` untuk backup berlaku sampai operasi stash/checkout Git, sehingga source baru menjadi0600. Docker COPY mempertahankan mode file dari build context. Di image, file milik root dengan mode0600 tidak terbaca oleh worker FPM www-data. Pemeriksaan isi/hash saja tidak menggantikan pemeriksaan izin baca pengguna aplikasi.
+
+Panduan sekarang memakai umask022 untuk checkout dan membuat **folder backup**0700 secara khusus. Dockerfile juga menormalkan izin baca/traverse hanya pada direktori source aplikasi dan konfigurasi image. Berkas env, roster privat dan volume storage tidak masuk normalisasi source tersebut. Referensi: [Dockerfile COPY](https://docs.docker.com/reference/dockerfile/#copy).
+
+Untuk memeriksa mode source pada container saat ini:
+
+```bash
+cd /opt/dadu-test
+docker compose --env-file .env.docker exec -T --interactive=false --user 0 app \
+  stat -c '%a %U:%G %n' app/Http/Controllers/SyncController.php
+```
+
+**Pemulihan sementara pada container app yang sedang berjalan:** perbaiki izin source sebagai root, lalu buktikan autoload controller berhasil sebagai www-data. Ini tidak menyentuh isi kode, database, env, atau roster privat:
+
+```bash
+bash <<'DADU_FIX_CODE_READ'
+set -euo pipefail
+cd /opt/dadu-test
+compose=(docker compose --env-file .env.docker)
+"${compose[@]}" exec -T --interactive=false --user 0 app sh -eu -c '
+chmod -R a+rX app config database public resources routes
+chmod a+rx bootstrap
+chmod a+r bootstrap/app.php bootstrap/providers.php artisan composer.json composer.lock
+'
+"${compose[@]}" exec -T --interactive=false --user www-data app php -r '
+require "vendor/autoload.php";
+if (!class_exists("App\\Http\\Controllers\\SyncController")) { exit(1); }
+echo "SyncController terbaca oleh www-data.\n";
+'
+"${compose[@]}" restart app web
+curl --fail --max-time 10 -sS -o /dev/null -w 'LOGIN HTTP %{http_code}\n' http://127.0.0.1:8091/login
+DADU_FIX_CODE_READ
+```
+
+Sesudah pesan `SyncController terbaca oleh www-data.` dan login200, buka ulang halaman sinkronisasi dalam sesi login browser. Script hanya memperbaiki container app saat ini; recreate dari image lama dapat mengembalikan izin yang salah. Worker/scheduler juga harus memakai image yang telah diperbaiki agar source baru dapat dibaca.
+
+**Perbaikan permanen:** commit/push Dockerfile dan panduan64 yang telah diperbaiki dari laptop. Sesudah perubahan itu tersedia di main, gunakan12.2 untuk fetch/build/migration/recreate. Tidak perlu mengubah source PHP atau mengulang fresh/seed. Dockerfile yang baru memperbaiki mode source saat build meskipun berkas host lama masih0600; konfigurasi PHP-FPM/Nginx yang di-COPY terpisah juga dibuat0644.
+
+Verifikasi pengembangan: uji simulasi Git sekarang memastikan hasil checkout dapat dibaca pengguna lain, dan uji instruksi awal RUN pada source stage Dockerfile memastikan source0600/direktori0700 menjadi terbaca/terlintasi, script executable tetap executable, serta fixture privat/env tetap0600. Uji izin ini menjalankan command build yang relevan pada direktori sementara; build Docker penuh dan pemulihan server tetap harus dijalankan pada lingkungan Docker pengguna.
 
 ## 13. Mengubah environment atau konfigurasi deployment
 
@@ -585,7 +713,7 @@ File konfigurasi Nginx/PHP tidak di-bind dari host. Perubahan file di Git/host m
 | Mematikan sementara, container tetap ada | stop |
 | Melepas container, volume tetap ada | down tanpa -v |
 | Mengulang proses dengan konfigurasi/image container yang sama | restart |
-| Menjalankan kode baru | pull → build → migrate → recreate sesuai bagian12 |
+| Menjalankan kode baru | Working tree bersih → fetch/fast-forward → build → migrate → recreate sesuai bagian12 |
 | Menerapkan environment baru | recreate, bukan restart saja |
 | Menghentikan akses HTTP dengan halaman503 | artisan down |
 | Mengembalikan akses setelah maintenance | artisan up |
@@ -597,6 +725,8 @@ Dokumen memakai service name Compose, bukan ID container yang berubah setiap rec
 
 ## Referensi dan pemeriksaan dokumen
 
+- [Git stash: pathspec dan include-untracked](https://git-scm.com/docs/git-stash)
+- [Git merge: fast-forward only](https://git-scm.com/docs/git-merge)
 - [Docker Compose CLI](https://docs.docker.com/reference/cli/docker/compose/)
 - [Compose restart](https://docs.docker.com/reference/cli/docker/compose/restart/)
 - [Compose down](https://docs.docker.com/reference/cli/docker/compose/down/)
@@ -604,4 +734,4 @@ Dokumen memakai service name Compose, bukan ID container yang berubah setiap rec
 - [Laravel migrations](https://laravel.com/docs/13.x/migrations)
 - [Laravel queues](https://laravel.com/docs/13.x/queues)
 
-Perintah dicocokkan dengan compose.yaml dan script backup/entrypoint saat ini. Blok Bash diperiksa syntax tanpa dieksekusi; source di kedua clone dan file deployment di-hash sebelum/sesudah setiap penulisan Markdown. Asisten tidak melakukan SSH, restart, migration, backup, seed, reset data atau operasi Git commit/push untuk membuat panduan ini.
+Perintah dicocokkan dengan compose.yaml dan script backup/entrypoint saat ini. Blok Bash diperiksa syntax. Penyelarasan Git diperiksa pada repo simulasi di /tmp, termasuk file tracked/untracked hasil SCP, pelestarian env/roster, dan pengaman working tree. Asisten tidak menjalankan SSH, build/restart Docker, migration, backup database, seed, reset data, atau commit/push repo aplikasi untuk memperbarui dokumen ini.

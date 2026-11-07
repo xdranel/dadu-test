@@ -6,14 +6,7 @@
         && !in_array($type, $meetContext['editable_types'] ?? [], true));
     $replacementNeeded = (bool) ($meetContext['targeted'] ?? false) && !$lockedUpload
         && $existing && $existing->source_document_id !== null;
-    $label = \App\Models\SidangTaRegistration::DOCUMENT_TYPES[$type] ?? $type;
-    $capture = in_array($type, \App\Support\SidangTaMeetRequirements::CAPTURES, true);
-    $guide = match ($type) {
-        'ta_data_capture' => 'assets/images/forms/sidang-ta/ta-data.png',
-        'online_supervision_capture' => 'assets/images/forms/sidang-ta/bimbingan-online.png',
-        default => null,
-    };
-    $guideAvailable = $guide && is_file(public_path($guide));
+    $label = \App\Support\SidangTaMeetRequirements::LABELS[$type] ?? $type;
     $conditional = $conditional ?? null;
     $errorKey = "documents.{$type}";
     $uploadInitial = ['serverError' => $errors->has($errorKey)];
@@ -25,31 +18,10 @@
         {{ $label }} @unless($lockedUpload)<span class="text-rose-600" aria-hidden="true">*</span>@endunless
     </label>
     <p id="help-{{ $type }}" class="mt-1.5 text-xs leading-relaxed text-slate-500">
-        @unless($guideAvailable)
-            {{ \App\Models\SidangTaRegistration::DOCUMENT_DESCRIPTIONS[$type] ?? '' }}
-        @endunless
-        {{ $capture ? 'PDF/JPG/JPEG/PNG' : 'PDF' }}, maksimal 10 MB per file.
+        {{ \App\Models\SidangTaRegistration::DOCUMENT_DESCRIPTIONS[$type] ?? '' }}
+        PDF, maksimal 10 MB per file.
     </p>
-    @if($guideAvailable)
-        <button data-upload-guide data-document-preview type="button"
-                class="mt-3 block w-full rounded-lg text-left focus:outline-none focus:ring-2 focus:ring-rose-500 focus:ring-offset-2"
-                data-preview-url="{{ asset($guide) }}" data-download-url=""
-                data-file-name="Contoh {{ $label }}" data-file-type="png"
-                aria-label="Lihat contoh {{ $label }}" aria-haspopup="dialog"
-                x-on:click="$dispatch('sidang-ta-preview', $el.dataset)">
-            <img loading="lazy" src="{{ asset($guide) }}" alt="Panduan {{ $label }}"
-                 class="w-full rounded-lg border border-slate-200 object-contain">
-            <span class="mt-1 block text-xs font-medium text-[#DA2D3B]">Lihat contoh</span>
-        </button>
-
-    @endif
-    @if($type === \App\Support\SidangTaMeetRequirements::WAIVER)
-        <p class="mt-2 text-xs leading-relaxed text-slate-600">
-            Unduh template, lengkapi, lalu unggah kembali dalam format PDF.
-            <a data-waiver-template href="https://telkomuniversityofficial-my.sharepoint.com/:w:/g/personal/akademiksby_telkomuniversity_ac_id/EYC5y40Ky_1PhVWh4_LswJoBtC8yKT6PuTEAwUTDiFY-2A?e=qRenjo"
-               target="_blank" rel="noopener" class="font-semibold text-[#DA2D3B] underline">Link Surat Permakluman</a>
-        </p>
-    @endif
+    @include('sidang_ta_guides.partials.guides', ['guides' => $guides, 'slot' => $type, 'preview' => true])
     @if($available)
         <div class="mt-3 space-y-2 rounded-lg border border-emerald-200 bg-emerald-50 p-3">
             <p class="text-xs font-semibold text-emerald-800">Berkas tersimpan</p>
@@ -81,7 +53,7 @@
             @dragenter.prevent.stop="enter()" @dragover.prevent.stop
             @dragleave.prevent.stop="leaveDrop()" @drop.prevent.stop="drop($event)">
             <input id="file-{{ $type }}" x-ref="file" type="file" name="documents[{{ $type }}]"
-                   accept="{{ $capture ? '.pdf,.jpg,.jpeg,.png' : '.pdf' }}"
+                   accept=".pdf"
                    class="absolute inset-0 h-full w-full cursor-pointer opacity-0"
                    aria-describedby="help-{{ $type }} error-documents-{{ $type }}"
                    aria-invalid="{{ $errors->has($errorKey) ? 'true' : 'false' }}"
@@ -104,7 +76,7 @@
                     Klik untuk memilih atau seret file ke sini
                 </p>
                 <p class="mt-1 text-xs text-slate-500">
-                    {{ $capture ? 'PDF/JPG/PNG' : 'PDF' }} · Maksimal 10 MB · Satu berkas
+                    PDF · Maksimal 10 MB · Satu berkas
                 </p>
             </div>
         </div>

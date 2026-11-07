@@ -87,7 +87,7 @@ beforeEach(function () {
         foreach ([2, 3, 4] as $step) {
             $data = ['version' => $draft->fresh()->version];
             if ($step === 3) $data['graduation_payment_date'] = today()->toDateString();
-            if ($step === 4) $data['diploma_biodata_accurate'] = $accurate;
+            if ($step === 4) { $data['diploma_biodata_accurate'] = $accurate; if (!$accurate) $data['pdm_submission_date'] = today()->toDateString(); }
             foreach (Requirements::typesForStep($step, $accurate) as $type) {
                 $data['documents'][$type] = \Illuminate\Http\UploadedFile::fake()
                     ->create($type.'.pdf', 100, 'application/pdf');
@@ -159,10 +159,12 @@ test('only_confirmation_form_submits_saved_draft_with_current_contract', functio
     $body = array_column($fields, 'value', 'name');
     $keys = array_keys($body);
     sort($keys);
-    expect($keys)->toBe(['_token', 'action', 'draft_id', 'version']);
+    expect($keys)->toBe(['_token', 'action', 'declaration_accepted', 'draft_id', 'version']);
     expect($body['draft_id'])->toBe($draft->id);
     expect($body['version'])->toBe((string) $draft->version);
     expect($body['action'])->toBe('submit');
+    expect($form->filter('input[name="declaration_accepted"]')->getNode(0)->hasAttribute('checked'))->toBeFalse();
+    $body['declaration_accepted'] = '1';
     expect(SidangTaRegistration::count())->toBe(0);
 
     $response = $this->post($form->attr('action'), $body);
@@ -231,12 +233,12 @@ test('unknown_eprt_allows_seven_document_review_but_blocks_send', function () {
     $crawler = new Crawler($this->get(route('sidang-ta-drafts.preview', $draft))->assertOk()->getContent());
     expect($draft->requirements_version)->toBe(2);
     expect($crawler->filter('a[data-document-preview]')->count())->toBe(7);
-    expect($crawler->filter('[data-review-group="3"] [data-review-document]')->count())->toBe(3);
+    expect($crawler->filter('[data-review-group="3"] [data-review-document]')->count())->toBe(1);
     expect($crawler->filter('[data-review-document="eprt_waiver_letter"]')->count())->toBe(0);
     expect($crawler->filter('[data-open-registration]')->getNode(0)->hasAttribute('disabled'))->toBeTrue();
     expect($crawler->filter('[data-confirm-registration]')->getNode(0)->hasAttribute('disabled'))->toBeTrue();
     $this->postJson(route('sidang-ta-registrations.store'), [
-        'action' => 'submit', 'draft_id' => $draft->id, 'version' => $draft->version,
+        'action' => 'submit', 'declaration_accepted' => true, 'draft_id' => $draft->id, 'version' => $draft->version,
     ])->assertUnprocessable();
     expect(SidangTaRegistration::count())->toBe(0);
     expect($draft->fresh()->status)->toBe('active');

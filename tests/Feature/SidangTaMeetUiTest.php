@@ -53,7 +53,8 @@ beforeEach(function () {
         $draft = SidangTaRegistrationDraft::create(['owner_user_id' => $this->user->id,
             'student_number' => $this->student->student_number, 'sidang_ta_period_id' => $this->period->id,
             'requirements_version' => 2, 'payload' => ['student_phone' => '081234567890', 'parent_phone' => '081234567891',
-                'graduation_payment_date' => today()->toDateString(), 'diploma_biodata_accurate' => $accurate]]);
+                'graduation_payment_date' => today()->toDateString(), 'diploma_biodata_accurate' => $accurate,
+                'pdm_submission_date' => $accurate ? null : today()->toDateString()]]);
         if ($complete) {
             foreach (Meet::allTypes($accurate, $mode) as $type) {
                 $path = 'sidang_ta/drafts/'.$draft->id.'/'.$type.'.pdf';
@@ -72,30 +73,30 @@ beforeEach(function () {
 
 afterEach(function () { $this->travelBack(); });
 
-test('meet_ui_stage_two_has_two_readonly_cards_and_only_two_uploads', function () {
+test('meet_ui_stage_two_has_four_pdf_uploads_and_shared_status_summary', function () {
     $draft = ($this->meetDraft)('automatic', true, false);
     $this->student->basilaApproval()->updateOrCreate(['student_number' => $this->student->student_number],
         ['photo_approval' => true, 'status' => 'approved']);
     $crawler = new Crawler($this->get(route('sidang-ta-drafts.edit', ['draft' => $draft, 'step' => 2]))->assertOk()->getContent());
     $form = $crawler->filter('#sidang-ta-step-form');
-    expect($form->filter('[data-upload-type]')->count())->toBe(2);
+    expect($form->filter('[data-upload-type]')->count())->toBe(4);
     expect($form->filter('[data-upload-type="ta_data_capture"]')->count())->toBe(1);
     expect($form->filter('[data-upload-type="online_supervision_capture"]')->count())->toBe(1);
-    expect($form->filter('[data-automatic-card]')->count())->toBe(2);
+    expect($form->filter('[data-automatic-card]')->count())->toBe(0);
     expect($form->filter('[data-automatic-card] input, [data-automatic-card] textarea, [data-automatic-card] select')->count())->toBe(0);
-    expect($form->filter('[data-automatic-card="sidang_approval"]')->text(null, true))->toContain('Belum tersedia');
-    expect($form->filter('[data-automatic-card="level_2"]')->text(null, true))->toContain('Lulus');
-    expect($form->filter('[data-step-progress]')->text(null, true))->toContain('2 dokumen tersimpan.');
+    expect($crawler->filter('[data-meet-admission]')->text(null, true))->toContain('Persetujuan sidang iGracias')->toContain('Belum tersedia');
+    expect($crawler->filter('[data-admission-gate="level_2_passed"]')->text(null, true))->toContain('Lulus');
+    expect($form->filter('[data-step-progress]')->text(null, true))->toContain('4 dokumen tersimpan.');
     expect($form->filter('[data-upload-type="skpi_tak_capture"]')->count())->toBe(0);
 });
 
-test('meet_ui_scalar_labels_have_no_required_star_but_keep_required_validation', function () {
+test('meet_ui_scalar_labels_have_required_stars_and_keep_required_validation', function () {
     $draft = ($this->meetDraft)();
     foreach ([1, 3, 4] as $step) {
         $form = (new Crawler($this->get(route('sidang-ta-drafts.edit', ['draft' => $draft, 'step' => $step]))
             ->assertOk()->getContent()))->filter('#sidang-ta-step-form');
-        $labels = $form->filter('label:not([for^="file-"]), legend');
-        $labels->each(function (Crawler $label) { expect($label->text(null, true))->not->toContain('*'); });
+        $labels = $form->filter('label[for]:not([for^="file-"]), legend');
+        $labels->each(function (Crawler $label) { expect($label->text(null, true))->toContain('*'); });
     }
     $form = (new Crawler($this->get(route('sidang-ta-drafts.edit', ['draft' => $draft, 'step' => 1]))
         ->assertOk()->getContent()))->filter('#sidang-ta-step-form');
@@ -103,27 +104,28 @@ test('meet_ui_scalar_labels_have_no_required_star_but_keep_required_validation',
     expect($form->filter('input[name="student_phone"]')->getNode(0)->hasAttribute('required'))->toBeTrue();
 });
 
-test('meet_ui_automatic_eprt_has_three_stage_three_uploads_and_no_certificate', function () {
+test('meet_ui_automatic_eprt_has_only_payment_upload_and_no_certificate', function () {
     $draft = ($this->meetDraft)();
-    $form = (new Crawler($this->get(route('sidang-ta-drafts.edit', ['draft' => $draft, 'step' => 3]))
-        ->assertOk()->getContent()))->filter('#sidang-ta-step-form');
-    expect($form->filter('[data-upload-type]')->count())->toBe(3);
-    expect($form->filter('[data-automatic-card="eprt"]')->text(null, true))->toContain('Nilai 450');
-    expect($form->filter('[data-automatic-card="bpp"]')->text(null, true))->toContain('Lunas')->toContain('Periode pembayaran belum terkonfirmasi');
+    $crawler = new Crawler($this->get(route('sidang-ta-drafts.edit', ['draft' => $draft, 'step' => 3]))->assertOk()->getContent());
+    $form = $crawler->filter('#sidang-ta-step-form');
+    expect($form->filter('[data-upload-type]')->count())->toBe(1);
+    expect($crawler->filter('[data-eprt-mode="automatic"]')->text(null, true))->toContain('450');
+    expect($crawler->filter('[data-meet-admission]')->text(null, true))->toContain('Lunas')->toContain('Periode pembayaran belum terkonfirmasi');
     expect($form->filter('[data-upload-type="eprt_lac_certificate"], [data-upload-type="bpp_payment_proof"], [data-upload-type="transcript_khs"], [data-upload-type="ta_course_ksm"]')->count())->toBe(0);
     expect($form->filter('input[name="eprt_score"], input[name="tak_score"]')->count())->toBe(0);
 });
 
 test('meet_ui_waiver_upload_has_pdf_format_and_masked_template_link', function () {
     $draft = ($this->meetDraft)('waiver');
-    $form = (new Crawler($this->get(route('sidang-ta-drafts.edit', ['draft' => $draft, 'step' => 3]))
-        ->assertOk()->getContent()))->filter('#sidang-ta-step-form');
-    expect($form->filter('[data-upload-type]')->count())->toBe(4);
+    \App\Models\SidangTaFormGuide::create(['slot'=>'eprt_waiver_letter','title'=>'Template surat','link_label'=>'Unduh template','url'=>'https://linktr.ee/laa.upps.sby','is_active'=>true]);
+    $crawler = new Crawler($this->get(route('sidang-ta-drafts.edit', ['draft' => $draft, 'step' => 3]))->assertOk()->getContent());
+    $form = $crawler->filter('#sidang-ta-step-form');
+    expect($form->filter('[data-upload-type]')->count())->toBe(2);
     $waiver = $form->filter('[data-upload-type="eprt_waiver_letter"]');
     expect($waiver->text(null, true))->toContain('Surat Permakluman EPRT');
     expect($waiver->filter('input[type="file"]')->attr('accept'))->toBe('.pdf');
-    expect($waiver->filter('[data-waiver-template]')->text(null, true))->toBe('Link Surat Permakluman');
-    expect($waiver->filter('[data-waiver-template]')->attr('href'))->toBe('https://telkomuniversityofficial-my.sharepoint.com/:w:/g/personal/akademiksby_telkomuniversity_ac_id/EYC5y40Ky_1PhVWh4_LswJoBtC8yKT6PuTEAwUTDiFY-2A?e=qRenjo');
+    expect($waiver->filter('[data-form-guide] a')->text(null,true))->toBe('Unduh template');
+    expect($waiver->filter('[data-form-guide] a')->attr('href'))->toBe('https://linktr.ee/laa.upps.sby');
 });
 
 test('meet_ui_retest_and_unknown_can_open_review_with_five_academic_checks', function () {
@@ -182,9 +184,9 @@ test('meet_ui_failed_tak_is_shown_without_blocking_the_review_page', function ()
 test('meet_ui_does_not_use_old_input_to_forge_automatic_scores_or_waiver_mode', function () {
     $draft = ($this->meetDraft)('waiver');
     $this->withSession(['_old_input' => ['eprt_score' => 999, 'tak_score' => 999, 'eprt_mode' => 'automatic']]);
-    $form = (new Crawler($this->get(route('sidang-ta-drafts.edit', ['draft' => $draft, 'step' => 3]))
-        ->assertOk()->getContent()))->filter('#sidang-ta-step-form');
-    expect($form->filter('[data-automatic-card="eprt"]')->text(null, true))->toContain('Nilai 449')->not->toContain('999');
+    $crawler = new Crawler($this->get(route('sidang-ta-drafts.edit', ['draft' => $draft, 'step' => 3]))->assertOk()->getContent());
+    $form = $crawler->filter('#sidang-ta-step-form');
+    expect($crawler->filter('[data-eprt-mode="waiver"]')->text(null, true))->toContain('449')->not->toContain('999');
     expect($form->filter('[data-upload-type="eprt_waiver_letter"]')->count())->toBe(1);
 });
 
@@ -289,24 +291,22 @@ test('meet_ui_unconfirmed_krs_disables_send_visibly_and_reenables_after_period_l
     expect(SidangTaRegistration::count())->toBe(0);
 });
 
-test('meet_ui_capture_examples_open_the_shared_modal_without_navigation_or_form_submission', function () {
+test('meet_ui_db_capture_examples_open_shared_modal_and_empty_slots_stay_empty', function () {
     $draft = ($this->meetDraft)();
-    $crawler = new Crawler($this->get(route('sidang-ta-drafts.edit', ['draft' => $draft, 'step' => 2]))
-        ->assertOk()->getContent());
-    foreach (['ta_data_capture' => 'ta-data.png', 'online_supervision_capture' => 'bimbingan-online.png'] as $type => $filename) {
-        $guide = $crawler->filter('[data-upload-type="'.$type.'"] button[data-upload-guide]');
-        expect($guide->count())->toBe(1);
-        expect($guide->attr('type'))->toBe('button');
-        expect($guide->getNode(0)->hasAttribute('href'))->toBeFalse();
-        expect($guide->getNode(0)->hasAttribute('target'))->toBeFalse();
-        expect($guide->attr('aria-haspopup'))->toBe('dialog');
-        expect($guide->attr('data-preview-url'))->toBe(asset('assets/images/forms/sidang-ta/'.$filename));
-        expect($guide->attr('data-download-url'))->toBe('');
-        expect($guide->attr('data-file-type'))->toBe('png');
-        expect($guide->attr('x-on:click'))->toContain("sidang-ta-preview");
-        expect($guide->filter('img')->attr('src'))->toBe($guide->attr('data-preview-url'));
-        expect($guide->filter('img')->attr('alt'))->not->toBe('');
+    $guides=[];
+    foreach (['ta_data_capture','online_supervision_capture'] as $type) {
+        $path='guides/'.$type.'.png'; Storage::disk('local')->put($path,'image');
+        $guides[$type]=\App\Models\SidangTaFormGuide::create(['slot'=>$type,'title'=>'Contoh '.$type,'file_path'=>$path,'file_name'=>$type.'.png','mime_type'=>'image/png','is_active'=>true]);
     }
+    $crawler = new Crawler($this->get(route('sidang-ta-drafts.edit', ['draft'=>$draft,'step'=>2]))->assertOk()->getContent());
+    foreach($guides as $type=>$model) {
+        $guide=$crawler->filter('[data-upload-type="'.$type.'"] [data-form-guide] [data-document-preview]');
+        expect($guide->count())->toBe(1);
+        expect($guide->attr('data-preview-url'))->toBe(route('sidang-ta-guides.media',$model));
+        expect($guide->attr('x-on:click.prevent'))->toContain('sidang-ta-preview');
+        expect($guide->attr('aria-haspopup'))->toBe('dialog');
+        expect($guide->filter('img')->attr('src'))->toBe($guide->attr('data-preview-url'));
+    }
+    expect($crawler->filter('[data-upload-type="thesis_draft"] [data-form-guide]')->count())->toBe(0);
     expect($crawler->filter('[data-document-preview-modal]')->count())->toBe(1);
-    expect($crawler->filter('[data-preview-download]')->attr('x-show'))->toBe('downloadUrl');
 });

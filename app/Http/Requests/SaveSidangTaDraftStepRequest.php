@@ -43,10 +43,10 @@ class SaveSidangTaDraftStepRequest extends FormRequest
         foreach (['requirements_version', 'owner_user_id', 'student_number', 'status', 'payload', 'source_registration_id',
                      'source_version', 'reviewed_version', 'submitted_registration_id', 'file_path',
                      'sidang_ta_period_id', 'student_phone', 'parent_phone', 'graduation_payment_date',
-                     'diploma_biodata_accurate'] as $key) {
+                     'diploma_biodata_accurate', 'pdm_submission_date', 'declaration_accepted_at', 'declaration_version'] as $key) {
             $rules[$key] = ['prohibited'];
         }
-        $rules = array_replace($rules, Requirements::draftScalarRules($step));
+        $rules = array_replace($rules, Requirements::draftScalarRules($step, $this->all()));
         if ($step === 1) {
             $rules['sidang_ta_period_id'] = ['required', 'integer', 'exists:sidang_ta_periods,id'];
             $rules['documents'] = ['prohibited'];
@@ -74,12 +74,16 @@ class SaveSidangTaDraftStepRequest extends FormRequest
             'sidang_ta_period_id.required' => 'Pilih periode sidang TA.',
             'sidang_ta_period_id.integer' => 'Pilih periode sidang TA yang valid.',
             'sidang_ta_period_id.exists' => 'Periode sidang TA tidak ditemukan.',
-            'student_phone.required' => 'Nomor HP mahasiswa wajib diisi.',
-            'parent_phone.required' => 'Nomor HP orang tua/wali wajib diisi.',
-            'student_phone.string' => 'Nomor HP mahasiswa harus berupa teks.',
-            'parent_phone.string' => 'Nomor HP orang tua/wali harus berupa teks.',
-            'student_phone.max' => 'Nomor HP mahasiswa maksimal 30 karakter.',
-            'parent_phone.max' => 'Nomor HP orang tua/wali maksimal 30 karakter.',
+            'student_phone.required' => 'Nomor WA Aktif Mahasiswa wajib diisi.',
+            'parent_phone.required' => 'Nomor WA Aktif Orang Tua/Wali wajib diisi.',
+            'student_phone.string' => 'Nomor WA mahasiswa harus berisi 8–15 digit angka (0–9).',
+            'student_phone.regex' => 'Nomor WA mahasiswa harus berisi 8–15 digit angka (0–9).',
+            'parent_phone.string' => 'Nomor WA orang tua/wali harus berisi 8–15 digit angka (0–9).',
+            'parent_phone.regex' => 'Nomor WA orang tua/wali harus berisi 8–15 digit angka (0–9).',
+            'student_phone.max' => 'Nomor WA Aktif Mahasiswa harus berisi 8–15 digit angka (0–9).',
+            'parent_phone.max' => 'Nomor WA Aktif Orang Tua/Wali harus berisi 8–15 digit angka (0–9).',
+            'pdm_submission_date.date' => 'Tanggal pengajuan PDM tidak valid.',
+            'pdm_submission_date.before_or_equal' => 'Tanggal pengajuan PDM tidak boleh melewati hari ini.',
             'graduation_payment_date.required' => 'Tanggal pembayaran wisuda wajib diisi.',
             'graduation_payment_date.date' => 'Tanggal pembayaran wisuda tidak valid.',
             'graduation_payment_date.before_or_equal' => 'Tanggal pembayaran wisuda tidak boleh melewati hari ini.',
@@ -101,9 +105,10 @@ class SaveSidangTaDraftStepRequest extends FormRequest
     {
         $attributes = [
             'sidang_ta_period_id' => 'periode sidang TA',
-            'student_phone' => 'nomor HP mahasiswa',
-            'parent_phone' => 'nomor HP orang tua/wali',
+            'student_phone' => 'nomor WA aktif mahasiswa',
+            'parent_phone' => 'nomor WA aktif orang tua/wali',
             'graduation_payment_date' => 'tanggal pembayaran wisuda',
+            'pdm_submission_date' => 'tanggal pengajuan PDM',
             'diploma_biodata_accurate' => 'kesesuaian biodata ijazah',
             'documents' => 'dokumen', 'version' => 'versi draft',
         ];

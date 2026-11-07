@@ -56,7 +56,7 @@ class SidangTaDraftDocumentService
 
                 $payload = array_replace($locked->payload ?? [],
                     array_intersect_key($validated, Requirements::draftScalarRules($step)));
-                Validator::make($payload, Requirements::draftScalarRules($step))->validate();
+                Validator::make($payload, Requirements::draftScalarRules($step, $payload))->validate();
                 $targeted = Revision::isTargeted($locked);
                 if ($targeted) Revision::assertPayloadUnchanged($locked, $payload);
                 if ($step === 4 && array_key_exists('diploma_biodata_accurate', $payload)) {

@@ -1,5 +1,8 @@
 <x-app-layout>
     <x-slot name="header">Pendaftaran Sidang TA</x-slot>
+    @php
+        $canUpdateRegistration = auth()->user()->can('sidang_ta_registration_update');
+    @endphp
 
     <div class="space-y-5">
         @if($errors->any())
@@ -21,7 +24,7 @@
             <div class="flex flex-wrap items-center gap-2">
                 @if($activeRegistration)
                     <a data-registration-active class="btn btn-secondary"
-                       href="{{ route('sidang-ta-registrations.show', $activeRegistration) }}">Lihat pengajuan aktif</a>
+                       href="{{ route($activeRegistration->status === 'needs_review' && $canUpdateRegistration ? 'sidang-ta-registrations.edit' : 'sidang-ta-registrations.show', $activeRegistration) }}">Lihat pengajuan aktif</a>
                     @if($activeRegistration->status === 'needs_review')
                         @can('sidang_ta_registration_update')
                             <a data-registration-revise class="btn btn-primary"
@@ -164,9 +167,10 @@
                             </td>
                             <td class="px-5 py-4 text-right">
                                 <a class="btn btn-secondary text-xs"
-                                   href="{{ route('sidang-ta-registrations.show', $registration) }}">
-                                    Detail
+                                   href="{{ route($registration->status === 'needs_review' && $canUpdateRegistration ? 'sidang-ta-registrations.edit' : 'sidang-ta-registrations.show', $registration) }}">
+                                    {{ $registration->status === 'needs_review' && $canUpdateRegistration ? 'Detail Revisi' : 'Detail' }}
                                 </a>
+                                <a data-registration-history class="btn btn-secondary text-xs" href="{{ route('sidang-ta-registrations.history', $registration) }}">Riwayat</a>
                             </td>
                         </tr>
                     @empty

@@ -95,7 +95,7 @@ test('g1_step_one_errors_are_inline_and_preserve_valid_contact_input', function 
     $xpath = sidangTaUiXpath($response->getContent());
     expect($xpath->query('//form[@id="sidang-ta-step-form" and @novalidate]')->length)->toBe(1);
     expect($xpath->query('//*[@id="error-sidang_ta_period_id"]')->length)->toBe(1);
-    expect($xpath->query('//*[@id="error-student_phone"]')->item(0)->textContent)->toContain('Nomor HP mahasiswa wajib diisi.');
+    expect($xpath->query('//*[@id="error-student_phone"]')->item(0)->textContent)->toContain('Nomor WA Aktif Mahasiswa wajib diisi.');
     expect($xpath->query('//input[@name="student_phone" and @aria-invalid="true"]')->length)->toBe(1);
     expect($xpath->query('//input[@name="parent_phone"]')->item(0)->getAttribute('value'))->toBe('089123456789');
     expect(SidangTaRegistrationDraft::count())->toBe(0);
@@ -110,7 +110,7 @@ test('g1_academic_panel_is_present_on_all_four_steps_and_keeps_zero_gpa', functi
     foreach ([1, 2, 3, 4] as $step) {
         $response = $this->get(route('sidang-ta-drafts.edit', ['draft' => $draft, 'step' => $step]))
             ->assertOk()->assertSee('Judul akademik untuk G1')->assertSee('Academic title for G1')
-            ->assertDontSee('Dosen Pembimbing G1')->assertSee('0,00')
+            ->assertSee('Dosen Pembimbing G1')->assertSee('0,00')
             ->assertSee('KRS Sidang TA 2')->assertDontSee('Pembimbing &amp; Penguji', false)
             ->assertDontSee('Jadwal sidang TA')->assertDontSee('Sidang tingkat 3')
             ->assertSee('Status BPP')->assertDontSee('Status i-Basila')->assertDontSee('Ketersediaan TAK');
@@ -197,7 +197,7 @@ test('g1_missing_saved_file_keeps_step_incomplete_and_preserves_other_saved_file
     ])->assertRedirect($url)->assertSessionHasNoErrors();
     $response = $this->get($url)->assertOk();
     $crawler = new \Symfony\Component\DomCrawler\Crawler($response->getContent());
-    expect($crawler->filter('[data-step-progress]')->text(null, true))->toContain('1 dari 2 dokumen tersimpan.')
+    expect($crawler->filter('[data-step-progress]')->text(null, true))->toContain('3 dari 4 dokumen tersimpan.')
         ->toContain(\App\Models\SidangTaRegistration::DOCUMENT_TYPES[$document->document_type]);
     expect($crawler->filter('button[data-next-step][disabled]')->count())->toBe(1);
     $response->assertDontSee(route('sidang-ta-draft-documents.download', $other), false)

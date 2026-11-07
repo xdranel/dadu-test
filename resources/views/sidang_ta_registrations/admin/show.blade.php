@@ -57,12 +57,15 @@
                                 :label="$statusLabels[$registration->status] ?? $registration->status"/>
             </div>
             <dl class="grid gap-4 text-sm sm:grid-cols-2">
-                @foreach(['HP mahasiswa' => $registration->student_phone, 'HP orang tua/wali' => $registration->parent_phone, 'Pembayaran wisuda' => $registration->graduation_payment_date?->format('d/m/Y'), 'Biodata ijazah' => $registration->diploma_biodata_accurate ? 'Sudah sesuai' : 'Belum sesuai, bukti PDM dilampirkan'] as $label => $value)
+                @foreach(['Nomor WA Aktif Mahasiswa' => $registration->student_phone, 'Nomor WA Aktif Orang Tua/Wali' => $registration->parent_phone, 'Pembayaran wisuda' => $registration->graduation_payment_date?->format('d/m/Y'), 'Biodata ijazah' => $registration->diploma_biodata_accurate ? 'Sudah sesuai' : 'Belum sesuai, bukti PDM dilampirkan'] as $label => $value)
                     <div>
                         <dt class="text-xs text-slate-500">{{ $label }}</dt>
                         <dd class="mt-1 break-words font-medium text-slate-800">{{ $value ?? 'Belum tersedia' }}</dd>
                     </div>
                 @endforeach
+                @unless($registration->diploma_biodata_accurate)
+                    <div><dt class="text-xs text-slate-500">Tanggal pengajuan PDM</dt><dd data-pdm-date class="mt-1 font-medium text-slate-800">{{ $registration->pdm_submission_date?->format('d/m/Y') ?? 'Belum tersedia' }}</dd></div>
+                @endunless
             </dl>
         </section>
         @if($readonlyNeedsReview)
@@ -99,7 +102,7 @@
                             {{ $actionLabels[$log->action] ?? ucfirst(str_replace('_', ' ', $log->action)) }}
                         </p>
                         <p class="mt-1 text-xs text-slate-500">
-                            {{ $log->performed_at?->format('d/m/Y H:i') }}
+                            {{ $log->performed_at?->timezone('Asia/Jakarta')->format('d/m/Y H:i') }} WIB · {{ $log->actor?->name ?? 'Sistem' }}
                         </p>
                         @if(filled($log->notes))
                             <p class="mt-1 whitespace-pre-line break-words text-sm text-slate-600">

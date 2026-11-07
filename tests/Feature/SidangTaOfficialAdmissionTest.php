@@ -85,7 +85,7 @@ beforeEach(function () {
         return $draft->fresh();
     };
     $this->submit67 = fn ($draft, array $extra = []) => $this->postJson(route('sidang-ta-registrations.store'),
-        array_replace(['draft_id' => $draft->id, 'version' => $draft->fresh()->version, 'action' => 'submit'], $extra));
+        array_replace(['draft_id' => $draft->id, 'version' => $draft->fresh()->version, 'action' => 'submit', 'declaration_accepted' => true], $extra));
 });
 
 afterEach(function () { $this->travelBack(); });
@@ -120,24 +120,24 @@ test('official67_ecct_null_score_with_three_tests_requires_waiver_without_fabric
 
 test('official67_below_threshold_or_null_before_three_tests_requires_retest', function () {
     foreach ([null, '440'] as $score) {
-        ($this->import67)(['nilai_bahasa' => $score, 'jumlah_tes_bahasa' => 2]);
+        ($this->import67)(['nilai_bahasa' => $score, 'jumlah_tes_bahasa' => 2, 'riwayat_nilai_bahasa' => []]);
         expect(($this->read67)()['eprt']['mode'])->toBe('retest');
     }
 });
 
 test('official67_qualifying_score_needs_no_count_and_unknown_count_cannot_create_waiver', function () {
-    ($this->import67)(['nilai_bahasa' => '450', 'jumlah_tes_bahasa' => null]);
+    ($this->import67)(['nilai_bahasa' => '450', 'jumlah_tes_bahasa' => null, 'riwayat_nilai_bahasa' => []]);
     expect(($this->read67)()['eprt']['mode'])->toBe('automatic');
-    ($this->import67)(['nilai_bahasa' => null, 'jumlah_tes_bahasa' => null]);
+    ($this->import67)(['nilai_bahasa' => null, 'jumlah_tes_bahasa' => null, 'riwayat_nilai_bahasa' => []]);
     expect(($this->read67)()['eprt']['mode'])->toBe('unknown');
 });
 
 test('official67_canonical_language_does_not_borrow_high_manual_scores', function () {
     StudentEprt::create(['student_number' => $this->student->student_number, 'total_score' => 650]);
-    ($this->import67)(['nilai_bahasa' => '440', 'jumlah_tes_bahasa' => 2]);
+    ($this->import67)(['nilai_bahasa' => '440', 'jumlah_tes_bahasa' => 2, 'riwayat_nilai_bahasa' => []]);
     expect(($this->read67)()['eprt']['mode'])->toBe('retest');
     expect((float) ($this->read67)()['eprt_facts']['score'])->toBe(440.0);
-    ($this->import67)(['nilai_bahasa' => null, 'jumlah_tes_bahasa' => 3]);
+    ($this->import67)(['nilai_bahasa' => null, 'jumlah_tes_bahasa' => 3, 'riwayat_nilai_bahasa' => []]);
     expect(($this->read67)()['eprt']['mode'])->toBe('waiver');
 });
 
@@ -183,7 +183,7 @@ test('official67_reads_fresh_profile_after_reimport_even_if_student_relations_we
     ($this->import67)();
     $this->student->load(['eprts', 'tak', 'skpi', 'sidangTingkat', 'courseIssues']);
     expect(($this->read67)()['eprt']['mode'])->toBe('automatic');
-    ($this->import67)(['nilai_bahasa' => '440', 'jumlah_tes_bahasa' => 2]);
+    ($this->import67)(['nilai_bahasa' => '440', 'jumlah_tes_bahasa' => 2, 'riwayat_nilai_bahasa' => []]);
     expect(($this->read67)()['eprt']['mode'])->toBe('retest');
 });
 
@@ -299,9 +299,9 @@ test('official67_submit_rechecks_new_skpi_and_keeps_draft_files_when_blocked', f
 });
 
 test('official67_submit_rechecks_official_count_after_review_without_consuming_draft', function () {
-    ($this->import67)(['nilai_bahasa' => '440', 'jumlah_tes_bahasa' => 3]);
+    ($this->import67)(['nilai_bahasa' => '440', 'jumlah_tes_bahasa' => 3, 'riwayat_nilai_bahasa' => []]);
     $draft = ($this->finish67)('waiver');
-    ($this->import67)(['nilai_bahasa' => '440', 'jumlah_tes_bahasa' => 2]);
+    ($this->import67)(['nilai_bahasa' => '440', 'jumlah_tes_bahasa' => 2, 'riwayat_nilai_bahasa' => []]);
     ($this->submit67)($draft)->assertUnprocessable()->assertJsonValidationErrors('eligibility.eprt');
     expect($draft->fresh()->status)->toBe('active');
     expect($draft->documents()->count())->toBe(8);
@@ -358,4 +358,49 @@ test('official67_demo_payload_imports_two_student_profiles_for_three_login_accou
     expect($facts['eprt_facts']['confirmed_attempts'])->toBe(3);
     expect($facts['eprt']['mode'])->toBe('waiver');
     expect(User::count())->toBe($usersBefore);
+});
+
+
+test('meeting77_official_highest_valid_history_drives_facts_and_submitted_snapshot', function () {
+    ($this->import67)(['nilai_bahasa' => '440', 'jumlah_tes_bahasa' => 3]);
+    $facts = ($this->read67)();
+    expect($facts['eprt_facts']['score'])->toBe(470.0);
+    expect($facts['eprt_facts']['history'][0]['test_date'])->toBeNull();
+    expect($facts['eprt_facts']['confirmed_attempts'])->toBe(3);
+    $draft = ($this->finish67)();
+    $id = ($this->submit67)($draft)->assertOk()->json('data.id');
+    $snapshot = SidangTaRegistration::findOrFail($id)->academic_snapshot;
+    expect($snapshot['admission']['eprt_facts']['score'])->toBe(470);
+    expect($snapshot['admission']['eprt_facts']['history'][0]['expires_at'])->toBe('2028-05-19');
+    expect($snapshot['admission']['eprt']['mode'])->toBe('automatic');
+});
+
+
+test('meeting77_unidentified_official_language_type_stays_unknown_and_preserves_imported_source', function ($type, $attempts) {
+    ($this->import67)(['nilai_bahasa' => 600, 'jenis_tes_bahasa' => $type,
+        'jumlah_tes_bahasa' => $attempts, 'riwayat_nilai_bahasa' => []]);
+    $groups = ($this->profile67)()->groups;
+    expect(($this->read67)()['eprt']['mode'])->toBe('unknown');
+    expect(($this->read67)()['eprt']['requires_waiver'])->toBeFalse();
+    expect(($this->read67)()['eprt_facts']['score'])->toBe(600.0);
+    expect(($this->read67)()['eprt_facts']['confirmed_attempts'])->toBe($attempts);
+    expect(($this->read67)()['eprt_facts']['scale_identified'])->toBeFalse();
+    expect($groups['language']['score'])->toBe(600);
+    expect($groups['language']['attempts'])->toBe($attempts);
+    expect($groups['language']['type'])->toBe($type === '' || trim((string) $type) === '' ? null : $type);
+    expect(($this->profile67)()->groups)->toBe($groups);
+})->with([[null, null], ['', null], ['Unknown scale', null],
+    [null, 3], ['   ', 3], ['Unknown scale', 3]]);
+
+
+test('meeting77_unidentified_summary_cannot_borrow_a_history_type_and_keeps_raw_history', function () {
+    $history = [['jenis_tes' => 'EPrT', 'nilai' => '470', 'status_berlaku' => 'Berlaku']];
+    ($this->import67)(['nilai_bahasa' => 600, 'jenis_tes_bahasa' => 'Unknown scale',
+        'jumlah_tes_bahasa' => 3, 'riwayat_nilai_bahasa' => $history]);
+    $admission = ($this->read67)();
+    expect($admission['eprt']['mode'])->toBe('unknown');
+    expect($admission['eprt_facts']['confirmed_attempts'])->toBe(3);
+    expect($admission['eprt_facts']['history'][0]['source'])->toEqual($history[0]);
+    expect($admission['eprt_facts']['history'][0]['source']['nilai'])->toBe('470');
+    expect(($this->profile67)()->groups['language']['history'])->toEqual($history);
 });

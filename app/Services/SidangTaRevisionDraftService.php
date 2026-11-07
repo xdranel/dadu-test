@@ -54,6 +54,7 @@ class SidangTaRevisionDraftService
                     'student_phone' => $source->student_phone, 'parent_phone' => $source->parent_phone,
                     'graduation_payment_date' => $source->graduation_payment_date?->toDateString(),
                     'diploma_biodata_accurate' => $source->diploma_biodata_accurate,
+                    'pdm_submission_date' => $source->pdm_submission_date?->toDateString(),
                 ],
             ]);
             $types = Eligibility::requiredTypes($source);

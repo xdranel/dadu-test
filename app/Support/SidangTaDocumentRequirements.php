@@ -47,24 +47,33 @@ class SidangTaDocumentRequirements
     }
 
     // Syarat lengkap: dipakai navigasi, tinjau dan finalisasi.
-    public static function scalarRules(int $step): array
+    public static function scalarRules(int $step, ?array $payload = null): array
     {
         return match ($step) {
-            1 => ['student_phone' => 'required|string|max:30', 'parent_phone' => 'required|string|max:30'],
+            1 => ['student_phone' => ['bail', 'required', 'string', 'regex:/\A[0-9]{8,15}\z/'],
+                'parent_phone' => ['bail', 'required', 'string', 'regex:/\A[0-9]{8,15}\z/']],
             3 => ['graduation_payment_date' => 'required|date|before_or_equal:today'],
-            4 => ['diploma_biodata_accurate' => 'required|boolean'],
+            4 => ['diploma_biodata_accurate' => 'required|boolean',
+                'pdm_submission_date' => self::requiresPdmDate($payload)
+                    ? 'required|date|before_or_equal:today' : 'nullable|date|before_or_equal:today'],
             default => [],
         };
     }
 
     // Syarat save: field belum ada/null boleh, tetapi nilai yang diisi tetap valid.
-    public static function draftScalarRules(int $step): array
+    public static function draftScalarRules(int $step, ?array $payload = null): array
     {
         return match ($step) {
             3 => ['graduation_payment_date' => 'sometimes|nullable|date|before_or_equal:today'],
-            4 => ['diploma_biodata_accurate' => 'sometimes|nullable|boolean'],
-            default => self::scalarRules($step),
+            4 => ['diploma_biodata_accurate' => 'sometimes|nullable|boolean',
+                'pdm_submission_date' => 'sometimes|nullable|date|before_or_equal:today'],
+            default => self::scalarRules($step, $payload),
         };
+    }
+
+    private static function requiresPdmDate(?array $payload): bool
+    {
+        return in_array($payload['diploma_biodata_accurate'] ?? null, [false, 0, '0'], true);
     }
 
     public static function fileRules(string $type): array
@@ -75,10 +84,11 @@ class SidangTaDocumentRequirements
     public static function progress(SidangTaRegistrationDraft $draft, int $step): array
     {
         $payload = $draft->payload ?? [];
-        $labels = ['student_phone' => 'Nomor HP mahasiswa', 'parent_phone' => 'Nomor HP orang tua/wali',
+        $labels = ['student_phone' => 'Nomor WA Aktif Mahasiswa', 'parent_phone' => 'Nomor WA Aktif Orang Tua/Wali',
             'graduation_payment_date' => 'Tanggal pembayaran wisuda',
-            'diploma_biodata_accurate' => 'Pilihan kesesuaian biodata ijazah'];
-        $validator = Validator::make($payload, self::scalarRules($step));
+            'diploma_biodata_accurate' => 'Pilihan kesesuaian biodata ijazah',
+            'pdm_submission_date' => 'Tanggal pengajuan PDM'];
+        $validator = Validator::make($payload, self::scalarRules($step, $payload));
         $validator->passes();
         $missing = [];
         foreach (array_keys($validator->failed()) as $key) {

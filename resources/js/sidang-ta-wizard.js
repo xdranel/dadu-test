@@ -1,3 +1,25 @@
+export const validWhatsapp = (value) => typeof value === 'string' && /^[0-9]{8,15}$/.test(value);
+
+export const periodCountdown = (openAt, closeAt, at = Date.now()) => {
+    if (openAt === null || closeAt === null || !Number.isFinite(openAt) || !Number.isFinite(closeAt)) return null;
+    if (at < openAt) return { status: 'Belum dibuka', seconds: Math.ceil((openAt - at) / 1000) };
+    if (at > closeAt) return { status: 'Ditutup', seconds: 0 };
+    return { status: 'Aktif', seconds: Math.max(0, Math.ceil((closeAt - at) / 1000)) };
+};
+
+export const sidangTaPeriodCountdown = (openAt, closeAt) => ({
+    status: '', label: '', timer: null,
+    init() { this.tick(); this.timer = setInterval(() => this.tick(), 1000); },
+    destroy() { clearInterval(this.timer); },
+    tick() {
+        const countdown = periodCountdown(openAt, closeAt);
+        if (!countdown) { this.status = ''; this.label = ''; return; }
+        this.status = countdown.status;
+        const seconds = countdown.seconds;
+        this.label = countdown.status === 'Ditutup' ? 'Ditutup' : `${countdown.status} · ${Math.floor(seconds / 86400)} hari ${Math.floor(seconds % 86400 / 3600)} jam ${Math.floor(seconds % 3600 / 60)} menit ${seconds % 60} detik`;
+    },
+});
+
 export default (initial = {}) => ({
     accurate: initial.accurate ?? '',
     dirty: initial.dirty ?? false,
@@ -19,6 +41,16 @@ export default (initial = {}) => ({
             const target = field ?? this.$root.querySelector('[data-error-summary]');
             target?.focus();
         });
+    },
+    validateWhatsapp(input) {
+        input.setCustomValidity(validWhatsapp(input.value) ? '' : 'Nomor WA harus berisi 8–15 digit angka (0–9).');
+    },
+    validateContacts(form) {
+        const contacts = [...form.querySelectorAll('input[name="student_phone"], input[name="parent_phone"]')];
+        for (const input of contacts) this.validateWhatsapp(input);
+        const invalid = contacts.find((input) => !validWhatsapp(input.value));
+        invalid?.reportValidity();
+        return !invalid;
     },
     updatePeriodHint(select) {
         this.periodHint = select.selectedOptions[0]?.dataset.window ?? '';
@@ -52,6 +84,15 @@ export const sidangTaUpload = (initial = {}) => ({
     picked() {
         if (this.$refs.file.disabled) return;
         const file = this.$refs.file.files[0];
+        if (file && (!/\.pdf$/i.test(file.name) || (file.type && file.type !== 'application/pdf') || file.size > 10 * 1024 * 1024)) {
+            this.$refs.file.value = '';
+            this.fileName = '';
+            this.fileSize = '';
+            this.localError = 'Gunakan file PDF maksimal 10 MB.';
+            this.selectionChanged = true;
+            this.$dispatch('sidang-ta-file-changed');
+            return;
+        }
         this.fileName = file?.name ?? '';
         this.fileSize = file ? `${(file.size / 1024 / 1024).toFixed(2)} MB` : '';
         this.localError = '';

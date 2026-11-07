@@ -141,7 +141,7 @@ test('p2a_document_matrix_shows_only_current_branch_and_distinguishes_all_review
     ($this->attach)($accurate, Requirements::CAPTURES[0], 'verified');
     ($this->attach)($accurate, Requirements::CAPTURES[1], 'rejected');
     ($this->attach)($accurate, Requirements::PAYMENT[0]);
-    ($this->attach)($accurate, Requirements::PAYMENT[1], 'verified', false);
+    ($this->attach)($accurate, Requirements::CAPTURES[2], 'verified', false);
     ($this->attach)($accurate, Requirements::PDM[0], 'verified');
     ($this->attach)($pdm, Requirements::PDM[0], 'verified');
     ($this->attach)($pdm, Requirements::DIPLOMA[0], 'verified');
@@ -149,11 +149,11 @@ test('p2a_document_matrix_shows_only_current_branch_and_distinguishes_all_review
     $row = $crawler->filter('[data-ta-row="'.$accurate->id.'"]');
     expect($row->filter('[data-ta-doc]')->count())->toBe(7);
     foreach ([Requirements::CAPTURES[0] => 'verified', Requirements::CAPTURES[1] => 'rejected',
-                 Requirements::PAYMENT[0] => 'pending', Requirements::PAYMENT[1] => 'unavailable',
-                 Requirements::PAYMENT[2] => 'missing'] as $type => $state) {
+                 Requirements::PAYMENT[0] => 'pending', Requirements::CAPTURES[2] => 'unavailable',
+                 Requirements::CAPTURES[3] => 'missing'] as $type => $state) {
         expect($row->filter('[data-ta-doc="'.$type.'"]')->attr('data-doc-state'))->toBe($state);
     }
-    expect($row->filter('a[data-ta-doc="'.Requirements::PAYMENT[1].'"]')->count())->toBe(0);
+    expect($row->filter('a[data-ta-doc="'.Requirements::CAPTURES[2].'"]')->count())->toBe(0);
     expect($row->filter('[data-ta-doc="'.Requirements::PDM[0].'"]')->count())->toBe(0);
     $row = $crawler->filter('[data-ta-row="'.$pdm->id.'"]');
     expect($row->filter('[data-ta-doc]')->count())->toBe(6);

@@ -34,11 +34,11 @@
             <h2 class="text-lg font-bold text-slate-900">Data pendaftaran</h2>
             <dl class="mt-4 grid gap-4 sm:grid-cols-2">
                 <div>
-                    <dt class="text-xs text-slate-500">Nomor HP mahasiswa</dt>
+                    <dt class="text-xs text-slate-500">Nomor WA Aktif Mahasiswa</dt>
                     <dd class="mt-1 break-words text-sm font-semibold text-slate-800">{{ $registration->student_phone }}</dd>
                 </div>
                 <div>
-                    <dt class="text-xs text-slate-500">Nomor HP orang tua/wali</dt>
+                    <dt class="text-xs text-slate-500">Nomor WA Aktif Orang Tua/Wali</dt>
                     <dd class="mt-1 break-words text-sm font-semibold text-slate-800">{{ $registration->parent_phone }}</dd>
                 </div>
                 <div>
@@ -49,6 +49,9 @@
                     <dt class="text-xs text-slate-500">Biodata ijazah</dt>
                     <dd class="mt-1 text-sm font-semibold text-slate-800">{{ $registration->diploma_biodata_accurate ? 'Sudah sesuai' : 'Belum sesuai, bukti pengajuan PDM dilampirkan' }}</dd>
                 </div>
+                @unless($registration->diploma_biodata_accurate)
+                    <div><dt class="text-xs text-slate-500">Tanggal pengajuan PDM</dt><dd data-pdm-date class="mt-1 text-sm font-semibold">{{ $registration->pdm_submission_date?->format('d/m/Y') ?? 'Belum tersedia' }}</dd></div>
+                @endunless
             </dl>
         </section>
 

@@ -56,7 +56,8 @@ beforeEach(function () {
         $draft = SidangTaRegistrationDraft::create(['owner_user_id' => $this->user->id,
             'student_number' => $this->student->student_number, 'sidang_ta_period_id' => $this->period->id,
             'requirements_version' => 2, 'payload' => ['student_phone' => '081234567890', 'parent_phone' => '081234567891',
-                'graduation_payment_date' => today()->toDateString(), 'diploma_biodata_accurate' => $accurate]]);
+                'graduation_payment_date' => today()->toDateString(), 'diploma_biodata_accurate' => $accurate,
+                'pdm_submission_date' => $accurate ? null : today()->toDateString()]]);
         if ($complete) {
             foreach (Meet::allTypes($accurate, $mode) as $type) {
                 $path = 'sidang_ta/drafts/'.$draft->id.'/'.$type.'.pdf';
@@ -73,7 +74,7 @@ beforeEach(function () {
     };
     $this->submitMeet = function ($draft, ?int $version = null) {
         return $this->postJson(route('sidang-ta-registrations.store'), [
-            'draft_id' => $draft->id, 'version' => $version ?? $draft->fresh()->version, 'action' => 'submit',
+            'draft_id' => $draft->id, 'version' => $version ?? $draft->fresh()->version, 'action' => 'submit', 'declaration_accepted' => true,
         ]);
     };
     $this->setMode = function (string $mode) {
@@ -172,7 +173,7 @@ test('meet_final_missing_skpi_stays_unknown_and_cannot_be_forged_with_http_field
     $paths = Storage::disk('local')->allFiles();
     $this->student->skpi()->delete();
     $this->postJson(route('sidang-ta-registrations.store'), ['draft_id' => $draft->id,
-        'version' => $draft->version, 'action' => 'submit', 'skpi_approved' => true, 'academic_passed' => true,
+        'version' => $draft->version, 'action' => 'submit', 'declaration_accepted' => true, 'skpi_approved' => true, 'academic_passed' => true,
         'admission' => ['academic' => ['academic_passed' => true]]])
         ->assertUnprocessable()->assertJsonValidationErrors('eligibility.skpi_approved');
     ($this->assertPreserved)($draft, $paths);

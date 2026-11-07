@@ -56,7 +56,8 @@ beforeEach(function () {
         $draft = SidangTaRegistrationDraft::create(['owner_user_id' => $this->user->id,
             'student_number' => $this->student->student_number, 'sidang_ta_period_id' => $this->period->id,
             'requirements_version' => 2, 'payload' => ['student_phone' => '081234567890', 'parent_phone' => '081234567891',
-                'graduation_payment_date' => today()->toDateString(), 'diploma_biodata_accurate' => $accurate]]);
+                'graduation_payment_date' => today()->toDateString(), 'diploma_biodata_accurate' => $accurate,
+                'pdm_submission_date' => $accurate ? null : today()->toDateString()]]);
         if ($complete) {
             foreach (Meet::allTypes($accurate, $mode) as $type) {
                 $path = 'sidang_ta/drafts/'.$draft->id.'/'.$type.'.pdf';
@@ -73,7 +74,7 @@ beforeEach(function () {
     };
     $this->submitMeet = function ($draft, ?int $version = null) {
         return $this->postJson(route('sidang-ta-registrations.store'), [
-            'draft_id' => $draft->id, 'version' => $version ?? $draft->fresh()->version, 'action' => 'submit',
+            'draft_id' => $draft->id, 'version' => $version ?? $draft->fresh()->version, 'action' => 'submit', 'declaration_accepted' => true,
         ]);
     };
     $this->setMode = function (string $mode) {
@@ -124,7 +125,7 @@ beforeEach(function () {
     };
     $this->submitRevision = function ($source, $draft) {
         return $this->putJson(route('sidang-ta-registrations.update', $source), [
-            'draft_id' => $draft->id, 'version' => $draft->fresh()->version, 'action' => 'submit',
+            'draft_id' => $draft->id, 'version' => $draft->fresh()->version, 'action' => 'submit', 'declaration_accepted' => true,
         ]);
     };
 });
@@ -156,7 +157,7 @@ test('targeted_revision_borrowed_rejected_file_keeps_stage_and_review_incomplete
     $draft = ($this->prepareRevision)($source);
     $progress = \App\Support\SidangTaDocumentRequirements::progress($draft, 2);
     expect($progress['complete'])->toBeFalse();
-    expect($progress['stored_documents'])->toBe(1);
+    expect($progress['stored_documents'])->toBe(3);
     $this->postJson(route('sidang-ta-drafts.review', $draft), ['version' => $draft->version])
         ->assertUnprocessable()->assertJsonValidationErrors('draft');
     $this->get(route('sidang-ta-drafts.edit', ['draft' => $draft, 'step' => 3]))
@@ -176,7 +177,7 @@ test('targeted_revision_only_requested_file_can_be_saved_and_verified_file_is_pr
     expect($source->documents()->where('document_type', 'ta_data_capture')->firstOrFail()->status)->toBe('rejected');
 });
 
-test('targeted_revision_freezes_payment_date_biodata_contacts_and_period_on_server', function () {
+test('targeted_revision_allows_contact_correction_but_freezes_payment_date_biodata_and_period_on_server', function () {
     $source = ($this->submittedSource)();
     $draft = ($this->prepareRevision)($source, ['graduation_payment_proof', 'diploma_statement']);
     $payload = $draft->payload;
@@ -184,7 +185,9 @@ test('targeted_revision_freezes_payment_date_biodata_contacts_and_period_on_serv
     $this->postJson(route('sidang-ta-drafts.steps.store', ['draft' => $draft, 'step' => 1]), [
         'version' => $draft->version, 'sidang_ta_period_id' => $source->sidang_ta_period_id,
         'student_phone' => '089999999999', 'parent_phone' => $payload['parent_phone'],
-    ])->assertUnprocessable()->assertJsonValidationErrors('student_phone');
+    ])->assertOk();
+    $draft->refresh();
+    $payload = $draft->payload;
     $this->postJson(route('sidang-ta-drafts.steps.store', ['draft' => $draft, 'step' => 3]), [
         'version' => $draft->version, 'graduation_payment_date' => today()->subDay()->toDateString(),
     ])->assertUnprocessable()->assertJsonValidationErrors('graduation_payment_date');
@@ -194,7 +197,7 @@ test('targeted_revision_freezes_payment_date_biodata_contacts_and_period_on_serv
         'version' => $draft->version, 'sidang_ta_period_id' => $otherPeriod->id,
         'student_phone' => $payload['student_phone'], 'parent_phone' => $payload['parent_phone'],
     ])->assertUnprocessable()->assertJsonValidationErrors('sidang_ta_period_id');
-    expect($draft->fresh()->version)->toBe(1);
+    expect($draft->fresh()->version)->toBe(2);
     expect(Storage::disk('local')->allFiles())->toBe($paths);
     ($this->replaceDocument)($draft, 'graduation_payment_proof', 3)->assertOk();
     $paths = Storage::disk('local')->allFiles();
@@ -202,7 +205,7 @@ test('targeted_revision_freezes_payment_date_biodata_contacts_and_period_on_serv
         'version' => $draft->fresh()->version, 'diploma_biodata_accurate' => false,
     ])->assertUnprocessable()->assertJsonValidationErrors('diploma_biodata_accurate');
     expect($draft->fresh()->payload)->toBe($payload);
-    expect($draft->fresh()->version)->toBe(2);
+    expect($draft->fresh()->version)->toBe(3);
     expect(Storage::disk('local')->allFiles())->toBe($paths);
 });
 
@@ -254,18 +257,25 @@ test('targeted_revision_rechecks_five_academic_gates_without_losing_replacement'
     ($this->submitRevision)($source, $draft)->assertOk();
 });
 
-test('targeted_revision_preserves_historical_eprt_contract_when_live_mode_changes', function (string $originalMode, string $liveMode) {
+test('targeted_revision_uses_live_eprt_contract_and_snapshots_only_successful_resubmission', function (string $originalMode, string $liveMode) {
     $source = ($this->submittedSource)($originalMode);
     $draft = ($this->prepareRevision)($source);
     $snapshot = $source->fresh()->academic_snapshot;
     ($this->setMode)($liveMode);
     expect(\App\Support\SidangTaDocumentRequirements::typesForDraftStep($draft, 3))
-        ->toBe(\App\Support\SidangTaMeetRequirements::typesForStep(3, true, $originalMode));
+        ->toBe($liveMode === 'waiver' ? ['graduation_payment_proof', 'eprt_waiver_letter'] : ['graduation_payment_proof']);
     ($this->replaceDocument)($draft)->assertOk();
-    $draft = ($this->markReviewed)($draft);
-    ($this->submitRevision)($source, $draft)->assertOk();
+    if ($liveMode === 'waiver') ($this->replaceDocument)($draft, Meet::WAIVER, 3)->assertOk();
     expect($source->fresh()->academic_snapshot)->toBe($snapshot);
-    expect($source->documents()->count())->toBe($originalMode === 'waiver' ? 8 : 7);
+    $draft = ($this->markReviewed)($draft);
+    if ($liveMode === 'unknown') {
+        ($this->submitRevision)($source, $draft)->assertUnprocessable()->assertJsonValidationErrors('eligibility.eprt');
+        expect($source->fresh()->academic_snapshot)->toBe($snapshot);
+    } else {
+        ($this->submitRevision)($source, $draft)->assertOk();
+        expect($source->fresh()->academic_snapshot['admission']['eprt']['mode'])->toBe($liveMode);
+        expect($source->documents()->count())->toBe($liveMode === 'waiver' ? 8 : 7);
+    }
 })->with([['waiver', 'automatic'], ['automatic', 'waiver'], ['waiver', 'unknown']]);
 
 test('targeted_revision_replaces_requested_waiver_in_stage_three_with_correct_feedback', function () {
@@ -355,17 +365,18 @@ test('targeted_revision_replay_after_later_decision_does_not_change_logs_or_file
     expect(Storage::disk('local')->allFiles())->toBe($paths);
 });
 
-test('targeted_revision_wizard_keeps_readonly_fields_and_only_requested_upload_input', function () {
+test('targeted_revision_wizard_allows_WA_edits_and_preserves_locked_data_and_documents', function () {
     $source = ($this->submittedSource)();
     $draft = ($this->prepareRevision)($source);
+    \App\Models\SidangTaFormGuide::create(['slot'=>'online_supervision_capture', 'title'=>'Panduan bimbingan', 'is_active'=>true]);
     $step1 = new Crawler($this->get(route('sidang-ta-drafts.edit', ['draft' => $draft, 'step' => 1]))->assertOk()->getContent());
-    expect($step1->filter('input[name="student_phone"]')->getNode(0)->hasAttribute('readonly'))->toBeTrue();
-    expect($step1->filter('input[name="parent_phone"]')->getNode(0)->hasAttribute('readonly'))->toBeTrue();
+    expect($step1->filter('input[name="student_phone"]')->getNode(0)->hasAttribute('readonly'))->toBeFalse();
+    expect($step1->filter('input[name="parent_phone"]')->getNode(0)->hasAttribute('readonly'))->toBeFalse();
     $step2 = new Crawler($this->get(route('sidang-ta-drafts.edit', ['draft' => $draft, 'step' => 2]))->assertOk()->getContent());
     $locked = $step2->filter('[data-upload-type="online_supervision_capture"]');
     expect($locked->attr('data-upload-locked'))->toBe('true');
     expect($locked->filter('input[type="file"]')->count())->toBe(0);
-    expect($locked->filter('[data-upload-guide]')->count())->toBe(1);
+    expect($locked->filter('[data-form-guide="online_supervision_capture"]')->count())->toBe(1);
     expect($step2->filter('[data-upload-type="ta_data_capture"] input[type="file"]')->count())->toBe(1);
     ($this->replaceDocument)($draft)->assertOk();
     $step3 = new Crawler($this->get(route('sidang-ta-drafts.edit', ['draft' => $draft, 'step' => 3]))->assertOk()->getContent());
@@ -393,7 +404,7 @@ test('targeted_revision_can_save_one_of_two_requested_files_without_unlocking_re
     $draft = ($this->prepareRevision)($source, ['ta_data_capture', 'online_supervision_capture']);
     ($this->replaceDocument)($draft)->assertOk();
     $progress = \App\Support\SidangTaDocumentRequirements::progress($draft->fresh(), 2);
-    expect($progress['stored_documents'])->toBe(1);
+    expect($progress['stored_documents'])->toBe(3);
     expect($progress['complete'])->toBeFalse();
     $this->postJson(route('sidang-ta-drafts.review', $draft), ['version' => $draft->fresh()->version])
         ->assertUnprocessable()->assertJsonValidationErrors('draft');

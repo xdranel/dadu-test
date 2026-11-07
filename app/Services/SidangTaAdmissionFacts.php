@@ -35,33 +35,19 @@ class SidangTaAdmissionFacts
         } else {
             // Compatibility for existing nested-import fixtures and pre-import local data.
             $facts = $this->legacyFacts($student, $krs);
-            $eprt = $this->legacyEprtFacts($student) + ['type' => null];
+            $eprt = $this->legacyEprtFacts($student);
         }
 
         return ['facts' => $facts, 'academic' => Policy::academic($facts),
             'krs_status' => $krs, 'eprt_facts' => $eprt,
-            'eprt' => Policy::eprt($eprt['score'], $eprt['confirmed_attempts'])];
+            'eprt' => $eprt['scale_identified']
+                ? Policy::eprt($eprt['score'], $eprt['confirmed_attempts'])
+                : Policy::eprt(null, null)];
     }
 
     private function officialLanguage(mixed $language): array
     {
-        $unknown = ['score' => null, 'confirmed_attempts' => null, 'type' => null];
-        if (!is_array($language)) return $unknown;
-        foreach (['score', 'attempts', 'type', 'history'] as $key) {
-            if (!array_key_exists($key, $language)) return $unknown;
-        }
-        $score = $this->number($language['score']);
-        if ($language['score'] !== null && $score === null) return $unknown;
-        $attempts = $language['attempts'];
-        if ($attempts !== null && (!is_int($attempts) || $attempts < 0)) return $unknown;
-        if ($language['type'] !== null && !is_string($language['type'])) return $unknown;
-        if (!is_array($language['history']) || !array_is_list($language['history'])) return $unknown;
-        foreach ($language['history'] as $entry) {
-            if (!is_array($entry) || array_is_list($entry)) return $unknown;
-        }
-
-        // The exporter owns filtering/counting; history length is not a test count.
-        return ['score' => $score, 'confirmed_attempts' => $attempts, 'type' => $language['type']];
+        return \App\Support\SidangTaLanguageHistory::facts($language);
     }
 
     private function number(mixed $value): ?float
@@ -137,6 +123,10 @@ class SidangTaAdmissionFacts
             $byAttempt[$attempt] = $date;
             $byDate[$date] = $attempt;
         }
-        return ['score' => $score, 'confirmed_attempts' => $complete ? count($byAttempt) : null];
+        return ['score' => $score, 'confirmed_attempts' => $complete ? count($byAttempt) : null,
+            'type' => null, 'scale_identified' => true, 'history' => $rows->map(fn ($row) => \App\Support\SidangTaLanguageHistory::row([
+                'type' => 'EPrT', 'score' => $row->total_score,
+                'test_date' => $row->test_date?->toDateString(),
+            ]))->all()];
     }
 }

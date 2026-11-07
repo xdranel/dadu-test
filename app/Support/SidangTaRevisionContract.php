@@ -29,24 +29,50 @@ class SidangTaRevisionContract
         return $source;
     }
 
-    public static function typesForStep(SidangTaRegistrationDraft $draft, int $step): array
+    public static function effectiveMode(SidangTaRegistrationDraft $draft, ?array $admission = null): string
     {
-        $groups = array_values(SidangTaReviewEligibility::groups(self::source($draft)));
-        return in_array($step, [2, 3, 4], true) ? $groups[$step - 2] : [];
+        self::source($draft);
+        $admission ??= app(\App\Services\SidangTaAdmissionFacts::class)->forStudent(
+            \App\Models\Student::where('student_number', $draft->student_number)->firstOrFail());
+        return $admission['eprt']['mode'];
     }
 
-    public static function editableTypes(SidangTaRegistrationDraft $draft): array
+    public static function effectiveTypes(SidangTaRegistrationDraft $draft, ?array $admission = null): array
     {
         $source = self::source($draft);
-        return $source->documents()->whereIn('document_type', SidangTaReviewEligibility::requiredTypes($source))
+        return SidangTaMeetRequirements::allTypes($source->diploma_biodata_accurate, self::effectiveMode($draft, $admission));
+    }
+
+    // Public wrapper retained for request, wizard and progress callers.
+    public static function typesForStep(SidangTaRegistrationDraft $draft, int $step, ?array $admission = null): array
+    {
+        $types = self::effectiveTypes($draft, $admission);
+        $group = match ($step) {
+            2 => SidangTaMeetRequirements::CAPTURES,
+            3 => [...SidangTaMeetRequirements::PAYMENT, SidangTaMeetRequirements::WAIVER],
+            4 => [...SidangTaMeetRequirements::DIPLOMA, ...SidangTaMeetRequirements::PDM],
+            default => [],
+        };
+        return array_values(array_intersect($group, $types));
+    }
+
+    public static function editableTypes(SidangTaRegistrationDraft $draft, ?array $admission = null): array
+    {
+        $source = self::source($draft);
+        $required = self::effectiveTypes($draft, $admission);
+        $editable = $source->documents()->whereIn('document_type', $required)
             ->where('status', 'rejected')->pluck('document_type')->all();
+        if (in_array(SidangTaMeetRequirements::WAIVER, $required, true)
+            && !$source->documents()->where('document_type', SidangTaMeetRequirements::WAIVER)->exists()) {
+            $editable[] = SidangTaMeetRequirements::WAIVER;
+        }
+        return $editable;
     }
 
     public static function assertPayloadUnchanged(SidangTaRegistrationDraft $draft, array $mergedPayload): void
     {
         $source = self::source($draft);
-        $expected = ['student_phone' => $source->student_phone, 'parent_phone' => $source->parent_phone,
-            'graduation_payment_date' => $source->graduation_payment_date?->format('Y-m-d'),
+        $expected = ['graduation_payment_date' => $source->graduation_payment_date?->format('Y-m-d'),
             'diploma_biodata_accurate' => $source->diploma_biodata_accurate];
         $errors = [];
         foreach ($expected as $key => $value) {
@@ -86,14 +112,17 @@ class SidangTaRevisionContract
         if ($errors !== []) throw ValidationException::withMessages($errors);
     }
 
-    public static function assertTransferReady(SidangTaRegistrationDraft $draft): void
+    public static function assertTransferReady(SidangTaRegistrationDraft $draft, ?array $admission = null): void
     {
         $source = self::source($draft);
         self::assertCanRequest($source);
         self::assertPayloadUnchanged($draft, $draft->payload ?? []);
-        $required = SidangTaReviewEligibility::requiredTypes($source);
+        $required = self::effectiveTypes($draft, $admission);
         $sourceDocuments = $source->documents()->get()->keyBy('document_type');
         $documents = $draft->documents()->get();
+        if (!in_array(SidangTaMeetRequirements::WAIVER, $required, true)) {
+            $documents = $documents->reject(fn ($document) => $document->document_type === SidangTaMeetRequirements::WAIVER);
+        }
         $actual = $documents->pluck('document_type')->all();
         $expected = $required;
         sort($actual); sort($expected);
@@ -103,6 +132,10 @@ class SidangTaRevisionContract
             $original = $sourceDocuments->get($document->document_type);
             if (!Storage::disk('local')->exists($document->file_path)) {
                 $errors['documents.'.$document->document_type] = 'Berkas tidak ditemukan. Muat ulang revisi.';
+            } elseif ($original === null) {
+                if ($document->document_type !== SidangTaMeetRequirements::WAIVER || $document->source_document_id !== null) {
+                    $errors['documents.'.$document->document_type] = 'Dokumen tambahan tidak sesuai persyaratan aktif.';
+                }
             } elseif ($original->status === 'rejected') {
                 if ($document->source_document_id !== null || $document->file_path === $original->file_path) {
                     $errors['documents.'.$document->document_type] = 'Unggah berkas pengganti untuk dokumen yang diminta diperbaiki.';

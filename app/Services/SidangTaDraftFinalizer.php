@@ -25,14 +25,14 @@ class SidangTaDraftFinalizer
                                 private SidangTaAdmissionFacts $facts) {}
 
     public function submit(User $user, SidangTaRegistrationDraft $draft, int $version,
-                           ?int $expectedSourceId = null): SidangTaRegistration
+                           ?int $expectedSourceId = null, bool $declarationAccepted = false): SidangTaRegistration
     {
         $student = $this->access->owner($user, $draft);
         $this->access->assertCanWrite($user, $draft);
         $retired = [];
 
         $registration = DB::transaction(function () use ($user, $draft, $version,
-            $expectedSourceId, $student, &$retired) {
+            $expectedSourceId, $declarationAccepted, $student, &$retired) {
             $student = Student::whereKey($student->id)->lockForUpdate()->firstOrFail();
             $locked = SidangTaRegistrationDraft::whereKey($draft->id)->lockForUpdate()->firstOrFail();
             $this->access->owner($user, $locked);
@@ -52,10 +52,13 @@ class SidangTaDraftFinalizer
                 return $existing; // Tidak mengubah keputusan reviewer atau menulis log ulang.
             }
 
+            if (!$declarationAccepted) {
+                throw ValidationException::withMessages(['declaration_accepted' =>
+                    'Anda wajib menyetujui pernyataan sebelum mengirim pengajuan.']);
+            }
             $this->access->check($user, $locked, true);
             $targeted = Revision::isTargeted($locked);
             abort_unless($locked->reviewed_version === $locked->version, 409, 'Tinjau draft terlebih dahulu.');
-            if ($targeted) Revision::assertTransferReady($locked);
             $source = $sourceId === null ? null
                 : $locked->sourceRegistration()->lockForUpdate()->firstOrFail();
             $period = $locked->period()->lockForUpdate()->firstOrFail();
@@ -77,21 +80,29 @@ class SidangTaDraftFinalizer
             foreach ($admission['academic']['blockers'] as $key => $message) {
                 $errors['eligibility.'.$key] = $message;
             }
-            if (!$targeted && !in_array($admission['eprt']['mode'], ['automatic', 'waiver'], true)) {
+            if (!in_array($admission['eprt']['mode'], ['automatic', 'waiver'], true)) {
                 $errors['eligibility.eprt'] = $admission['eprt']['message'];
             }
             if ($errors !== []) throw ValidationException::withMessages($errors);
+            if ($targeted) Revision::assertTransferReady($locked, $admission);
             $rules = [];
-            foreach (range(1, 4) as $step) $rules = array_merge($rules, Requirements::scalarRules($step));
-            if (Validator::make($payload, $rules)->fails()) {
-                throw ValidationException::withMessages(['draft' => 'Data belum lengkap. Buka form dan lengkapi kembali.']);
+            foreach (range(1, 4) as $step) $rules = array_merge($rules, Requirements::scalarRules($step, $payload));
+            $validator = Validator::make($payload, $rules, [
+                'pdm_submission_date.required' => 'Tanggal pengajuan PDM wajib diisi.',
+                'pdm_submission_date.date' => 'Tanggal pengajuan PDM tidak valid.',
+                'pdm_submission_date.before_or_equal' => 'Tanggal pengajuan PDM tidak boleh melewati hari ini.',
+            ]);
+            if ($validator->fails()) {
+                throw ValidationException::withMessages($validator->errors()->toArray() + [
+                    'draft' => 'Data belum lengkap. Buka form dan lengkapi kembali.',
+                ]);
             }
-            $types = $targeted ? \App\Support\SidangTaReviewEligibility::requiredTypes($source)
+            $types = $targeted ? Revision::effectiveTypes($locked, $admission)
                 : Meet::allTypes((bool) $payload['diploma_biodata_accurate'], $admission['eprt']['mode']);
             $allDocuments = $locked->documents()->lockForUpdate()->get();
             // A formerly necessary waiver may become obsolete after a qualifying test.
             // Only an explicit successful submission retires it failed submissions keep it.
-            $documents = !$targeted && $admission['eprt']['mode'] === 'automatic'
+            $documents = $admission['eprt']['mode'] === 'automatic'
                 ? $allDocuments->reject(fn ($document) => $document->document_type === Meet::WAIVER)->values()
                 : $allDocuments;
             $actual = $documents->pluck('document_type')->all();
@@ -106,17 +117,14 @@ class SidangTaDraftFinalizer
                         'Berkas tidak ditemukan. Unggah ulang dan tinjau kembali.']);
                 }
             }
-            $snapshot = $targeted ? $source->academic_snapshot : $this->snapshots->forStudent($student);
-            if (!$targeted) {
-                $snapshot = array_replace($snapshot, [
-                    'passed_credits' => $admission['facts']['passed_credits'],
-                    'tak_score' => $admission['facts']['tak_score'],
-                    'eprt_score' => $admission['eprt_facts']['score'],
-                    'sidang_tingkat_2' => 'Lulus', 'skpi_status' => 'Disetujui',
-                    'ta2_krs_status' => 'eligible', 'ta2_krs_label' => 'Terdaftar',
-                    'admission' => $admission + ['checked_at' => now()->toIso8601String()],
-                ]);
-            }
+            $snapshot = array_replace($this->snapshots->forStudent($student, $admission), [
+                'passed_credits' => $admission['facts']['passed_credits'],
+                'tak_score' => $admission['facts']['tak_score'],
+                'eprt_score' => $admission['eprt_facts']['score'], 'eprt_facts' => $admission['eprt_facts'],
+                'sidang_tingkat_2' => 'Lulus', 'skpi_status' => 'Disetujui',
+                'ta2_krs_status' => 'eligible', 'ta2_krs_label' => 'Terdaftar',
+                'admission' => $admission + ['checked_at' => now()->toIso8601String()],
+            ]);
 
             $registration = $source ?? new SidangTaRegistration();
             $oldStatus = $source?->status;
@@ -129,6 +137,8 @@ class SidangTaDraftFinalizer
                 'student_phone' => $payload['student_phone'], 'parent_phone' => $payload['parent_phone'],
                 'graduation_payment_date' => $payload['graduation_payment_date'],
                 'diploma_biodata_accurate' => $payload['diploma_biodata_accurate'],
+                'pdm_submission_date' => $payload['diploma_biodata_accurate'] ? null : ($payload['pdm_submission_date'] ?? null),
+                'declaration_accepted_at' => now(), 'declaration_version' => Meet::DECLARATION_VERSION,
                 'academic_snapshot' => $snapshot,
                 'requirements_version' => 2,
                 'status' => 'submitted', 'submitted_at' => now(),
@@ -161,20 +171,22 @@ class SidangTaDraftFinalizer
             return $registration;
         });
 
-        // Hanya sesudah transaksi final sukses. Jika DB gagal, tidak ada file yang dihapus.
-        foreach (array_unique($retired) as $path) {
-            try {
-                if (SidangTaRegistrationDocument::where('file_path', $path)->exists()
-                    || SidangTaRegistrationDraftDocument::where('file_path', $path)->exists()) {
-                    continue;
+        // Defer physical cleanup until any caller's outer transaction commits as well.
+        DB::afterCommit(function () use ($retired) {
+            foreach (array_unique($retired) as $path) {
+                try {
+                    if (SidangTaRegistrationDocument::where('file_path', $path)->exists()
+                        || SidangTaRegistrationDraftDocument::where('file_path', $path)->exists()) {
+                        continue;
+                    }
+                    if (!Storage::disk('local')->delete($path)) {
+                        Log::warning('Cleanup finalisasi perlu diulang.', ['path' => $path]);
+                    }
+                } catch (Throwable $exception) {
+                    Log::warning('Cleanup finalisasi gagal.', ['path' => $path, 'error' => $exception->getMessage()]);
                 }
-                if (!Storage::disk('local')->delete($path)) {
-                    Log::warning('Cleanup finalisasi perlu diulang.', ['path' => $path]);
-                }
-            } catch (Throwable $exception) {
-                Log::warning('Cleanup finalisasi gagal.', ['path' => $path, 'error' => $exception->getMessage()]);
             }
-        }
+        });
         return $registration;
     }
 }

@@ -7,7 +7,7 @@
         $accurate = (bool) $payload['diploma_biodata_accurate'];
         $isRevision = $draft->source_registration_id !== null;
         $permission = $isRevision ? 'sidang_ta_registration_update' : 'sidang_ta_registration_create';
-        $groups = [2 => 'Verifikasi iGracias & akademik', 3 => 'Pembayaran & dokumen', 4 => 'Biodata ijazah'];
+        $groups = [2 => 'Data TA di Igracias', 3 => 'Pembayaran & Nilai Bahasa', 4 => 'Pernyataan Biodata Dummy Ijazah'];
         $documentCount = array_sum(array_map('count', $documentGroups));
         $confirmLabel = $isRevision ? 'Ya, kirim revisi' : 'Ya, kirim pendaftaran';
     @endphp
@@ -55,7 +55,7 @@
                 <dl class="grid gap-x-6 gap-y-5 sm:grid-cols-2">
                     <div>
                         <dt class="text-xs text-slate-500">
-                            Nomor HP mahasiswa
+                            Nomor WA Aktif Mahasiswa
                         </dt>
                         <dd class="mt-1 break-words text-sm font-semibold text-slate-800">
                             {{ $payload['student_phone'] }}
@@ -63,7 +63,7 @@
                     </div>
                     <div>
                         <dt class="text-xs text-slate-500">
-                            Nomor HP orang tua/wali
+                            Nomor WA Aktif Orang Tua/Wali
                         </dt>
                         <dd class="mt-1 break-words text-sm font-semibold text-slate-800">
                             {{ $payload['parent_phone'] }}
@@ -85,6 +85,9 @@
                             {{ $accurate ? 'Sudah sesuai' : 'Belum sesuai, bukti PDM dilampirkan' }}
                         </dd>
                     </div>
+                    @unless($accurate)
+                        <div><dt class="text-xs text-slate-500">Tanggal pengajuan PDM</dt><dd class="mt-1 text-sm font-semibold">{{ filled($payload['pdm_submission_date'] ?? null) ? \Carbon\Carbon::parse($payload['pdm_submission_date'])->format('d/m/Y') : 'Belum tersedia' }}</dd></div>
+                    @endunless
                 </dl>
                 <div class="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-4">
                     <p class="text-xs leading-relaxed text-slate-500">
@@ -98,7 +101,8 @@
             </div>
         </section>
 
-        @include('sidang_ta_registrations.partials.meet-admission-summary', ['admission' => $meetContext['admission']])
+        @include('sidang_ta_registrations.partials.wizard-academic', ['hideIdentity' => true])
+        @include('sidang_ta_registrations.partials.language-history', ['history' => $meetContext['admission']['eprt_facts']['history']])
 
         @foreach($groups as $number => $title)
             @php
@@ -121,16 +125,11 @@
                        href="{{ route('sidang-ta-drafts.edit', ['draft' => $draft, 'step' => $number]) }}">Ubah
                         tahap {{ $number }}</a>
                 </header>
-                @if(isset($meetContext['automatic'][$number]))
-                    <div class="px-5 pt-4 sm:px-6">
-                        @include('sidang_ta_registrations.partials.meet-automatic-cards', ['items' => $meetContext['automatic'][$number]])
-                    </div>
-                @endif
                 <div class="divide-y divide-slate-100 px-5 sm:px-6">
                     @foreach($types as $type)
                         @php
                             $document = $draft->documents->firstWhere('document_type', $type);
-                            $documentLabel = \App\Models\SidangTaRegistration::DOCUMENT_TYPES[$type] ?? $type;
+                            $documentLabel = \App\Support\SidangTaMeetRequirements::LABELS[$type] ?? $type;
                         @endphp
                         <div data-review-document="{{ $type }}"
                              class="flex flex-col gap-3 py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-5">
@@ -221,7 +220,7 @@
                             setelah pengiriman mengikuti proses revisi yang tersedia.</p>
                     </div>
                     <form data-final-registration-form method="POST"
-                          class="mt-5 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end"
+                          class="mt-5 flex flex-wrap justify-end gap-3"
                           action="{{ $isRevision ? route('sidang-ta-registrations.update', $draft->source_registration_id) : route('sidang-ta-registrations.store') }}"
                           @submit="if (sending || {{ $sendBlocked ? 'true' : 'false' }}) { $event.preventDefault(); } else { sending = true; }">
                         @csrf
@@ -231,6 +230,13 @@
                         <input type="hidden" name="draft_id" value="{{ $draft->id }}">
                         <input type="hidden" name="version" value="{{ $draft->version }}">
                         <input type="hidden" name="action" value="submit">
+                        <label class="flex w-full items-start gap-3 rounded-xl border border-slate-200 p-3 text-sm leading-relaxed">
+                            <input type="checkbox" name="declaration_accepted" value="1" required class="mt-1 rounded border-slate-300 text-rose-600"
+                                   aria-describedby="error-declaration_accepted" aria-invalid="{{ $errors->has('declaration_accepted') ? 'true' : 'false' }}">
+                            <span>Saya MENYATAKAN bahwa saya telah memastikan dan memeriksa kembali seluruh berkas telah lengkap dan sesuai dengan ketentuan. Jika berkas tidak lengkap, maka saya siap tidak disertakan pada sidang tugas akhir periode terdekat. *</span>
+                        </label>
+                        <p class="w-full text-xs text-slate-600">Pastikan seluruh data benar. Anda bertanggung jawab dan menerima konsekuensi atas kesalahan data atau berkas yang dikirim.</p>
+                        @include('sidang_ta_registrations.partials.wizard-error', ['field' => 'declaration_accepted'])
                         <button data-cancel-registration type="button" autofocus class="btn btn-secondary"
                                 :disabled="sending"
                                 onclick="this.closest('dialog').close()">Periksa kembali

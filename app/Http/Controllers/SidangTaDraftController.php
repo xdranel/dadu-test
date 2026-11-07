@@ -69,55 +69,34 @@ class SidangTaDraftController extends Controller
         if ($targeted) {
             $source = SidangTaRevisionContract::source($draft);
             $revisionExpired = SidangTaRevisionDeadline::hasExpired($source);
-            $snapshot = $source->academic_snapshot ?? [];
-            $stored = $snapshot['admission'] ?? [];
-            $storedMode = $stored['eprt']['mode'] ?? null;
-            abort_unless(in_array($storedMode, ['automatic', 'waiver'], true), 409,
-                'Persyaratan EPRT pengajuan asal belum lengkap.');
-            $admission['eprt'] = ['mode' => $storedMode, 'requires_waiver' => $storedMode === 'waiver',
-                'message' => $storedMode === 'waiver' ? 'Surat Permakluman mengikuti pengajuan asal.' : 'EPRT memenuhi syarat saat pengajuan asal.'];
-            $admission['eprt_facts'] = ['score' => $stored['eprt_facts']['score'] ?? $snapshot['eprt_score'] ?? null,
-                'confirmed_attempts' => $stored['eprt_facts']['confirmed_attempts'] ?? null];
         }
         $mode = $admission['eprt']['mode'];
-        $facts = $admission['facts'];
-        $level = match ($facts['level_2_passed']) { true => 'Lulus', false => 'Belum lulus', default => 'Belum tersedia' };
-        $skpi = match ($facts['skpi_approved']) { true => 'Disetujui', false => 'Belum memenuhi', default => 'Belum tersedia' };
-        $krs = match ($admission['krs_status']) { 'eligible' => 'Terdaftar', 'unconfirmed' => 'Belum terkonfirmasi', default => 'Belum tersedia' };
-        $payment = strtolower(trim((string) ($student->bppPayment()->value('status') ?? '')));
-        $payment = match ($payment) { 'paid', 'lunas' => 'Lunas', 'unpaid', 'belum lunas', 'belum_lunas' => 'Belum lunas', default => 'Belum tersedia' };
-        $score = $admission['eprt_facts']['score'];
-        $attempts = $admission['eprt_facts']['confirmed_attempts'];
         $payload = $draft->payload ?? [];
         $choice = $payload['diploma_biodata_accurate'] ?? null;
         $accurate = $choice === null ? null : (bool) $choice;
         $types = [];
         foreach ([2, 3, 4] as $step) {
-            $types[$step] = $targeted ? SidangTaRevisionContract::typesForStep($draft, $step)
+            $types[$step] = $targeted ? SidangTaRevisionContract::typesForStep($draft, $step, $admission)
                 : SidangTaMeetRequirements::typesForStep($step, $accurate, $mode);
         }
         return [
             'admission' => $admission, 'types' => $types, 'targeted' => $targeted,
             'revision_expired' => $revisionExpired,
-            'editable_types' => $targeted ? SidangTaRevisionContract::editableTypes($draft) : [],
+            'editable_types' => $targeted ? SidangTaRevisionContract::editableTypes($draft, $admission) : [],
             'can_submit' => !$revisionExpired && ($draft->source_registration_id === null || $targeted)
                 && $admission['academic']['academic_passed']
                 && in_array($mode, ['automatic', 'waiver'], true),
-            'academic' => ['sidang_tingkat_2' => $level, 'skpi_status' => $skpi, 'ta2_krs_label' => $krs,
-                'tak_score' => $facts['tak_score'], 'passed_credits' => $facts['passed_credits'], 'eprt_score' => $score],
-            'automatic' => [
-                2 => [
-                    ['key' => 'level_2', 'title' => 'Hasil sidang tingkat 2', 'value' => $level, 'hint' => 'Tidak memerlukan unggahan.'],
-                    ['key' => 'sidang_approval', 'title' => 'Persetujuan sidang iGracias', 'value' => 'Belum tersedia', 'hint' => 'Persetujuan sidang belum tercatat.'],
-                ],
-                3 => [
-                    ['key' => 'bpp', 'title' => 'BPP semester berjalan', 'value' => $payment,
-                        'hint' => 'Periode pembayaran belum terkonfirmasi. Tidak memerlukan unggahan.'],
-                    ['key' => 'eprt', 'title' => $targeted ? 'EPRT pengajuan asal' : 'EPRT', 'value' => $score === null ? 'Belum tersedia' : 'Nilai '.$score,
-                        'hint' => $admission['eprt']['message'].($attempts === null ? '' : ' '.$attempts.' tes tercatat.')],
-                ],
-            ],
+            'waiver_ready' => $this->waiverReady($draft, $targeted, $admission),
         ];
+    }
+
+    private function waiverReady(SidangTaRegistrationDraft $draft, bool $targeted, array $admission): bool
+    {
+        if ($admission['eprt']['mode'] !== 'waiver') return false;
+        $document = $draft->documents->firstWhere('document_type', SidangTaMeetRequirements::WAIVER);
+        return $document && Storage::disk('local')->exists($document->file_path)
+            && !($targeted && $document->source_document_id !== null
+                && in_array(SidangTaMeetRequirements::WAIVER, SidangTaRevisionContract::editableTypes($draft, $admission), true));
     }
 
     public function edit(Request $request, SidangTaRegistrationDraft $draft): JsonResponse|View|RedirectResponse
@@ -136,11 +115,11 @@ class SidangTaDraftController extends Controller
         $stepProgress = SidangTaDocumentRequirements::progress($draft, $step);
         $student = app(SidangTaStudentContext::class)->studentFor($request->user());
         $openPeriods = SidangTaPeriod::query()->openForRegistration()->get();
-        $academic = app(SidangTaAcademicSnapshot::class)->forStudent($student);
         $meetContext = $this->meetContext($draft, $student);
-        $academic = array_replace($academic, $meetContext['academic']);
+        $academic = app(SidangTaAcademicSnapshot::class)->forStudent($student, $meetContext['admission']);
+        $guides = app(\App\Services\SidangTaFormGuideService::class)->activeForSlots(array_keys(\App\Support\SidangTaFormGuideSlots::labels()));
         return view('sidang_ta_registrations.wizard', compact(
-            'draft', 'student', 'step', 'maxStep', 'completedThrough', 'openPeriods', 'academic', 'stepProgress', 'meetContext'
+            'draft', 'student', 'step', 'maxStep', 'completedThrough', 'openPeriods', 'academic', 'stepProgress', 'meetContext', 'guides'
         ));
     }
 
@@ -226,6 +205,7 @@ class SidangTaDraftController extends Controller
                     'Persyaratan atau berkas berubah. Buka form dan tinjau ulang.');
             }
         }
-        return view('sidang_ta_registrations.wizard-review', compact('draft', 'student', 'meetContext', 'documentGroups'));
+        $academic = app(SidangTaAcademicSnapshot::class)->forStudent($student, $meetContext['admission']);
+        return view('sidang_ta_registrations.wizard-review', compact('draft', 'student', 'meetContext', 'documentGroups', 'academic'));
     }
 }

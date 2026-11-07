@@ -9,23 +9,23 @@ test('meet_requirements_stage_one_has_no_upload', function () {
     expect(Requirements::typesForStep(1, null, 'unknown'))->toBe([]);
 });
 
-test('meet_requirements_stage_two_only_requires_data_ta_and_approved_supervision', function () {
+test('meet_requirements_stage_two_requires_four_ta_pdfs', function () {
     foreach (['automatic', 'waiver', 'retest', 'unknown'] as $mode) {
         expect(Requirements::typesForStep(2, null, $mode))->toBe([
-            'ta_data_capture', 'online_supervision_capture',
+            'ta_data_capture', 'online_supervision_capture', 'ta_supervisor_sk', 'thesis_draft',
         ]);
     }
 });
 
-test('meet_requirements_stage_three_has_three_base_pdfs_and_no_certificate_for_automatic_eprt', function () {
+test('meet_requirements_stage_three_has_one_base_pdf_and_no_certificate_for_automatic_eprt', function () {
     expect(Requirements::typesForStep(3, null, 'automatic'))->toBe([
-        'graduation_payment_proof', 'ta_supervisor_sk', 'thesis_draft',
+        'graduation_payment_proof',
     ]);
 });
 
 test('meet_requirements_eprt_waiver_adds_exactly_one_required_pdf', function () {
     $types = Requirements::typesForStep(3, null, Policy::eprt(449, 3)['mode']);
-    expect($types)->toBe(['graduation_payment_proof', 'ta_supervisor_sk', 'thesis_draft', 'eprt_waiver_letter']);
+    expect($types)->toBe(['graduation_payment_proof', 'eprt_waiver_letter']);
     expect(Requirements::fileRules('eprt_waiver_letter'))->toBe(['nullable', 'file', 'max:10240', 'mimes:pdf']);
 });
 
@@ -66,7 +66,7 @@ test('meet_requirements_every_upload_has_a_label_and_expected_format', function 
         expect(Requirements::LABELS[$type])->not->toBe('');
         $rules = Requirements::fileRules($type);
         expect($rules)->toContain('nullable')->toContain('file')->toContain('max:10240');
-        expect(end($rules))->toBe(in_array($type, Requirements::CAPTURES, true) ? 'mimes:pdf,jpg,jpeg,png' : 'mimes:pdf');
+        expect(end($rules))->toBe('mimes:pdf');
     }
 });
 

@@ -6,15 +6,16 @@ use InvalidArgumentException;
 
 class SidangTaMeetRequirements
 {
-    public const CAPTURES = ['ta_data_capture', 'online_supervision_capture'];
-    public const PAYMENT = ['graduation_payment_proof', 'ta_supervisor_sk', 'thesis_draft'];
+    public const CAPTURES = ['ta_data_capture', 'online_supervision_capture', 'ta_supervisor_sk', 'thesis_draft'];
+    public const PAYMENT = ['graduation_payment_proof'];
+    public const DECLARATION_VERSION = 1;
     public const WAIVER = 'eprt_waiver_letter';
     public const DIPLOMA = ['diploma_statement', 'diploma_biodata_form'];
     public const PDM = ['pdm_submission_proof'];
 
     public const LABELS = [
-        'ta_data_capture' => 'Capture Data TA (Menu TA/PA)',
-        'online_supervision_capture' => 'Capture Bimbingan Online yang Disetujui',
+        'ta_data_capture' => 'Data TA di iGracias',
+        'online_supervision_capture' => 'Bimbingan Online yang Disetujui',
         'graduation_payment_proof' => 'Bukti Pembayaran Wisuda',
         'ta_supervisor_sk' => 'SK Pembimbing TA Aktif',
         'thesis_draft' => 'Draft Buku TA (PDF)',
@@ -47,8 +48,7 @@ class SidangTaMeetRequirements
         if (!array_key_exists($type, self::LABELS)) {
             throw new InvalidArgumentException('Jenis upload tidak termasuk persyaratan hasil meet.');
         }
-        return ['nullable', 'file', 'max:10240', in_array($type, self::CAPTURES, true)
-            ? 'mimes:pdf,jpg,jpeg,png' : 'mimes:pdf'];
+        return ['nullable', 'file', 'max:10240', 'mimes:pdf'];
     }
 
     private static function assertMode(string $mode): void

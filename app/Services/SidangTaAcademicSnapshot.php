@@ -5,22 +5,28 @@ namespace App\Services;
 use App\Models\AcademicPeriod;
 use App\Models\Student;
 use App\Models\StudentCourse;
-use App\Models\StudentTak;
-use App\Models\StudentEprt;
 
 class SidangTaAcademicSnapshot
 {
-    public function forStudent(Student $student): array
+    public function forStudent(Student $student, ?array $admission = null): array
     {
         $number = $student->student_number;
         $ta2Status = $this->ta2KrsStatus($student);
         $project = $student->finalProject;
-        $tak = $student->tak ?? StudentTak::where('student_number', $number)->latest('test_date')->first();
-        $eprt = $student->eprts()->orderByDesc('test_date')->first()
-            ?? StudentEprt::where('student_number', $number)->orderByDesc('test_date')->first();
-        $skpi = $student->skpi?->raw_data ?? [];
-        $status = $skpi['status'] ?? $skpi['approval_status'] ?? $skpi['is_approved'] ?? 'Belum tersedia';
-        if ($status === true) $status = 'Disetujui';
+        $admission ??= app(SidangTaAdmissionFacts::class)->forStudent($student);
+        $language = $admission['eprt_facts'];
+        $profile = \App\Models\StudentAcademicProfile::where('student_number', $number)->first();
+        $groups = $profile?->groups ?? [];
+        $bpp = $profile ? ($groups['bpp'] ?? []) : ['status' => $student->bppPayment?->status];
+        $bppStatus = is_scalar($bpp['status'] ?? null) ? trim((string) $bpp['status']) : '';
+        $bppStatus = match (strtolower($bppStatus)) {
+            'paid', 'lunas' => 'Lunas', 'unpaid', 'belum lunas', 'belum_lunas' => 'Belum lunas',
+            '' => 'Belum tersedia', default => $bppStatus,
+        };
+        $approval = $groups['sidang_approval'] ?? [];
+        $approvalStatus = is_scalar($approval['status'] ?? null) && trim((string) $approval['status']) !== ''
+            ? (string) $approval['status'] : 'Belum tersedia';
+        $facts = $admission['facts'];
 
         return [
             'student_number' => $number, 'student_name' => $student->name,
@@ -31,17 +37,21 @@ class SidangTaAcademicSnapshot
                 default => 'Belum tersedia',
             },
             'study_program' => $student->study_program ?? '-', 'semester' => $student->active_semester ?? '-',
-            'gpa' => $student->gpa, 'passed_credits' => $student->total_credits,
-            'sidang_tingkat_2' => $student->sidangTingkat?->tingkat_2 ? 'Lulus' : 'Belum lulus / belum tersedia',
+            'gpa' => $student->gpa, 'passed_credits' => $facts['passed_credits'],
+            'sidang_tingkat_2' => match ($facts['level_2_passed']) { true => 'Lulus', false => 'Belum lulus', default => 'Belum tersedia' },
             'ta_title' => $project?->thesis_title_id ?? '-', 'ta_title_en' => $project?->thesis_title_en ?? '-',
             'advisor_1' => $project?->advisor_1 ?? '-', 'advisor_2' => $project?->advisor_2 ?? '-',
             'examiner_1' => $project?->examiner_1 ?? '-', 'examiner_2' => $project?->examiner_2 ?? '-',
             'examiner_3' => $project?->examiner_3 ?? '-',
             'exam_date' => $project?->exam_date?->format('d/m/Y') ?? '-',
             'exam_time' => $project?->exam_time ?? '-', 'exam_location' => $project?->exam_location ?? '-',
-            'tak_score' => $tak?->total_points, 'eprt_score' => $eprt?->total_score,
-            'bpp_status' => $student->bppPayment?->status ?? 'Belum tersedia',
-            'skpi_status' => is_scalar($status) ? (string) $status : 'Tersedia',
+            'tak_score' => $facts['tak_score'], 'eprt_score' => $language['score'], 'eprt_facts' => $language,
+            'bpp_status' => $bppStatus, 'bpp_period' => $bpp['period'] ?? null,
+            'bpp_periods' => $profile?->bpp_periods ?? [],
+            'sidang_approval_status' => $approvalStatus,
+            'sidang_approval_approved' => $approval['approved'] ?? null,
+            'admission' => $admission,
+            'skpi_status' => match ($facts['skpi_approved']) { true => 'Disetujui', false => 'Belum memenuhi', default => 'Belum tersedia' },
             'skpi_tak' => $student->tak ? 'TAK tersedia' : 'TAK belum tersedia',
             'level_3_status' => $student->sidangTingkat?->tingkat_3 ? 'Lulus' : 'Belum lulus / belum tersedia',
             'ibasila_status' => $student->basilaApproval?->status ?? 'Belum tersedia',

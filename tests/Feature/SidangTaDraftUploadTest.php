@@ -56,9 +56,9 @@ beforeEach(function () {
     };
 });
 
-test('saves_two_captures_and_resumes_with_private_downloads', function () {
+test('saves_four_ta_pdfs_and_resumes_with_private_downloads', function () {
     ($this->saveUploadStep)(2, ['documents' => ($this->filesFor)(2)])
-        ->assertOk()->assertJsonCount(2, 'data.documents')
+        ->assertOk()->assertJsonCount(4, 'data.documents')
         ->assertJsonPath('data.first_incomplete_step', 3);
     $response = $this->getJson(route('sidang-ta-drafts.edit', $this->draft))->assertOk();
     expect($response->json('data.documents.0'))->not->toHaveKey('file_path');
@@ -81,7 +81,7 @@ test('completes_both_biodata_branches_and_removes_obsolete_files', function () {
     expect($this->draft->fresh()->payload['diploma_biodata_accurate'])->toBeFalse();
     foreach ($oldPaths as $path) Storage::disk('local')->assertMissing($path);
     ($this->saveUploadStep)(4, [
-        'diploma_biodata_accurate' => false, 'documents' => ($this->filesFor)(4, false),
+        'diploma_biodata_accurate' => false, 'pdm_submission_date' => today()->toDateString(), 'documents' => ($this->filesFor)(4, false),
     ])->assertOk()->assertJsonCount(6, 'data.documents')->assertJsonPath('data.first_incomplete_step', null);
 });
 
@@ -110,8 +110,8 @@ test('accepts_size_boundary_and_requires_pdf_in_payment_stage', function () {
     $files['ta_data_capture'] = UploadedFile::fake()->create('limit.pdf', 10240, 'application/pdf');
     ($this->saveUploadStep)(2, ['documents' => $files])->assertOk();
     ($this->saveUploadStep)(3, ['documents' => [
-        'thesis_draft' => UploadedFile::fake()->create('image.jpg', 100, 'image/jpeg'),
-    ]])->assertUnprocessable()->assertJsonValidationErrors('documents.thesis_draft');
+        'graduation_payment_proof' => UploadedFile::fake()->create('image.jpg', 100, 'image/jpeg'),
+    ]])->assertUnprocessable()->assertJsonValidationErrors('documents.graduation_payment_proof');
 });
 
 test('keeps_existing_files_on_partial_save_and_rejects_stale_version', function () {
@@ -153,7 +153,7 @@ test('storage_failure_preserves_old_metadata_and_files', function () {
     expect($this->draft->fresh()->version)->toBe($version);
     Storage::disk('local')->assertExists($old->file_path);
     expect(Storage::disk('local')->allFiles())->toBe($beforeFiles);
-    expect($this->draft->documents()->count())->toBe(2);
+    expect($this->draft->documents()->count())->toBe(4);
 });
 
 test('another_user_cannot_download_draft_document', function () {

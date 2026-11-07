@@ -244,8 +244,12 @@ test('meet_staff_detail_groups_uploads_into_two_columns_with_status_colors_and_d
     foreach ($crawler->filter('[data-meet-document-grid]') as $node) {
         expect($node->getAttribute('class'))->toContain('lg:grid-cols-2');
     }
-    expect($crawler->filter('[data-meet-document-group="2"] [data-ta-detail-document]')->count())->toBe(2);
-    expect($crawler->filter('[data-meet-document-group="3"] [data-ta-detail-document]')->count())->toBe(4);
+    expect($crawler->filter('[data-meet-document-group="2"] [data-ta-detail-document]')->count())->toBe(4);
+    foreach (['ta_supervisor_sk', 'thesis_draft'] as $type) {
+        $document = $registration->documents()->where('document_type', $type)->firstOrFail();
+        expect($crawler->filter('[data-meet-document-group="2"] #review-document-'.$document->id)->count())->toBe(1);
+    }
+    expect($crawler->filter('[data-meet-document-group="3"] [data-ta-detail-document]')->count())->toBe(2);
     expect($crawler->filter('[data-meet-document-group="4"] [data-ta-detail-document]')->count())->toBe(2);
     $green = $crawler->filter('#review-document-'.$verified->id);
     $yellow = $crawler->filter('#review-document-'.$rejected->id);
@@ -265,7 +269,8 @@ test('meet_staff_pdm_and_automatic_groups_only_show_their_six_uploads', function
     $registration = ($this->makeMeetRegistration)('automatic', false);
     $crawler = ($this->reviewPage)($registration);
     expect($crawler->filter('[data-ta-detail-document]')->count())->toBe(6);
-    expect($crawler->filter('[data-meet-document-group="3"] [data-ta-detail-document]')->count())->toBe(3);
+    expect($crawler->filter('[data-meet-document-group="2"] [data-ta-detail-document]')->count())->toBe(4);
+    expect($crawler->filter('[data-meet-document-group="3"] [data-ta-detail-document]')->count())->toBe(1);
     expect($crawler->filter('[data-meet-document-group="4"] [data-ta-detail-document]')->count())->toBe(1);
     expect($crawler->filter('[data-doc-review-form]')->count())->toBe(6);
 });

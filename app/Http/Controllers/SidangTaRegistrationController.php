@@ -58,28 +58,15 @@ class SidangTaRegistrationController extends Controller
             return redirect()->route('sidang-ta-drafts.edit', $existing);
         }
         $openPeriods = SidangTaPeriod::query()->openForRegistration()->get();
-        $academic = app(SidangTaAcademicSnapshot::class)->forStudent($student);
         $admission = app(\App\Services\SidangTaAdmissionFacts::class)->forStudent($student);
-        $facts = $admission['facts'];
-        $academic = array_replace($academic, [
-            'sidang_tingkat_2' => match ($facts['level_2_passed']) {
-                true => 'Lulus', false => 'Belum lulus', default => 'Belum tersedia',
-            },
-            'skpi_status' => match ($facts['skpi_approved']) {
-                true => 'Disetujui', false => 'Belum memenuhi', default => 'Belum tersedia',
-            },
-            'ta2_krs_label' => match ($admission['krs_status']) {
-                'eligible' => 'Terdaftar', 'unconfirmed' => 'Belum terkonfirmasi', default => 'Belum tersedia',
-            },
-            'tak_score' => $facts['tak_score'], 'passed_credits' => $facts['passed_credits'],
-            'eprt_score' => $admission['eprt_facts']['score'],
-        ]);
-        $meetContext = ['targeted' => false, 'revision_expired' => false];
+        $academic = app(SidangTaAcademicSnapshot::class)->forStudent($student, $admission);
+        $meetContext = ['targeted' => false, 'revision_expired' => false, 'admission' => $admission];
         $draft = null;
         $step = $maxStep = 1;
         $completedThrough = 0;
+        $guides = app(\App\Services\SidangTaFormGuideService::class)->activeForSlots(array_keys(\App\Support\SidangTaFormGuideSlots::labels()));
         return view('sidang_ta_registrations.wizard', compact(
-            'draft', 'student', 'step', 'maxStep', 'completedThrough', 'openPeriods', 'academic', 'meetContext'
+            'draft', 'student', 'step', 'maxStep', 'completedThrough', 'openPeriods', 'academic', 'meetContext', 'guides'
         ));
     }
 
@@ -104,7 +91,23 @@ class SidangTaRegistrationController extends Controller
                 $canRevise = false;
             }
         }
+        if ($canRevise) return redirect()->route('sidang-ta-registrations.edit', $registration);
         return view('sidang_ta_registrations.show', compact('registration', 'canRevise'));
+    }
+
+    public function history(Request $request, SidangTaRegistration $sidang_ta_registration)
+    {
+        try {
+            $student = app(SidangTaStudentContext::class)->studentFor($request->user());
+        } catch (ValidationException $exception) {
+            abort(403);
+        }
+        // This student-context endpoint never grants a reviewer bypass.
+        $registration = $sidang_ta_registration;
+        abort_unless($registration->student_number === $student->student_number, 403);
+        $events = app(\App\Services\SidangTaHistoryPresenter::class)->forStudent($registration);
+        return $request->expectsJson() ? response()->json(['data' => $events])
+            : view('sidang_ta_registrations.history', compact('registration', 'events'));
     }
 
     public function edit(SidangTaRegistration $sidang_ta_registration)
@@ -150,7 +153,7 @@ class SidangTaRegistrationController extends Controller
 
     public function adminShow(SidangTaRegistration $sidang_ta_registration)
     {
-        $registration = $sidang_ta_registration->load(['period', 'documents', 'logs']);
+        $registration = $sidang_ta_registration->load(['period', 'documents', 'logs.actor']);
         $needsReview = $registration->status === 'needs_review';
         $readonlyNeedsReview = $needsReview;
         $reviewable = $registration->status === 'submitted';
@@ -313,7 +316,8 @@ class SidangTaRegistrationController extends Controller
         try {
             $draft = SidangTaRegistrationDraft::findOrFail($request->validated('draft_id'));
             $registration = app(SidangTaDraftFinalizer::class)->submit($request->user(), $draft,
-                (int) $request->validated('version'), $source ? (int) $source->id : null);
+                (int) $request->validated('version'), $source ? (int) $source->id : null,
+                $request->boolean('declaration_accepted'));
         } catch (ValidationException $exception) {
             if ($request->expectsJson()) throw $exception;
             return redirect()->route('sidang-ta-registrations.index')->withErrors($exception->errors());

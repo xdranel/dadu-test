@@ -20,15 +20,25 @@ class StoreSidangTaRegistrationRequest extends FormRequest
             'draft_id' => ['required', 'uuid', 'exists:sidang_ta_registration_drafts,id'],
             'version' => ['required', 'integer', 'min:1'],
             'action' => ['required', 'in:submit'],
+            'declaration_accepted' => ['required', 'accepted'],
         ];
         foreach (['requirements_version', 'student_number', 'student_name', 'study_program', 'owner_user_id',
                      'sidang_ta_period_id', 'student_phone', 'parent_phone', 'graduation_payment_date',
                      'diploma_biodata_accurate', 'academic_snapshot', 'status', 'submitted_by',
                      'reviewed_by', 'reviewed_at', 'review_notes', 'reviewed_version',
-                     'source_registration_id', 'source_version', 'documents', 'file_path'] as $key) {
+                     'source_registration_id', 'source_version', 'documents', 'file_path',
+                     'pdm_submission_date', 'declaration_accepted_at', 'declaration_version'] as $key) {
             $rules[$key] = ['prohibited'];
         }
         return $rules;
+    }
+
+    public function messages(): array
+    {
+        return [
+            'declaration_accepted.required' => 'Anda wajib menyetujui pernyataan sebelum mengirim pengajuan.',
+            'declaration_accepted.accepted' => 'Anda wajib menyetujui pernyataan sebelum mengirim pengajuan.',
+        ];
     }
 
     public function withValidator($validator): void
