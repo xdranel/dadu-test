@@ -26,18 +26,19 @@ docs/fixtures/sidang-ta/data_dadu/
   README.md
   manifest.json
   blackbox-accounts.json
-  sumber/                         # enam JSON sumber, disalin persis
+  sumber/                         # tujuh JSON sumber, disalin persis
   impor/
     75-01-mahasiswa-demo.json
     75-02-krs-demo-sumber.json
     75-02b-krs-demo-skenario-ta.json
     75-03-profil-akademik-demo.json
     75-04-bpp-demo.json
+    75-05-bahasa-demo.json
 ```
 
-Folder `sumber` menyimpan SEEDER 11 mahasiswa, MATRICS 11 mahasiswa, rekap awal, KRS, UPDT TAK & SKPI, dan FINANCE UPDATE. Salinan diverifikasi dengan SHA-256 di manifest. Berkas Downloads tetap tersedia. Folder privat diabaikan Git; ekspor identitas tidak masuk commit/image Docker.
+Folder `sumber` menyimpan SEEDER 11 mahasiswa, MATRICS 11 mahasiswa, rekap awal, KRS, UPDT TAK & SKPI, FINANCE UPDATE, dan NILAI BAHASA UPDATE 7 November. Salinan diverifikasi dengan SHA-256 di manifest. Berkas Downloads tetap tersedia. Folder privat diabaikan Git; ekspor identitas tidak masuk commit/image Docker.
 
-`MATRICS_BLACKBOX_11_MAHASISWA.json` menjadi acuan program studi dan skenario; SEEDER menjadi acuan identitas dan nilai profil akademik. Roster setup hanya membawa 11 identitas dan semester studi, tanpa password server. Tiga ekspor umum berisi 277 mahasiswa tidak mencakup 11 NIM blackbox, sehingga tidak menggantikan profil/BPP skenario mereka.
+`MATRICS_BLACKBOX_11_MAHASISWA.json` menjadi acuan program studi dan skenario; SEEDER menjadi acuan identitas dan nilai profil akademik. Roster setup hanya membawa 11 identitas dan semester studi, tanpa password server. Empat ekspor umum berisi 277 mahasiswa tidak mencakup 11 NIM blackbox, sehingga tidak menggantikan profil/BPP skenario mereka.
 
 KRS sumber untuk 11 mahasiswa berisi 83 mata kuliah dan belum mempunyai mata kuliah TA yang diterima sistem. Dua fixture KRS disediakan:
 
@@ -54,10 +55,11 @@ Untuk membuat ulang fixture, jalankan dari repo Docker di laptop; pilih folder o
 cd /home/xdranel/Code/Project/secret/dadu-test
 php docker/scripts/prepare-demo-imports.php \
   --source=/home/xdranel/Downloads/data_dadu \
+  --language-source="/home/xdranel/Downloads/data_dadu/rekap_igracias_2026-11-07 NILAI BAHASA UPDATE.json" \
   --output=/tmp/dadu-demo75-private
 ```
 
-Generator hanya membaca/menulis berkas; tidak membuka database. Periksa manifest sebelum mengganti fixture privat yang sudah digunakan.
+Generator hanya membaca/menulis berkas; tidak membuka database. Periksa manifest sebelum mengganti fixture privat yang sudah digunakan. Opsi `--language-source` opsional agar enam sumber lama tetap didukung. Dengan opsi tersebut, manifest mencatat tujuh sumber. Sumber bahasa baru berisi 277 mahasiswa dan tidak mencakup 11 identitas blackbox; tanggal asli mereka tidak ditempelkan pada mahasiswa dummy. `75-05` menggunakan tanggal sintetis yang ditandai eksplisit, sambil mempertahankan nilai, jumlah tes, jenis, dan status skenario.
 
 ## 3. Reset development lokal
 
@@ -175,16 +177,17 @@ Login superadmin, buka **Sinkronisasi Data → Import JSON**, lalu pilih berkas 
 | 2 | `75-02b-krs-demo-skenario-ta.json` | KRS | 12 mahasiswa, 95 KRS pada Ganjil 2026/2027 |
 | 3 | `75-03-profil-akademik-demo.json` | Profil Akademik | Profil akademik, bahasa, TAK, SKPI, persetujuan dan status BPP skenario |
 | 4 | `75-04-bpp-demo.json` | Profil Akademik | Status BPP yang sama dengan konteks periode `2627/1` eksplisit |
+| 5 | `75-05-bahasa-demo.json` | Profil Akademik | Bahasa saja, termasuk tanggal tes dummy; BPP dan grup lain dipertahankan |
 
-Gunakan pilihan tipe **Profil Akademik** yang tersedia di UI untuk dua berkas terakhir; `semester` di profil adalah semester studi, sedangkan `periode_keuangan` adalah periode BPP. Jangan mengimpor SEEDER profil sebagai tipe Mahasiswa: format profil tidak membawa semua kolom master Student.
+Gunakan pilihan tipe **Profil Akademik** yang tersedia di UI untuk tiga berkas terakhir; `semester` di profil adalah semester studi, sedangkan `periode_keuangan` adalah periode BPP. Jangan mengimpor SEEDER profil sebagai tipe Mahasiswa: format profil tidak membawa semua kolom master Student.
 
 Jika ingin memeriksa data KRS sumber, gunakan `75-02-krs-demo-sumber.json` sebagai pengganti langkah 2. Akibatnya 11 mahasiswa masih belum memenuhi syarat KRS TA. Untuk kembali ke pengujian matriks, impor ulang `75-02b`. Impor KRS mengganti seluruh daftar mahasiswa pada periode yang sama; impor sumber **sesudah** skenario akan menghapus tambahan TA sintetis.
 
-Enam berkas dalam `sumber` disimpan untuk referensi/audit. Ekspor umum 277 mahasiswa dan KRS penuh 4.277 mahasiswa tidak diperlukan untuk menguji 12 mahasiswa demo. Pengujian cohort umum memerlukan master Student yang cocok dan merupakan impor terpisah.
+Tujuh berkas dalam `sumber` disimpan untuk referensi/audit. Ekspor umum 277 mahasiswa dan KRS penuh 4.277 mahasiswa tidak diperlukan untuk menguji 12 mahasiswa demo. Pengujian cohort umum memerlukan master Student yang cocok dan merupakan impor terpisah.
 
 Setelah impor, buka periode pendaftaran Sidang TA melalui akun Petugas/Krisna bila ingin menguji pengajuan. Periode akademik Ganjil 2026/2027 yang dibuat seeder berbeda dari periode pendaftaran Sidang TA. Periksa hasil sinkronisasi/log setiap impor sebelum lanjut ke langkah berikutnya.
 
-Matriks adalah acuan skenario, bukan pernyataan bahwa semua label UI sudah disesuaikan. Tampilan BPP, label bahasa EPRT/ECCT, dan kartu persetujuan yang sebelumnya tercatat masih perlu ditinjau terpisah. BPP tidak menjadi penghalang utama kelayakan Sidang TA.
+Matriks tetap menjadi acuan skenario. Sejak pembaruan79, IPK minimal 2,00 menjadi syarat pengiriman. BPP dan persetujuan iGracias tampil sebagai kartu informasi; keduanya tidak menambah syarat pengiriman baru. Tanggal dummy, pemeriksaan BPP Docker, dan langkah setelah update dijelaskan pada [panduan79](79-penyempurnaan-validasi-dan-fixture-bahasa.md).
 
 ### 5.1. Docker melewati seluruh 12 baris KRS
 

@@ -1,5 +1,5 @@
 {
-  "source": "DUMMY DEMO TA 67 - data sintetis, bukan data kampus resmi",
+  "source": "DUMMY DEMO TA 67 - data sintetis, bukan data kampus resmi; tanggal_tes SINTETIS = kedaluwarsa minus dua tahun kalender, bukan tanggal tes resmi",
   "total": 1,
   "selected_menus": [
     "bahasa"
@@ -16,7 +16,9 @@
           "jenis_tes": "Online ECCT",
           "nilai": "3,5",
           "kedaluwarsa": "19 Mei 2028",
-          "status_berlaku": "Berlaku"
+          "status_berlaku": "Berlaku",
+          "tanggal_tes": "2026-05-19",
+          "tanggal_tes_sintetis": true
         }
       ]
     }

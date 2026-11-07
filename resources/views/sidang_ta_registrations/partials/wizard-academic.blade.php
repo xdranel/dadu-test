@@ -20,7 +20,6 @@
             @foreach(['Judul Bahasa Indonesia'=>'ta_title','Judul Bahasa Inggris'=>'ta_title_en','Pembimbing 1'=>'advisor_1','Pembimbing 2'=>'advisor_2'] as $label=>$key)
                 <div><dt class="text-xs font-semibold text-slate-500">{{ $label }}</dt><dd class="mt-1 break-words text-sm text-slate-800">{{ $display($academic[$key] ?? null) }}</dd></div>
             @endforeach
-            <div><dt class="text-xs text-slate-500">IPK</dt><dd class="text-lg font-bold">{{ is_numeric($academic['gpa']) ? number_format((float) $academic['gpa'],2,',','.') : $display($academic['gpa']) }}</dd></div>
         </dl>
     </section>
     @include('sidang_ta_registrations.partials.meet-admission-summary', ['admission'=>$meetContext['admission']])

@@ -1,3 +1,5 @@
+import * as wizardExports79 from '../../resources/js/sidang-ta-wizard.js';
+const sidangTaConfirmation = wizardExports79.sidangTaConfirmation;
 import test, { before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import sidangTaWizard, { sidangTaUpload, validWhatsapp, periodCountdown, sidangTaPeriodCountdown } from '../../resources/js/sidang-ta-wizard.js';
@@ -179,4 +181,19 @@ test('live period badge and timer use the same state across open and close trans
         Date.now=()=>61001; state.tick();
         assert.equal(state.status,'Ditutup'); assert.equal(state.label,'Ditutup');
     } finally { Date.now=originalNow; }
+});
+
+test('Indonesian WA validates prefixes and rejects whitespace or arbitrary numeric strings', () => {
+    for (const value of ['08123456','62812345','081234567890123','628123456789012']) assert.equal(validWhatsapp(value),true,value);
+    for (const value of ['55555555','620812345678','0712345678','0812345','6281234','0812345678901234','08123456\n',' 08123456','+62812345678']) assert.equal(validWhatsapp(value),false,value);
+});
+
+test('confirmation needs explicit consent and disables again on uncheck or sending', () => {
+    assert.equal(typeof sidangTaConfirmation, 'function');
+    const state=sidangTaConfirmation(false);let prevented=0;
+    assert.equal(state.canConfirm,false);state.submit({preventDefault(){prevented++;}});assert.equal(prevented,1);
+    state.accepted=true;assert.equal(state.canConfirm,true);
+    state.accepted=false;assert.equal(state.canConfirm,false);
+    state.accepted=true;state.submit({preventDefault(){prevented++;}});assert.equal(state.sending,true);assert.equal(state.canConfirm,false);
+    const blocked=sidangTaConfirmation(true);blocked.accepted=true;assert.equal(blocked.canConfirm,false);
 });

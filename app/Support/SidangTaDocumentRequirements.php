@@ -9,6 +9,9 @@ use Illuminate\Support\Facades\Validator;
 
 class SidangTaDocumentRequirements
 {
+    public const WHATSAPP_PATTERN = '(?:08[0-9]{6,13}|628[0-9]{5,12})';
+    public const WHATSAPP_MESSAGE = 'Nomor WA harus diawali 08 atau 628 dan berisi 8–15 digit angka (0–9).';
+
     public const CAPTURES = SidangTaMeetRequirements::CAPTURES;
     public const PAYMENT = SidangTaMeetRequirements::PAYMENT;
     public const DIPLOMA = SidangTaMeetRequirements::DIPLOMA;
@@ -50,8 +53,8 @@ class SidangTaDocumentRequirements
     public static function scalarRules(int $step, ?array $payload = null): array
     {
         return match ($step) {
-            1 => ['student_phone' => ['bail', 'required', 'string', 'regex:/\A[0-9]{8,15}\z/'],
-                'parent_phone' => ['bail', 'required', 'string', 'regex:/\A[0-9]{8,15}\z/']],
+            1 => ['student_phone' => ['bail', 'required', 'string', 'regex:/\A'.self::WHATSAPP_PATTERN.'\z/'],
+                'parent_phone' => ['bail', 'required', 'string', 'regex:/\A'.self::WHATSAPP_PATTERN.'\z/']],
             3 => ['graduation_payment_date' => 'required|date|before_or_equal:today'],
             4 => ['diploma_biodata_accurate' => 'required|boolean',
                 'pdm_submission_date' => self::requiresPdmDate($payload)

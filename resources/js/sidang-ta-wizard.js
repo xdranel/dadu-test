@@ -1,4 +1,14 @@
-export const validWhatsapp = (value) => typeof value === 'string' && /^[0-9]{8,15}$/.test(value);
+export const validWhatsapp = (value) => typeof value === 'string' && value.length >= 8 && value.length <= 15
+    && (value.startsWith('08') || value.startsWith('628')) && !/[^0-9]/.test(value);
+
+export const sidangTaConfirmation = (blocked = false) => ({
+    blocked, accepted: false, sending: false,
+    get canConfirm() { return this.accepted && !this.blocked && !this.sending; },
+    submit(event) {
+        if (!this.canConfirm) { event.preventDefault(); return; }
+        this.sending = true;
+    },
+});
 
 export const periodCountdown = (openAt, closeAt, at = Date.now()) => {
     if (openAt === null || closeAt === null || !Number.isFinite(openAt) || !Number.isFinite(closeAt)) return null;
@@ -43,7 +53,7 @@ export default (initial = {}) => ({
         });
     },
     validateWhatsapp(input) {
-        input.setCustomValidity(validWhatsapp(input.value) ? '' : 'Nomor WA harus berisi 8–15 digit angka (0–9).');
+        input.setCustomValidity(validWhatsapp(input.value) ? '' : 'Nomor WA harus diawali 08 atau 628 dan berisi 8–15 digit angka (0–9).');
     },
     validateContacts(form) {
         const contacts = [...form.querySelectorAll('input[name="student_phone"], input[name="parent_phone"]')];

@@ -37,7 +37,7 @@ class SidangTaAcademicSnapshot
                 default => 'Belum tersedia',
             },
             'study_program' => $student->study_program ?? '-', 'semester' => $student->active_semester ?? '-',
-            'gpa' => $student->gpa, 'passed_credits' => $facts['passed_credits'],
+            'gpa' => $facts['gpa'] ?? null, 'passed_credits' => $facts['passed_credits'],
             'sidang_tingkat_2' => match ($facts['level_2_passed']) { true => 'Lulus', false => 'Belum lulus', default => 'Belum tersedia' },
             'ta_title' => $project?->thesis_title_id ?? '-', 'ta_title_en' => $project?->thesis_title_en ?? '-',
             'advisor_1' => $project?->advisor_1 ?? '-', 'advisor_2' => $project?->advisor_2 ?? '-',

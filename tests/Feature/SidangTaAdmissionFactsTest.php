@@ -24,9 +24,9 @@ beforeEach(function () {
 
 afterEach(function () { $this->travelBack(); });
 
-test('meet_facts_empty_profile_has_five_unknown_gates_and_unknown_eprt', function () {
+test('meet_facts_empty_profile_has_six_unknown_gates_and_unknown_eprt', function () {
     $result = ($this->readFacts)();
-    expect(count($result['academic']['blockers']))->toBe(5);
+    expect(count($result['academic']['blockers']))->toBe(6);
     foreach ($result['academic']['gates'] as $gate) expect($gate['state'])->toBe('unknown');
     expect($result['eprt']['mode'])->toBe('unknown');
     expect($result['eprt_facts']['confirmed_attempts'])->toBeNull();
@@ -75,7 +75,8 @@ test('meet_facts_passed_credits_prefers_imported_passed_credits_including_zero',
     expect(($this->readFacts)()['academic']['gates']['passed_credits']['state'])->toBe('passed');
 });
 
-test('meet_facts_ta2_uses_linked_active_period_and_can_complete_all_five_gates', function () {
+test('meet_facts_ta2_uses_linked_active_period_and_can_complete_all_six_gates', function () {
+    $this->student->update(['gpa' => 2]);
     AcademicPeriod::query()->update(['is_active' => false]);
     $period = AcademicPeriod::create(['year' => '2026/2027', 'semester' => 1, 'label' => 'Meet facts',
         'start_date' => '2026-08-01', 'end_date' => '2027-01-31', 'is_active' => true]);
@@ -147,11 +148,11 @@ test('meet_facts_eprt_qualifying_total_score_needs_no_attempt_metadata_but_futur
 
 test('meet_facts_never_borrows_another_students_academic_records', function () {
     $other = Student::create(['student_number' => '1202200051', 'name' => 'Other', 'academic_year' => 2022,
-        'study_program' => 'Informatika', 'status' => 'Aktif', 'email' => 'other-admission-facts@test.local']);
+        'study_program' => 'Informatika', 'status' => 'Aktif', 'gpa' => 4, 'email' => 'other-admission-facts@test.local']);
     StudentSidangTingkat::create(['student_number' => $other->student_number, 'tingkat_2' => true]);
     StudentSkpi::create(['student_number' => $other->student_number, 'raw_data' => ['status' => 'approved']]);
     StudentTak::create(['student_number' => $other->student_number, 'total_points' => 100]);
     StudentEprt::create(['student_number' => $other->student_number, 'total_score' => 550]);
-    expect(count(($this->readFacts)()['academic']['blockers']))->toBe(5);
+    expect(count(($this->readFacts)()['academic']['blockers']))->toBe(6);
     expect(($this->readFacts)()['eprt']['mode'])->toBe('unknown');
 });

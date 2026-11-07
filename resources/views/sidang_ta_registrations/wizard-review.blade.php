@@ -9,14 +9,19 @@
         $permission = $isRevision ? 'sidang_ta_registration_update' : 'sidang_ta_registration_create';
         $groups = [2 => 'Data TA di Igracias', 3 => 'Pembayaran & Nilai Bahasa', 4 => 'Pernyataan Biodata Dummy Ijazah'];
         $documentCount = array_sum(array_map('count', $documentGroups));
+        $eligibilityErrors = collect($errors->messages())->filter(fn($messages,$key)=>str_starts_with($key,'eligibility.'))->flatten()->all();
+        $otherErrors = collect($errors->messages())->reject(fn($messages,$key)=>str_starts_with($key,'eligibility.'))->flatten()->all();
+        $readinessMessages = array_values($meetContext['admission']['academic']['blockers']);
+        if (!in_array($meetContext['admission']['eprt']['mode'], ['automatic','waiver'], true)) $readinessMessages[]=$meetContext['admission']['eprt']['message'];
+        $readinessMessages=array_values(array_unique(array_merge($readinessMessages,$eligibilityErrors)));
         $confirmLabel = $isRevision ? 'Ya, kirim revisi' : 'Ya, kirim pendaftaran';
     @endphp
     <div class="mx-auto max-w-6xl space-y-5">
-        @if($errors->any())
+        @if($otherErrors !== [])
             <div role="alert" class="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800">
                 <p class="font-bold">Pendaftaran belum dapat dikirim.</p>
                 <ul class="mt-2 list-inside list-disc space-y-1">
-                    @foreach($errors->all() as $error)
+                    @foreach($otherErrors as $error)
                         <li>{{ $error }}</li>
                     @endforeach
                 </ul>
@@ -157,7 +162,7 @@
         @endforeach
 
         <section data-review-actions class="campus-card space-y-4 p-5 sm:p-6"
-                 x-data="{ sending: false }" @pageshow.window="sending = false">
+                 x-data="sidangTaConfirmation(@js($sendBlocked))" @pageshow.window="sending = false">
             <div>
                 <h2 class="text-base font-bold text-slate-800">
                     Sudah memeriksa semua data?
@@ -173,6 +178,14 @@
                         : ($isRevision ? 'Penuhi persyaratan akademik sebelum mengirim revisi. Data dan berkas tetap tersimpan.'
                             : 'Penuhi persyaratan akademik dan EPRT sebelum mengirim. Draft dan berkas tetap tersimpan.') }}
                 </p>
+            @endif
+            @if($readinessMessages !== [])
+                <div data-review-blockers role="status" class="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-900">
+                    <p class="font-semibold">Persyaratan berikut belum terpenuhi:</p>
+                    <ul class="mt-2 list-inside list-disc space-y-1">
+                        @foreach($readinessMessages as $message)<li>{{ $message }}</li>@endforeach
+                    </ul>
+                </div>
             @endif
             <div class="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div class="flex flex-wrap gap-2">
@@ -222,7 +235,7 @@
                     <form data-final-registration-form method="POST"
                           class="mt-5 flex flex-wrap justify-end gap-3"
                           action="{{ $isRevision ? route('sidang-ta-registrations.update', $draft->source_registration_id) : route('sidang-ta-registrations.store') }}"
-                          @submit="if (sending || {{ $sendBlocked ? 'true' : 'false' }}) { $event.preventDefault(); } else { sending = true; }">
+                          @submit="submit($event)">
                         @csrf
                         @if($isRevision)
                             @method('PUT')
@@ -231,9 +244,9 @@
                         <input type="hidden" name="version" value="{{ $draft->version }}">
                         <input type="hidden" name="action" value="submit">
                         <label class="flex w-full items-start gap-3 rounded-xl border border-slate-200 p-3 text-sm leading-relaxed">
-                            <input type="checkbox" name="declaration_accepted" value="1" required class="mt-1 rounded border-slate-300 text-rose-600"
+                            <input type="checkbox" name="declaration_accepted" value="1" required x-model="accepted" class="mt-1 rounded border-slate-300 text-rose-600"
                                    aria-describedby="error-declaration_accepted" aria-invalid="{{ $errors->has('declaration_accepted') ? 'true' : 'false' }}">
-                            <span>Saya MENYATAKAN bahwa saya telah memastikan dan memeriksa kembali seluruh berkas telah lengkap dan sesuai dengan ketentuan. Jika berkas tidak lengkap, maka saya siap tidak disertakan pada sidang tugas akhir periode terdekat. *</span>
+                            <span>Saya MENYATAKAN bahwa saya telah memastikan dan memeriksa kembali seluruh berkas telah lengkap dan sesuai dengan ketentuan. Jika berkas tidak lengkap, maka saya siap tidak disertakan pada sidang tugas akhir periode terdekat</span>
                         </label>
                         <p class="w-full text-xs text-slate-600">Pastikan seluruh data benar. Anda bertanggung jawab dan menerima konsekuensi atas kesalahan data atau berkas yang dikirim.</p>
                         @include('sidang_ta_registrations.partials.wizard-error', ['field' => 'declaration_accepted'])
@@ -243,10 +256,10 @@
                         </button>
                         <button data-confirm-registration type="submit"
                                 class="btn btn-primary disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none"
-                                aria-disabled="{{ $sendBlocked ? 'true' : 'false' }}"
-                                :aria-disabled="sending || {{ $sendBlocked ? 'true' : 'false' }} ? 'true' : 'false'"
+                                aria-disabled="true"
+                                :aria-disabled="!canConfirm ? 'true' : 'false'"
                                 @if($sendBlocked) aria-describedby="registration-send-readiness" @endif
-                                @disabled($sendBlocked) :disabled="sending || {{ $sendBlocked ? 'true' : 'false' }}"
+                                disabled :disabled="!canConfirm"
                                 x-text="sending ? 'Sedang mengirim…' : '{{ $confirmLabel }}'">{{ $confirmLabel }}
                         </button>
                     </form>

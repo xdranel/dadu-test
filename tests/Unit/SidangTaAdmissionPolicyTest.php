@@ -5,20 +5,20 @@ use App\Support\SidangTaAdmissionPolicy as Policy;
 function meetAdmissionFacts(): array
 {
     return ['level_2_passed' => true, 'ta2_registered' => true, 'skpi_approved' => true,
-        'tak_score' => 60, 'passed_credits' => 120];
+        'gpa' => 2, 'tak_score' => 60, 'passed_credits' => 120];
 }
 
-test('meet_policy_accepts_exact_five_academic_boundaries', function () {
+test('meet_policy_accepts_exact_six_academic_boundaries', function () {
     $result = Policy::academic(meetAdmissionFacts());
     expect($result['academic_passed'])->toBeTrue();
     expect($result['blockers'])->toBe([]);
-    expect(count($result['gates']))->toBe(5);
+    expect(count($result['gates']))->toBe(6);
     foreach ($result['gates'] as $gate) expect($gate['state'])->toBe('passed');
 });
 
 test('meet_policy_each_single_failure_blocks_academic_eligibility', function () {
     foreach (['level_2_passed' => false, 'ta2_registered' => false, 'skpi_approved' => false,
-                 'tak_score' => 59.99, 'passed_credits' => 119] as $key => $value) {
+                 'gpa' => 1.99, 'tak_score' => 59.99, 'passed_credits' => 119] as $key => $value) {
         $result = Policy::academic(array_replace(meetAdmissionFacts(), [$key => $value]));
         expect($result['academic_passed'])->toBeFalse();
         expect(array_keys($result['blockers']))->toBe([$key]);
@@ -38,7 +38,7 @@ test('meet_policy_missing_or_unconfirmed_facts_never_pass', function () {
         unset($facts[$key]);
         expect(Policy::academic($facts)['gates'][$key]['state'])->toBe('unknown');
     }
-    expect(count(Policy::academic([])['blockers']))->toBe(5);
+    expect(count(Policy::academic([])['blockers']))->toBe(6);
 });
 
 test('meet_policy_requires_normalized_booleans_instead_of_truthy_source_strings', function () {
@@ -51,9 +51,9 @@ test('meet_policy_requires_normalized_booleans_instead_of_truthy_source_strings'
 });
 
 test('meet_policy_numeric_strings_zero_and_invalid_values_are_distinguished', function () {
-    $result = Policy::academic(array_replace(meetAdmissionFacts(), ['tak_score' => '60.00', 'passed_credits' => '120']));
+    $result = Policy::academic(array_replace(meetAdmissionFacts(), ['gpa' => '2.00', 'tak_score' => '60.00', 'passed_credits' => '120']));
     expect($result['academic_passed'])->toBeTrue();
-    foreach (['tak_score', 'passed_credits'] as $key) {
+    foreach (['gpa', 'tak_score', 'passed_credits'] as $key) {
         expect(Policy::academic(array_replace(meetAdmissionFacts(), [$key => 0]))['gates'][$key]['state'])->toBe('failed');
         foreach ([true, false, -1, 'invalid', INF, NAN] as $invalid) {
             expect(Policy::academic(array_replace(meetAdmissionFacts(), [$key => $invalid]))['gates'][$key]['state'])->toBe('unknown');
@@ -94,11 +94,11 @@ test('meet_policy_eprt_unknown_data_never_activates_waiver_or_automatic_approval
     }
 });
 
-test('meet_policy_eprt_is_not_a_sixth_academic_gate_and_waiver_is_not_final_approval', function () {
+test('meet_policy_eprt_is_not_a_seventh_academic_gate_and_waiver_is_not_final_approval', function () {
     $facts = array_replace(meetAdmissionFacts(), ['eprt_score' => 0, 'eprt_attempts' => 0]);
     $academic = Policy::academic($facts);
     expect($academic['academic_passed'])->toBeTrue();
-    expect(count($academic['gates']))->toBe(5);
+    expect(count($academic['gates']))->toBe(6);
     expect(Policy::eprt(0, 0)['mode'])->toBe('retest');
     expect(Policy::eprt(449, 3)['mode'])->toBe('waiver');
     expect(Policy::eprt(449, 3))->not->toHaveKey('can_submit');
@@ -116,3 +116,10 @@ test('meet_policy_null_language_score_uses_official_count_without_inventing_zero
     expect(Policy::eprt(null, null)['mode'])->toBe('unknown');
     expect(Policy::eprt('invalid', 3)['mode'])->toBe('unknown');
 });
+
+test('meet_policy_gpa_threshold_distinguishes_values_either_side_of_two', function ($value, $state) {
+    $result = Policy::academic(array_replace(meetAdmissionFacts(), ['gpa' => $value]));
+    expect($result['gates']['gpa']['state'])->toBe($state);
+    expect($result['academic_passed'])->toBe($state === 'passed');
+    expect(array_keys($result['blockers']))->toBe($state === 'passed' ? [] : ['gpa']);
+})->with([[1.99, 'failed'], [2, 'passed'], [2.01, 'passed']]);

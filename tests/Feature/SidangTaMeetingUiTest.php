@@ -32,7 +32,7 @@ test('meeting wizard has approved stages editable WA and static supervisors',fun
     foreach (['Data Mahasiswa','Data TA di Igracias','Pembayaran & Nilai Bahasa','Pernyataan Biodata Dummy Ijazah','Pembimbing Satu','Pembimbing Dua'] as $text) $response->assertSee($text);
     foreach (['student_phone','parent_phone'] as $field) {
         $input=$c->filter('input[name="'.$field.'"]');
-        expect($input->attr('pattern'))->toBe('[0-9]{8,15}');
+        expect($input->attr('pattern'))->toBe('(?:08[0-9]{6,13}|628[0-9]{5,12})');
         expect($input->attr('maxlength'))->toBe('15');
         expect($input->getNode(0)->hasAttribute('readonly'))->toBeFalse();
     }

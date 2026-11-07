@@ -88,6 +88,10 @@ class SidangTaDraftFinalizer
             $rules = [];
             foreach (range(1, 4) as $step) $rules = array_merge($rules, Requirements::scalarRules($step, $payload));
             $validator = Validator::make($payload, $rules, [
+                'student_phone.regex' => Requirements::WHATSAPP_MESSAGE,
+                'parent_phone.regex' => Requirements::WHATSAPP_MESSAGE,
+                'student_phone.string' => Requirements::WHATSAPP_MESSAGE,
+                'parent_phone.string' => Requirements::WHATSAPP_MESSAGE,
                 'pdm_submission_date.required' => 'Tanggal pengajuan PDM wajib diisi.',
                 'pdm_submission_date.date' => 'Tanggal pengajuan PDM tidak valid.',
                 'pdm_submission_date.before_or_equal' => 'Tanggal pengajuan PDM tidak boleh melewati hari ini.',

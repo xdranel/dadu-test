@@ -23,7 +23,7 @@ beforeEach(function () {
     $this->period = SidangTaPeriod::create(['name' => 'Meeting Contract', 'is_active' => true,
         'open_at' => now()->subDay(), 'close_at' => now()->addDay()]);
     $this->start = fn (array $extra = []) => $this->postJson(route('sidang-ta-drafts.store'), array_replace([
-        'sidang_ta_period_id' => $this->period->id, 'student_phone' => '081234567890', 'parent_phone' => '00123456789',
+        'sidang_ta_period_id' => $this->period->id, 'student_phone' => '081234567890', 'parent_phone' => '08123456789',
     ], $extra));
     $this->makeDraft = function (bool $accurate = true) {
         $id = ($this->start)()->assertCreated()->json('data.id');
@@ -63,7 +63,7 @@ afterEach(function () { $this->travelBack(); });
 
 test('meeting_contract_rejects_invalid_whatsapp_with_a_field_message', function ($field, $value) {
     ($this->start)([$field => $value])->assertUnprocessable()->assertJsonValidationErrors($field)
-        ->assertJsonPath('errors.'.$field.'.0', 'Nomor WA '.($field === 'student_phone' ? 'mahasiswa' : 'orang tua/wali').' harus berisi 8–15 digit angka (0–9).');
+        ->assertJsonPath('errors.'.$field.'.0', 'Nomor WA harus diawali 08 atau 628 dan berisi 8–15 digit angka (0–9).');
     expect(SidangTaRegistrationDraft::count())->toBe(0);
 })->with([['student_phone', '08abcd1234'], ['parent_phone', '+62812345678'], ['student_phone', '1234567'],
     ['parent_phone', '1234567890123456'], ['student_phone', 812345678]]);
@@ -71,7 +71,7 @@ test('meeting_contract_rejects_invalid_whatsapp_with_a_field_message', function 
 test('meeting_contract_preserves_leading_zeroes_and_locks_identity', function () {
     $id = ($this->start)(['student_name' => 'Forged', 'email' => 'forged@example.test'])->assertCreated()->json('data.id');
     $draft = SidangTaRegistrationDraft::findOrFail($id);
-    expect($draft->payload)->toEqual(['student_phone' => '081234567890', 'parent_phone' => '00123456789']);
+    expect($draft->payload)->toEqual(['student_phone' => '081234567890', 'parent_phone' => '08123456789']);
     expect($this->student->fresh()->name)->toBe('Meeting Contract');
 });
 
@@ -130,7 +130,7 @@ test('meeting_contract_revision_allows_contact_and_missing_historical_pdm_date_b
     $revision = app(SidangTaRevisionDraftService::class)->start($this->user, $source);
     expect(Requirements::complete($revision, 4))->toBeFalse();
     $this->postJson(route('sidang-ta-drafts.steps.store', ['draft' => $revision, 'step' => 1]), [
-        'version' => 1, 'sidang_ta_period_id' => $this->period->id, 'student_phone' => '00987654321', 'parent_phone' => '00123456789',
+        'version' => 1, 'sidang_ta_period_id' => $this->period->id, 'student_phone' => '08987654321', 'parent_phone' => '08123456789',
     ])->assertOk();
     $revision = $revision->fresh();
     $this->postJson(route('sidang-ta-drafts.steps.store', ['draft' => $revision, 'step' => 2]), [
@@ -141,14 +141,14 @@ test('meeting_contract_revision_allows_contact_and_missing_historical_pdm_date_b
         ->assertUnprocessable()->assertJsonValidationErrors('diploma_biodata_accurate');
     $this->postJson($url, ['version' => $revision->fresh()->version, 'pdm_submission_date' => today()->toDateString()])->assertOk();
     $this->postJson(route('sidang-ta-drafts.steps.store', ['draft' => $revision, 'step' => 1]), [
-        'version' => $revision->fresh()->version, 'sidang_ta_period_id' => 99999, 'student_phone' => '00987654321', 'parent_phone' => '00123456789',
+        'version' => $revision->fresh()->version, 'sidang_ta_period_id' => 99999, 'student_phone' => '08987654321', 'parent_phone' => '08123456789',
     ])->assertUnprocessable()->assertJsonValidationErrors('sidang_ta_period_id');
     $revision->refresh()->update(['reviewed_version' => $revision->version]);
     $submit = ['draft_id' => $revision->id, 'version' => $revision->version, 'action' => 'submit'];
     $this->putJson(route('sidang-ta-registrations.update', $source), $submit)->assertUnprocessable()->assertJsonValidationErrors('declaration_accepted');
     $this->travel(1)->minutes();
     $this->putJson(route('sidang-ta-registrations.update', $source), $submit + ['declaration_accepted' => true])->assertOk();
-    expect($source->fresh()->student_phone)->toBe('00987654321');
+    expect($source->fresh()->student_phone)->toBe('08987654321');
     expect($source->fresh()->student_name)->toBe('Meeting Contract');
     expect($source->fresh()->pdm_submission_date->toDateString())->toBe(today()->toDateString());
     expect($source->fresh()->declaration_accepted_at->toDateTimeString())->toBe(now()->toDateTimeString());

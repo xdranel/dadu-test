@@ -180,7 +180,7 @@
                     @if($step === 1)
                         <div class="max-w-lg">
                             <label for="sidang-ta-period-id" class="mb-1.5 block text-sm font-semibold text-slate-700">
-                                Periode Sidang TA *
+                                Periode Sidang TA <span class="text-rose-600" aria-hidden="true">*</span>
                             </label>
                             @if($draft?->source_registration_id)
                                 <input type="hidden" name="sidang_ta_period_id"
@@ -213,12 +213,12 @@
                         <div class="grid max-w-xl gap-4 sm:grid-cols-2">
                             <div class="min-w-0">
                                 <label for="student-phone" class="mb-1.5 block text-sm font-semibold text-slate-700">
-                                    Nomor WA Aktif Mahasiswa *
+                                    Nomor WA Aktif Mahasiswa <span class="text-rose-600" aria-hidden="true">*</span>
                                 </label>
                                 <input id="student-phone"
                                        class="campus-input w-full {{ $errors->has('student_phone') ? '!border-rose-500' : '' }}"
-                                       name="student_phone" inputmode="numeric" pattern="[0-9]{8,15}" minlength="8" maxlength="15" required @input="validateWhatsapp($event.target)"
-                                       placeholder="08xxxxxxxxxx"
+                                       name="student_phone" inputmode="numeric" pattern="{{ \App\Support\SidangTaDocumentRequirements::WHATSAPP_PATTERN }}" minlength="8" maxlength="15" required @input="validateWhatsapp($event.target)"
+                                       placeholder="08xxxxxxxxxx atau 628xxxxxxxxxx"
                                        aria-invalid="{{ $errors->has('student_phone') ? 'true' : 'false' }}"
                                        aria-describedby="error-student_phone"
                                        value="{{ old('student_phone', $payload['student_phone'] ?? $student->phone_number) }}">
@@ -226,12 +226,12 @@
                             </div>
                             <div class="min-w-0">
                                 <label for="parent-phone" class="mb-1.5 block text-sm font-semibold text-slate-700">
-                                    Nomor WA Aktif Orang Tua/Wali *
+                                    Nomor WA Aktif Orang Tua/Wali <span class="text-rose-600" aria-hidden="true">*</span>
                                 </label>
                                 <input id="parent-phone"
                                        class="campus-input w-full {{ $errors->has('parent_phone') ? '!border-rose-500' : '' }}"
-                                       name="parent_phone" inputmode="numeric" pattern="[0-9]{8,15}" minlength="8" maxlength="15" required @input="validateWhatsapp($event.target)"
-                                       placeholder="08xxxxxxxxxx"
+                                       name="parent_phone" inputmode="numeric" pattern="{{ \App\Support\SidangTaDocumentRequirements::WHATSAPP_PATTERN }}" minlength="8" maxlength="15" required @input="validateWhatsapp($event.target)"
+                                       placeholder="08xxxxxxxxxx atau 628xxxxxxxxxx"
                                        aria-invalid="{{ $errors->has('parent_phone') ? 'true' : 'false' }}"
                                        aria-describedby="error-parent_phone"
                                        value="{{ old('parent_phone', $payload['parent_phone'] ?? $student->parent_phone_number) }}">
@@ -243,7 +243,7 @@
                             <div class="max-w-xs">
                                 <label for="graduation-payment-date"
                                        class="mb-1.5 block text-sm font-semibold text-slate-700">
-                                    Tanggal pembayaran wisuda *
+                                    Tanggal pembayaran wisuda <span class="text-rose-600" aria-hidden="true">*</span>
                                 </label>
                                 <input id="graduation-payment-date"
                                        class="campus-input w-full {{ $errors->has('graduation_payment_date') ? '!border-rose-500' : '' }}"
@@ -272,7 +272,7 @@
                                   aria-invalid="{{ $errors->has('diploma_biodata_accurate') ? 'true' : 'false' }}"
                                   aria-describedby="error-diploma_biodata_accurate">
                             <legend class="text-sm font-semibold text-slate-700">
-                                Apakah biodata dummy ijazah sudah sesuai? *
+                                Apakah biodata dummy ijazah sudah sesuai? <span class="text-rose-600" aria-hidden="true">*</span>
                             </legend>
                             <div class="mt-3 grid gap-3 sm:grid-cols-2">
                                 @foreach(['1' => 'Sudah sesuai', '0' => 'Belum sesuai, sudah mengajukan PDM'] as $value => $label)
@@ -299,7 +299,7 @@
                         </div>
                         <div x-show="accurate === '0'" x-cloak class="space-y-4">
                             <div>
-                                <label for="pdm-submission-date" class="mb-1.5 block text-sm font-semibold text-slate-700">Tanggal pengajuan PDM *</label>
+                                <label for="pdm-submission-date" class="mb-1.5 block text-sm font-semibold text-slate-700">Tanggal pengajuan PDM <span class="text-rose-600" aria-hidden="true">*</span></label>
                                 <input id="pdm-submission-date" type="date" name="pdm_submission_date"
                                        class="campus-input {{ $errors->has('pdm_submission_date') ? '!border-rose-500' : '' }}"
                                        max="{{ today()->toDateString() }}" value="{{ old('pdm_submission_date', $payload['pdm_submission_date'] ?? '') }}"

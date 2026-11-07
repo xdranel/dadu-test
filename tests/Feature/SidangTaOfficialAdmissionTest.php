@@ -90,12 +90,12 @@ beforeEach(function () {
 
 afterEach(function () { $this->travelBack(); });
 
-test('official67_full_import_supplies_five_gates_and_authoritative_language_summary', function () {
+test('official67_full_import_supplies_six_gates_and_authoritative_language_summary', function () {
     $result = ($this->import67)();
     expect($result['errors'])->toBe([]);
     $facts = ($this->read67)();
     expect($facts['academic']['academic_passed'])->toBeTrue();
-    expect(count($facts['academic']['gates']))->toBe(5);
+    expect(count($facts['academic']['gates']))->toBe(6);
     expect((float) $facts['eprt_facts']['score'])->toBe(470.0);
     expect($facts['eprt_facts']['confirmed_attempts'])->toBe(1);
     expect($facts['eprt']['mode'])->toBe('automatic');
@@ -154,13 +154,13 @@ test('official67_status_skpi_is_the_only_approval_authority_even_when_cached_fla
 
 test('official67_first_partial_profile_does_not_fallback_to_unimported_manual_gate_values', function () {
     $nim = $this->student->student_number;
-    $this->student->update(['total_credits' => 150]);
+    $this->student->update(['total_credits' => 150, 'gpa' => 4]);
     StudentSidangTingkat::create(['student_number' => $nim, 'tingkat_2' => true]);
     StudentSkpi::create(['student_number' => $nim, 'raw_data' => ['status' => 'approved']]);
     StudentEprt::create(['student_number' => $nim, 'total_score' => 550]);
     ($this->import67)([], ['tak']);
     $facts = ($this->read67)();
-    expect(array_keys($facts['academic']['blockers']))->toBe(['level_2_passed', 'skpi_approved', 'passed_credits']);
+    expect(array_keys($facts['academic']['blockers']))->toBe(['level_2_passed', 'skpi_approved', 'gpa', 'passed_credits']);
     expect($facts['eprt']['mode'])->toBe('unknown');
 });
 
@@ -191,11 +191,11 @@ test('official67_does_not_borrow_another_students_canonical_profile', function (
     $other = Student::create(['student_number' => '1202267002', 'name' => 'Mahasiswa Lain 67',
         'academic_year' => 2022, 'study_program' => 'Informatika', 'status' => 'Aktif']);
     StudentAcademicProfile::create(['student_number' => $other->student_number, 'groups' => [
-        'academic' => ['level_2_passed' => true, 'passed_credits' => 150],
+        'academic' => ['level_2_passed' => true, 'passed_credits' => 150, 'gpa' => 4],
         'skpi' => ['status' => 'Disetujui', 'approved' => true], 'tak' => ['score' => 100],
         'language' => ['score' => 550, 'attempts' => 1, 'type' => 'Online EPrT', 'history' => []],
     ]]);
-    expect(count(($this->read67)()['academic']['blockers']))->toBe(4);
+    expect(count(($this->read67)()['academic']['blockers']))->toBe(5);
     expect(($this->read67)()['eprt']['mode'])->toBe('unknown');
 });
 

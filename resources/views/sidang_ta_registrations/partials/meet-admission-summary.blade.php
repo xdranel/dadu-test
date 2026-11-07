@@ -1,6 +1,6 @@
 @php
     $values = ['level_2_passed'=>$academic['sidang_tingkat_2'], 'ta2_registered'=>$academic['ta2_krs_label'],
-        'skpi_approved'=>$academic['skpi_status'], 'tak_score'=>$academic['tak_score'], 'passed_credits'=>$academic['passed_credits']];
+        'skpi_approved'=>$academic['skpi_status'], 'gpa'=>is_numeric($academic['gpa'] ?? null) ? number_format((float)$academic['gpa'],2,',','.') : 'Belum tersedia', 'tak_score'=>$academic['tak_score'], 'passed_credits'=>$academic['passed_credits']];
     $otherBpp = collect($academic['bpp_periods'] ?? [])->except([$academic['bpp_period']])->all();
     $mode=$admission['eprt']['mode'];
     $waiverReady=(bool) ($meetContext['waiver_ready'] ?? false);
@@ -23,11 +23,18 @@
             <dd class="mt-1 text-xs">{{ $waiverReady ? 'Surat permakluman terlampir' : $admission['eprt']['message'] }}</dd>
             <dd class="mt-1 text-xs">{{ $admission['eprt_facts']['confirmed_attempts'] === null ? 'Jumlah tes belum terkonfirmasi' : $admission['eprt_facts']['confirmed_attempts'].' tes tercatat' }}</dd>
         </div>
-    </dl>
-    <dl class="space-y-3 text-sm">
-        <div><dt class="text-slate-500">Persetujuan sidang iGracias</dt><dd class="font-medium">{{ $academic['sidang_approval_status'] }}</dd></div>
-        <div><dt class="text-slate-500">Status BPP</dt><dd data-academic-field="bpp_status" class="font-medium">{{ $academic['bpp_status'] }}</dd>
-            <dd class="mt-1 text-xs text-slate-500">{{ $academic['bpp_period'] ? 'Periode pembayaran '.$academic['bpp_period'].'. Status ini hanya berlaku pada periode tersebut.' : 'Periode pembayaran belum terkonfirmasi.' }}</dd>
+        @php
+            $approvalState = match ($academic['sidang_approval_approved'] ?? null) { true => 'passed', false => 'failed', default => 'unknown' };
+            $bppState = !$academic['bpp_period'] ? 'unknown' : match (strtoupper(trim($academic['bpp_status']))) { 'LUNAS', 'PAID' => 'passed', 'KREDIT', 'UNPAID', 'BELUM LUNAS', 'PERLU VERIFIKASI' => 'failed', default => 'unknown' };
+        @endphp
+        <div data-information-card="sidang_approval" data-state="{{ $approvalState }}" class="rounded-xl border p-3 {{ $tones[$approvalState] }}">
+            <dt class="text-sm font-semibold">Persetujuan sidang iGracias</dt>
+            <dd class="mt-1 text-base font-bold">{{ $academic['sidang_approval_status'] }}</dd>
+        </div>
+        <div data-information-card="bpp" data-state="{{ $bppState }}" class="rounded-xl border p-3 {{ $tones[$bppState] }}">
+            <dt class="text-sm font-semibold">Status BPP</dt>
+            <dd data-academic-field="bpp_status" class="mt-1 text-base font-bold">{{ $academic['bpp_status'] }}</dd>
+            <dd class="mt-1 text-xs">{{ $academic['bpp_period'] ? 'Periode pembayaran '.$academic['bpp_period'].'. Status ini hanya berlaku pada periode tersebut.' : 'Periode pembayaran belum tersedia pada data sinkronisasi.' }}</dd>
         </div>
     </dl>
     @if($otherBpp !== [])
@@ -40,10 +47,5 @@
                 @endforeach
             </ul>
         </details>
-    @endif
-    @if($admission['academic']['blockers'] !== [])
-        <ul data-academic-blockers class="list-inside list-disc space-y-1 text-xs text-rose-800">
-            @foreach($admission['academic']['blockers'] as $message)<li>{{ $message }}</li>@endforeach
-        </ul>
     @endif
 </section>

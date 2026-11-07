@@ -1,5 +1,5 @@
 {
-  "source": "DUMMY DEMO TA 67 - data sintetis, bukan data kampus resmi",
+  "source": "DUMMY DEMO TA 67 - data sintetis, bukan data kampus resmi; tanggal_tes SINTETIS = kedaluwarsa minus dua tahun kalender, bukan tanggal tes resmi",
   "total": 2,
   "selected_menus": [
     "akademik",
@@ -42,12 +42,15 @@
           "jenis_tes": "Online EPrT",
           "nilai": "470",
           "kedaluwarsa": "19 Mei 2028",
-          "status_berlaku": "Berlaku"
+          "status_berlaku": "Berlaku",
+          "tanggal_tes": "2026-05-19",
+          "tanggal_tes_sintetis": true
         }
       ],
       "total_tak": "80",
       "status_keuangan": "LUNAS",
-      "status_keuangan_asli": "SUDAH LUNAS"
+      "status_keuangan_asli": "SUDAH LUNAS",
+      "periode_keuangan": "2627/1"
     },
     {
       "nim": "1202299002",
@@ -79,24 +82,31 @@
           "jenis_tes": "Online EPrT",
           "nilai": "449",
           "kedaluwarsa": "19 Mei 2028",
-          "status_berlaku": "Berlaku"
+          "status_berlaku": "Berlaku",
+          "tanggal_tes": "2026-05-19",
+          "tanggal_tes_sintetis": true
         },
         {
           "jenis_tes": "Online EPrT",
           "nilai": "449",
           "kedaluwarsa": "20 Mei 2028",
-          "status_berlaku": "Berlaku"
+          "status_berlaku": "Berlaku",
+          "tanggal_tes": "2026-05-20",
+          "tanggal_tes_sintetis": true
         },
         {
           "jenis_tes": "Online EPrT",
           "nilai": "449",
           "kedaluwarsa": "21 Mei 2028",
-          "status_berlaku": "Berlaku"
+          "status_berlaku": "Berlaku",
+          "tanggal_tes": "2026-05-21",
+          "tanggal_tes_sintetis": true
         }
       ],
       "total_tak": "60",
       "status_keuangan": "LUNAS",
-      "status_keuangan_asli": "SUDAH LUNAS"
+      "status_keuangan_asli": "SUDAH LUNAS",
+      "periode_keuangan": "2627/1"
     }
   ]
 }

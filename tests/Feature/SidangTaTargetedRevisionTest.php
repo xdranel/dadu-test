@@ -393,7 +393,8 @@ test('targeted_revision_review_can_submit_after_replacement_but_blocks_new_acade
     $draft = ($this->markReviewed)($draft);
     $crawler = new Crawler($this->get(route('sidang-ta-drafts.preview', $draft))->assertOk()->getContent());
     expect($crawler->filter('[data-open-registration]')->getNode(0)->hasAttribute('disabled'))->toBeFalse();
-    expect($crawler->filter('[data-confirm-registration]')->getNode(0)->hasAttribute('disabled'))->toBeFalse();
+    expect($crawler->filter('[data-confirm-registration]')->getNode(0)->hasAttribute('disabled'))->toBeTrue();
+    expect($crawler->filter('[data-confirm-registration]')->attr(':disabled'))->toBe('!canConfirm');
     StudentTak::where('student_number', $this->student->student_number)->update(['total_points' => 59]);
     $crawler = new Crawler($this->get(route('sidang-ta-drafts.preview', $draft))->assertOk()->getContent());
     expect($crawler->filter('[data-open-registration]')->getNode(0)->hasAttribute('disabled'))->toBeTrue();

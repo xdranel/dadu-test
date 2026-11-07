@@ -127,7 +127,8 @@ test('review_summary_and_download_buttons_do_not_submit_registration', function 
     expect(SidangTaRegistration::count())->toBe(0);
     expect($draft->fresh()->status)->toBe('active');
     expect($crawler->filter('[data-open-registration]')->getNode(0)->hasAttribute('disabled'))->toBeFalse();
-    expect($crawler->filter('[data-confirm-registration]')->getNode(0)->hasAttribute('disabled'))->toBeFalse();
+    expect($crawler->filter('[data-confirm-registration]')->getNode(0)->hasAttribute('disabled'))->toBeTrue();
+    expect($crawler->filter('[data-confirm-registration]')->attr(':disabled'))->toBe('!canConfirm');
 });
 
 test('only_confirmation_form_submits_saved_draft_with_current_contract', function () {
@@ -147,7 +148,8 @@ test('only_confirmation_form_submits_saved_draft_with_current_contract', functio
     expect($dialog->filter('[data-cancel-registration]')->attr('type'))->toBe('button');
     expect($dialog->filter('[data-cancel-registration]')->getNode(0)->hasAttribute('autofocus'))->toBeTrue();
     expect($dialog->filter('[data-confirm-registration]')->attr('type'))->toBe('submit');
-    expect($dialog->filter('[data-confirm-registration]')->getNode(0)->hasAttribute('disabled'))->toBeFalse();
+    expect($dialog->filter('[data-confirm-registration]')->getNode(0)->hasAttribute('disabled'))->toBeTrue();
+    expect($dialog->filter('[data-confirm-registration]')->attr(':disabled'))->toBe('!canConfirm');
     $form = $dialog->filter('form[data-final-registration-form]');
     expect($crawler->filter('form[data-final-registration-form]')->count())->toBe(1);
     expect($form->attr('method'))->toBe('POST');

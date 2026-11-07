@@ -1,9 +1,10 @@
 import './bootstrap';
 import Alpine from 'alpinejs';
-import sidangTaWizard, { sidangTaUpload, sidangTaDocumentPreview, sidangTaPeriodCountdown } from './sidang-ta-wizard';
+import sidangTaWizard, { sidangTaUpload, sidangTaDocumentPreview, sidangTaPeriodCountdown, sidangTaConfirmation } from './sidang-ta-wizard';
 
 window.Alpine = Alpine;
 Alpine.data('sidangTaWizard', sidangTaWizard);
+Alpine.data('sidangTaConfirmation', sidangTaConfirmation);
 Alpine.data('sidangTaPeriodCountdown', sidangTaPeriodCountdown);
 Alpine.data('sidangTaUpload', sidangTaUpload);
 Alpine.data('sidangTaDocumentPreview', sidangTaDocumentPreview);

@@ -30,6 +30,7 @@ class SidangTaAdmissionFacts
                 'skpi_approved' => array_key_exists('skpi', $groups) ? ($skpi['status'] ?? null) === 'Disetujui' : null,
                 'tak_score' => $this->number($tak['score'] ?? null),
                 'passed_credits' => $this->number($academic['passed_credits'] ?? null),
+                'gpa' => $this->number($academic['gpa'] ?? null),
             ];
             $eprt = $this->officialLanguage($groups['language'] ?? null);
         } else {
@@ -71,6 +72,7 @@ class SidangTaAdmissionFacts
             'skpi_approved' => $this->skpiApproval($skpi?->raw_data ?? []),
             'tak_score' => $tak?->total_points,
             'passed_credits' => $issues?->credits_passed ?? $student->total_credits,
+            'gpa' => $this->number($student->gpa),
         ];
     }
 

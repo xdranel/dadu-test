@@ -14,7 +14,7 @@ class SidangTaAdmissionPolicy
             $gates[$key] = ['label' => $label,
                 'state' => $value === true ? 'passed' : ($value === false ? 'failed' : 'unknown')];
         }
-        foreach (['tak_score' => ['TAK minimal 60', 60], 'passed_credits' => ['SKS lulus minimal 120', 120]] as $key => [$label, $minimum]) {
+        foreach (['gpa' => ['IPK minimal 2,00', 2], 'tak_score' => ['TAK minimal 60', 60], 'passed_credits' => ['SKS lulus minimal 120', 120]] as $key => [$label, $minimum]) {
             $value = self::number($facts[$key] ?? null);
             $gates[$key] = ['label' => $label,
                 'state' => $value === null ? 'unknown' : ($value >= $minimum ? 'passed' : 'failed')];
@@ -29,7 +29,7 @@ class SidangTaAdmissionPolicy
         return ['gates' => $gates, 'blockers' => $blockers, 'academic_passed' => $blockers === []];
     }
 
-    /** EPRT is separate from the five academic gates; waiver still needs a PDF. */
+    /** EPRT is separate from the six academic gates; waiver still needs a PDF. */
     public static function eprt(mixed $score, mixed $confirmedAttempts): array
     {
         $numericScore = self::number($score);
