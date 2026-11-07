@@ -45,7 +45,7 @@ Kode dan fixture privat dipersiapkan pada kedua repo laptop. Database aplikasi t
 
 Development lokal memakai `/home/xdranel/Code/Project/php-laravel/dadu`. Jalankan proses Vite development yang biasa digunakan, atau `npm run build` bila memakai aset hasil build. Untuk data yang sudah ada, impor ulang `75-04` lalu `75-05` dari folder `docs/fixtures/sidang-ta/data_dadu/impor`.
 
-Untuk Docker, setelah commit/push jalankan **bagian4 Update Docker pada panduan64**, termasuk build **app dan web** serta recreate container. Perubahan ini membawa PHP dan aset frontend. Pemeriksaan hash file saja tidak membuktikan FPM telah memuat versi baru; image/container yang melayani website harus ikut diperbarui. Setelah update, unggah fixture dari laptop melalui Sinkronisasi Data. JSON privat diabaikan Git dan tidak ikut image.
+Untuk Docker, setelah commit/push jalankan **bagian4 Update Docker pada [panduan78](78-hasil-implementasi-meeting-mahasiswa-petugas-it-panel.md)** (alur update rutin juga tersedia pada panduan64 bagian12.2 di repo Docker), termasuk build **app dan web** serta recreate container. Perubahan ini membawa PHP dan aset frontend. Pemeriksaan hash file saja tidak membuktikan FPM telah memuat versi baru; image/container yang melayani website harus ikut diperbarui. Setelah update, unggah fixture dari laptop melalui Sinkronisasi Data. JSON privat diabaikan Git dan tidak ikut image.
 
 Bila memang melakukan reset baru, ikuti [panduan75](75-reset-demo-lokal-docker-dan-urutan-impor.md). Urutan yang sama untuk lokal dan Docker:
 
