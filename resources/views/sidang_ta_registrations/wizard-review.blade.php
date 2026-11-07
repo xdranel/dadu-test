@@ -172,21 +172,6 @@
                     kembali ke form untuk memperbaikinya.
                 </p>
             </div>
-            @if($sendBlocked)
-                <p id="registration-send-readiness" data-meet-send-held @if($revisionExpired) data-revision-deadline-expired @endif role="{{ $revisionExpired ? 'alert' : 'status' }}" class="rounded-lg bg-amber-50 p-3 text-sm text-amber-900">
-                    {{ $revisionExpired ? 'Batas waktu revisi telah berakhir. Pengiriman revisi sudah ditutup. Data dan berkas tetap tersimpan untuk dilihat.'
-                        : ($isRevision ? 'Penuhi persyaratan akademik sebelum mengirim revisi. Data dan berkas tetap tersimpan.'
-                            : 'Penuhi persyaratan akademik dan EPRT sebelum mengirim. Draft dan berkas tetap tersimpan.') }}
-                </p>
-            @endif
-            @if($readinessMessages !== [])
-                <div data-review-blockers role="status" class="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-900">
-                    <p class="font-semibold">Persyaratan berikut belum terpenuhi:</p>
-                    <ul class="mt-2 list-inside list-disc space-y-1">
-                        @foreach($readinessMessages as $message)<li>{{ $message }}</li>@endforeach
-                    </ul>
-                </div>
-            @endif
             <div class="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div class="flex flex-wrap gap-2">
                     <a class="btn btn-secondary"
@@ -210,6 +195,21 @@
 
                 @endcan
             </div>
+            @if($sendBlocked)
+                <p id="registration-send-readiness" data-meet-send-held @if($revisionExpired) data-revision-deadline-expired @endif role="{{ $revisionExpired ? 'alert' : 'status' }}" class="rounded-lg bg-amber-50 p-3 text-sm text-amber-900">
+                    {{ $revisionExpired ? 'Batas waktu revisi telah berakhir. Pengiriman revisi sudah ditutup. Data dan berkas tetap tersimpan untuk dilihat.'
+                        : ($isRevision ? 'Penuhi persyaratan akademik sebelum mengirim revisi. Data dan berkas tetap tersimpan.'
+                            : 'Penuhi persyaratan akademik dan EPRT sebelum mengirim. Draft dan berkas tetap tersimpan.') }}
+                </p>
+            @endif
+            @if($readinessMessages !== [])
+                <div data-review-blockers role="status" class="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-900">
+                    <p class="font-semibold">Persyaratan berikut belum terpenuhi:</p>
+                    <ul class="mt-2 list-inside list-disc space-y-1">
+                        @foreach($readinessMessages as $message)<li>{{ $message }}</li>@endforeach
+                    </ul>
+                </div>
+            @endif
             @can($permission)
                 <dialog id="confirm-send-registration" aria-labelledby="confirm-send-title"
                         aria-describedby="confirm-send-description"

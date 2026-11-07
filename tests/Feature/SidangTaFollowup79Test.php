@@ -134,3 +134,26 @@ test('follow79 language only import displays actual test date and preserves BPP 
     $c=new Crawler($page->getContent());expect($c->filter('[data-language-history]')->text())->toContain('Tanggal tes 23/04/2025')->toContain('Tanggal tes 28/05/2025')->toContain('Kedaluwarsa 28/05/2027');
     expect($this->profile->fresh()->groups['bpp']['period'])->toBe('2627/1');
 });
+
+test('follow80 review actions precede both unmet requirement warnings', function () {
+    $groups = $this->profile->groups;
+    $groups['academic']['gpa'] = null;
+    $this->profile->update(['groups' => $groups]);
+    $draft = ($this->draft79)();
+    $page = $this->get(route('sidang-ta-drafts.preview', $draft))->assertOk();
+    $card = (new Crawler($page->getContent()))->filter('[data-review-actions]');
+    $children = $card->children()->each(fn (Crawler $node) => $node->getNode(0));
+    $warning = $card->filter('[data-meet-send-held]')->getNode(0);
+    $blockers = $card->filter('[data-review-blockers]')->getNode(0);
+    $button = $card->filter('[data-open-registration]')->getNode(0);
+    $row = $button->parentNode;
+    $header = $children[0];
+    expect($header->textContent)->toContain('Pastikan periode, kontak, pembayaran, biodata');
+    expect(array_search($row, $children, true))->toBe(1);
+    expect(array_search($warning, $children, true))->toBe(2);
+    expect(array_search($blockers, $children, true))->toBe(3);
+    $rowText = $row->textContent;
+    expect($rowText)->toContain('Kembali ke form')->toContain('Kembali ke pendaftaran')->toContain('Kirim Pendaftaran');
+    expect($card->filter('[data-open-registration]')->getNode(0)->hasAttribute('disabled'))->toBeTrue();
+    expect($card->filter('[data-confirm-registration]')->attr(':disabled'))->toBe('!canConfirm');
+});
