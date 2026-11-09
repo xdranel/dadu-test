@@ -10,7 +10,13 @@ class SidangTaFormGuideRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return $this->user()?->hasRole('Akademik') ?? false;
+        $permission = match ($this->method()) {
+            'POST' => 'sidang_ta_form_guide_create',
+            'PUT', 'PATCH' => 'sidang_ta_form_guide_update',
+            default => null,
+        };
+
+        return $permission !== null && ($this->user()?->can($permission) ?? false);
     }
 
     public function rules(): array

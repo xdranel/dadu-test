@@ -8,7 +8,9 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
-use RuntimeException;
+use Illuminate\Validation\ValidationException;
+use League\Flysystem\FilesystemException;
+use League\Flysystem\UnableToWriteFile;
 use Throwable;
 
 class SidangTaFormGuideService
@@ -29,9 +31,19 @@ class SidangTaFormGuideService
             }
             $oldPath = $guide->file_path;
             if ($file) {
-                $path = $file->store('sidang-ta/form-guides', 'local');
-                if (! $path) {
-                    throw new RuntimeException('Berkas panduan gagal disimpan.');
+                try {
+                    $path = $file->store('sidang-ta/form-guides', 'local');
+                    if (! $path) {
+                        throw UnableToWriteFile::atLocation('sidang-ta/form-guides', 'Storage returned false.');
+                    }
+                } catch (FilesystemException $exception) {
+                    Log::warning('Penyimpanan berkas panduan Sidang TA gagal.', [
+                        'disk' => 'local', 'directory' => 'sidang-ta/form-guides',
+                        'exception' => $exception::class, 'error' => $exception->getMessage(),
+                    ]);
+                    throw ValidationException::withMessages([
+                        'file' => 'Berkas panduan gagal disimpan. Hubungi administrator untuk memeriksa penyimpanan server.',
+                    ]);
                 }
                 DB::afterRollBack(fn () => $this->removeFile($path));
                 $attributes = array_replace($attributes, ['file_path' => $path,

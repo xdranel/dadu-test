@@ -24,12 +24,9 @@ beforeEach(function () {
         'url' => 'https://example.test/guide', 'link_label' => 'Buka panduan', 'sort_order' => 2, 'is_active' => true];
 });
 
-test('guide administration requires Akademik even when another role holds guide permissions', function () {
+test('guide administration rejects a role without the required permissions', function () {
     $user = User::factory()->create(['status' => 'active']);
     $user->assignRole('Petugas');
-    foreach (['read', 'create', 'update', 'delete'] as $action) {
-        $user->givePermissionTo(Permission::firstOrCreate(['name' => 'sidang_ta_form_guide_'.$action, 'guard_name' => 'web']));
-    }
     $guide = SidangTaFormGuide::create($this->payload);
     $this->actingAs($user);
     $this->get(route('admin.sidang-ta-guides.index'))->assertForbidden();
@@ -188,3 +185,78 @@ test('initializer copies actual defaults idempotently without overwriting admini
     expect(SidangTaFormGuide::withTrashed()->count())->toBe(4);
     Storage::disk('local')->assertMissing($online->file_path);
 });
+
+test('guide83 delegated role CRUD accepts links images and PDFs', function (string $roleName, string $kind) {
+    $role = Role::firstOrCreate(['name' => $roleName, 'guard_name' => 'web']);
+    foreach (['read', 'create', 'update', 'delete'] as $action) {
+        $role->givePermissionTo(Permission::firstOrCreate(['name' => 'sidang_ta_form_guide_'.$action, 'guard_name' => 'web']));
+    }
+    $user = User::factory()->create(['status' => 'active']);
+    $user->assignRole($role);
+    $this->actingAs($user);
+    $this->get(route('admin.sidang-ta-guides.index'))->assertOk();
+    $this->get(route('admin.sidang-ta-guides.create'))->assertOk();
+    $this->get(route('dashboard'))->assertSee(route('admin.sidang-ta-guides.index'), false);
+    $payload = $this->payload;
+    if ($kind === 'image') $payload['file'] = UploadedFile::fake()->image('example.png');
+    if ($kind === 'pdf') $payload['file'] = UploadedFile::fake()->create('example.pdf', 10, 'application/pdf');
+    $this->post(route('admin.sidang-ta-guides.store'), $payload)->assertSessionHasNoErrors()->assertRedirect();
+    $guide = SidangTaFormGuide::firstOrFail();
+    expect($guide->url)->toBe('https://example.test/guide');
+    if ($kind !== 'link') {
+        Storage::disk('local')->assertExists($guide->file_path);
+        $this->get(route('sidang-ta-guides.media', $guide))->assertOk();
+    }
+    $this->get(route('admin.sidang-ta-guides.edit', $guide))->assertOk();
+    $this->put(route('admin.sidang-ta-guides.update', $guide), array_replace($payload, ['title' => 'Updated by role']))->assertSessionHasNoErrors()->assertRedirect();
+    $this->patch(route('admin.sidang-ta-guides.update', $guide), array_replace($this->payload, ['title' => 'Patched by role']))->assertSessionHasNoErrors()->assertRedirect();
+    expect($guide->fresh()->title)->toBe('Patched by role');
+    $this->delete(route('admin.sidang-ta-guides.destroy', $guide))->assertRedirect();
+    expect(SidangTaFormGuide::find($guide->id))->toBeNull();
+})->with([['admin', 'link'], ['admin', 'image'], ['admin', 'pdf'], ['Petugas', 'link']]);
+
+test('guide83 create and update permissions remain independent', function () {
+    foreach (['create', 'update'] as $action) Permission::firstOrCreate(['name' => 'sidang_ta_form_guide_'.$action, 'guard_name' => 'web']);
+    $user = User::factory()->create(['status' => 'active']);
+    $user->assignRole('Petugas');
+    $user->givePermissionTo('sidang_ta_form_guide_update');
+    $guide = SidangTaFormGuide::create($this->payload);
+    $this->actingAs($user);
+    $this->post(route('admin.sidang-ta-guides.store'), $this->payload)->assertForbidden();
+    $this->put(route('admin.sidang-ta-guides.update', $guide), array_replace($this->payload, ['title' => 'Update only']))->assertSessionHasNoErrors()->assertRedirect();
+    $user->syncPermissions(['sidang_ta_form_guide_create']);
+    $this->actingAs($user->fresh());
+    $this->put(route('admin.sidang-ta-guides.update', $guide), $this->payload)->assertForbidden();
+    $this->patch(route('admin.sidang-ta-guides.update', $guide), $this->payload)->assertForbidden();
+    $this->delete(route('admin.sidang-ta-guides.destroy', $guide))->assertForbidden();
+    $this->post(route('admin.sidang-ta-guides.store'), $this->payload)->assertSessionHasNoErrors()->assertRedirect();
+});
+
+test('guide83 storage failures return a file error and preserve existing data', function (bool $replacement, string $failure) {
+    $guide = null;
+    $path = null;
+    $disk = Storage::disk('local');
+    if ($replacement) {
+        $guide = app(SidangTaFormGuideService::class)->save(new SidangTaFormGuide, $this->payload, UploadedFile::fake()->image('old.png'));
+        $path = $guide->file_path;
+    }
+    $adapter = Mockery::mock(\Illuminate\Filesystem\FilesystemAdapter::class);
+    $write = $adapter->shouldReceive('putFileAs')->once();
+    if ($failure === 'mkdir') $write->andThrow(\League\Flysystem\UnableToCreateDirectory::atLocation('/private/server/path', 'Permission denied'));
+    elseif ($failure === 'write') $write->andThrow(\League\Flysystem\UnableToWriteFile::atLocation('/private/server/path', 'Permission denied'));
+    else $write->andReturn(false);
+    Storage::shouldReceive('disk')->with('local')->andReturn($adapter);
+    $payload = array_replace($this->payload, ['title' => 'Failed new title', 'file' => UploadedFile::fake()->image('new.png')]);
+    $this->actingAs($this->academic);
+    if ($replacement) $response = $this->putJson(route('admin.sidang-ta-guides.update', $guide), $payload);
+    else $response = $this->postJson(route('admin.sidang-ta-guides.store'), $payload);
+    $response->assertUnprocessable()->assertJsonValidationErrors('file');
+    expect($response->getContent())->not->toContain('/private/server/path', 'Permission denied');
+    expect(SidangTaFormGuide::count())->toBe($replacement ? 1 : 0);
+    if ($replacement) {
+        expect($guide->fresh()->title)->toBe('Panduan TA');
+        expect($guide->fresh()->file_path)->toBe($path);
+        $disk->assertExists($path);
+        expect($disk->allFiles('sidang-ta/form-guides'))->toBe([$path]);
+    }
+})->with([[false, 'mkdir'], [true, 'mkdir'], [false, 'write'], [true, 'write'], [false, 'false'], [true, 'false']]);
