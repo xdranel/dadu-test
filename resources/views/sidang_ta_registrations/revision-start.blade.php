@@ -3,11 +3,11 @@
         Revisi Pendaftaran Sidang TA
     </x-slot>
     @php
+        $revisionDisabled = \App\Support\SidangTaRevisionDeadline::hasBeenDisabled($registration);
         $revisionExpired = \App\Support\SidangTaRevisionDeadline::hasExpired($registration);
         $revisionNotStarted = \App\Support\SidangTaRevisionDeadline::hasNotStarted($registration);
     @endphp
     <section class="campus-card space-y-4 p-5">
-        @include('sidang_ta_registrations.partials.period-schedule', ['schedulePeriod' => $registration->period])
         <h2 class="font-bold">
             Perbaikan Pengajuan Anda
         </h2>
@@ -19,6 +19,11 @@
         </p>
         <h3 class="text-base font-bold text-slate-800">Detail Revisi</h3>
         @include('sidang_ta_registrations.partials.revision-feedback')
+        @if($revisionDisabled)
+            <p data-revision-disabled role="alert" class="rounded-lg bg-amber-50 p-3 text-sm text-amber-900">
+                {{ \App\Support\SidangTaRevisionDeadline::DISABLED_MESSAGE }}
+            </p>
+        @endif
         @if($revisionNotStarted)
             <p data-revision-not-started role="alert" class="rounded-lg bg-amber-50 p-3 text-sm text-amber-900">
                 Verifikasi berkas belum dibuka. Anda dapat melihat detail revisi; mulai atau lanjutkan draft saat jadwal verifikasi dibuka.
@@ -32,7 +37,7 @@
         @endif
         <form method="POST" action="{{ route('sidang-ta-drafts.revision', $registration) }}">
             @csrf
-            <button type="submit" @disabled($revisionExpired || $revisionNotStarted)
+            <button type="submit" @disabled($revisionDisabled || $revisionExpired || $revisionNotStarted)
             class="btn btn-primary disabled:cursor-not-allowed disabled:opacity-50">
                 Mulai atau lanjutkan draft revisi
             </button>

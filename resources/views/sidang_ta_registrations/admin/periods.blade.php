@@ -60,8 +60,17 @@
                 <p class="text-xs text-slate-500 md:col-span-2">Verifikasi boleh dimulai selama pendaftaran. Waktu selesai harus setelah mulai verifikasi dan tidak lebih awal dari tenggat pendaftaran.</p>
                 <label class="inline-flex items-center gap-2 text-sm text-slate-700">
                     <input type="checkbox" name="is_active" value="1" @checked(old('is_active'))>
-                    Aktifkan setelah dibuat
+                    Pendaftaran aktif
                 </label>
+                <label class="inline-flex items-center gap-2 text-sm text-slate-700">
+                    <input type="checkbox" name="is_revision_active" value="1" @checked(old('is_revision_active'))>
+                    Revisi aktif
+                </label>
+                <label class="inline-flex items-center gap-2 text-sm text-slate-700">
+                    <input type="checkbox" name="show_to_students" value="1" @checked(old('show_to_students'))>
+                    Tampilkan jadwal ke mahasiswa
+                </label>
+                <p class="text-xs text-slate-500 md:col-span-2">Tampilan jadwal tidak mengubah izin pendaftaran atau revisi. Kartu otomatis hilang setelah kedua jadwal berakhir.</p>
                 <div class="md:col-span-2">
                     <button type="submit" class="btn btn-primary">Simpan periode</button>
                 </div>
@@ -126,8 +135,17 @@
                             <p class="text-xs text-slate-500 md:col-span-2">Verifikasi boleh dimulai selama pendaftaran. Waktu selesai harus setelah mulai verifikasi dan tidak lebih awal dari tenggat pendaftaran.</p>
                             <label class="inline-flex items-center gap-2 text-sm text-slate-700">
                                 <input type="checkbox" name="is_active" value="1" @checked($period->is_active)>
-                                Periode aktif
+                                Pendaftaran aktif
                             </label>
+                            <label class="inline-flex items-center gap-2 text-sm text-slate-700">
+                                <input type="checkbox" name="is_revision_active" value="1" @checked($period->is_revision_active)>
+                                Revisi aktif
+                            </label>
+                            <label class="inline-flex items-center gap-2 text-sm text-slate-700">
+                                <input type="checkbox" name="show_to_students" value="1" @checked($period->show_to_students)>
+                                Tampilkan jadwal ke mahasiswa
+                            </label>
+                            <p class="text-xs text-slate-500 md:col-span-2">Tampilan jadwal tidak mengubah izin pendaftaran atau revisi. Kartu otomatis hilang setelah kedua jadwal berakhir.</p>
                             <div class="md:col-span-2">
                                 <button type="submit" class="btn btn-primary">Simpan perubahan</button>
                             </div>

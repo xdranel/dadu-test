@@ -9,6 +9,7 @@ use Illuminate\Validation\ValidationException;
 class SidangTaRevisionDeadline
 {
     public const MESSAGE = 'Batas waktu revisi telah berakhir. Revisi tidak dapat disimpan atau dikirim lagi.';
+    public const DISABLED_MESSAGE = 'Revisi sedang dinonaktifkan. Hubungi petugas untuk informasi lebih lanjut.';
     public const NOT_STARTED_MESSAGE = 'Jadwal verifikasi berkas belum dimulai. Revisi dapat dikerjakan sesuai tanggal mulai yang ditetapkan.';
 
     private static function period(SidangTaRegistration $registration, bool $lockPeriod): SidangTaPeriod
@@ -25,6 +26,11 @@ class SidangTaRevisionDeadline
         return self::period($registration, $lockPeriod)->revisionHasExpired();
     }
 
+    public static function hasBeenDisabled(SidangTaRegistration $registration, bool $lockPeriod = false): bool
+    {
+        return !self::period($registration, $lockPeriod)->is_revision_active;
+    }
+
     public static function hasNotStarted(SidangTaRegistration $registration, bool $lockPeriod = false): bool
     {
         $period = self::period($registration, $lockPeriod);
@@ -37,6 +43,9 @@ class SidangTaRevisionDeadline
         $period = self::period($registration, true);
         if ($period->revisionHasExpired()) {
             throw ValidationException::withMessages([$field => self::MESSAGE]);
+        }
+        if (!$period->is_revision_active) {
+            throw ValidationException::withMessages([$field => self::DISABLED_MESSAGE]);
         }
         if (!$period->revisionIsOpen()) {
             throw ValidationException::withMessages([$field => self::NOT_STARTED_MESSAGE]);

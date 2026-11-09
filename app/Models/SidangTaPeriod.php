@@ -7,7 +7,9 @@ use Illuminate\Database\Eloquent\Model;
 
 class SidangTaPeriod extends Model
 {
-    protected $fillable = ['name', 'open_at', 'close_at', 'revision_open_at', 'revision_close_at', 'is_active', 'description'];
+    protected $fillable = ['name', 'open_at', 'close_at', 'revision_open_at', 'revision_close_at', 'is_active', 'is_revision_active', 'show_to_students', 'description'];
+
+    protected $attributes = ['is_revision_active' => true, 'show_to_students' => false];
 
     protected $casts = [
         'open_at' => 'datetime',
@@ -15,6 +17,8 @@ class SidangTaPeriod extends Model
         'revision_open_at' => 'datetime',
         'revision_close_at' => 'datetime',
         'is_active' => 'boolean',
+        'is_revision_active' => 'boolean',
+        'show_to_students' => 'boolean',
     ];
 
     public function isOpen(): bool
@@ -29,12 +33,24 @@ class SidangTaPeriod extends Model
 
     public function revisionIsOpen(): bool
     {
-        return !$this->revisionIsConfigured() || now()->between($this->revision_open_at, $this->revision_close_at);
+        return $this->is_revision_active && (!$this->revisionIsConfigured() || now()->between($this->revision_open_at, $this->revision_close_at));
     }
 
     public function revisionHasExpired(): bool
     {
         return $this->revisionIsConfigured() && now()->greaterThan($this->revision_close_at);
+    }
+
+    public function scopeVisibleToStudents(Builder $query): Builder
+    {
+        $at = now();
+        // Incomplete legacy verification dates cannot keep a closed card on screen forever.
+        return $query->where('show_to_students', true)->where(function (Builder $query) use ($at) {
+            $query->where('close_at', '>=', $at)->orWhere(function (Builder $query) use ($at) {
+                $query->whereNotNull('revision_open_at')->whereNotNull('revision_close_at')
+                    ->where('revision_close_at', '>=', $at);
+            });
+        })->orderBy('open_at')->orderBy('id');
     }
 
     public function scopeRevisionExpired(Builder $query): Builder

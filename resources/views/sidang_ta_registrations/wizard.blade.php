@@ -7,7 +7,9 @@
         $targetedRevision = (bool) ($meetContext['targeted'] ?? false);
         $revisionExpired = (bool) ($meetContext['revision_expired'] ?? false);
         $revisionNotStarted = (bool) ($meetContext['revision_not_started'] ?? false);
-        $revisionBlocked = $revisionExpired || $revisionNotStarted;
+        $revisionDisabled = (bool) ($meetContext['revision_disabled'] ?? false);
+        $registrationClosed = (bool) ($meetContext['registration_closed'] ?? false);
+        $writeBlocked = $revisionDisabled || $registrationClosed || $revisionExpired || $revisionNotStarted;
         $rawAccurate = $targetedRevision ? ($payload['diploma_biodata_accurate'] ?? null)
             : old('diploma_biodata_accurate', $payload['diploma_biodata_accurate'] ?? null);
         $accurate = match ($rawAccurate) {
@@ -21,12 +23,8 @@
         if ($draft && !$periods->contains('id', $draft->sidang_ta_period_id)) {
             $periods = $periods->prepend($draft->period);
         }
-        $selected = $periods->first(fn ($period) => (string) $period->id === $selectedPeriod);
-        $windowFor = static fn ($period) => $period->open_at->format('d/m/Y H:i').' – '
-            .$period->close_at->format('d/m/Y H:i').($period->isOpen() ? '' : ' (ditutup)');
-        $initial = ['accurate' => $accurate, 'dirty' => $errors->any(), 'hasErrors' => $errors->any(),
-            'selectedPeriodId' => $selectedPeriod, 'periodHint' => $selected ? $windowFor($selected) : ''];
-        $reviewReady = $draft && $completedThrough === 4 && !$revisionBlocked;
+        $initial = ['accurate' => $accurate, 'dirty' => $errors->any(), 'hasErrors' => $errors->any()];
+        $reviewReady = $draft && $completedThrough === 4 && !$writeBlocked;
         $permission = $draft?->source_registration_id ? 'sidang_ta_registration_update' : 'sidang_ta_registration_create';
         $titles = [1 => 'Data Mahasiswa', 2 => 'Data TA di Igracias',
             3 => 'Pembayaran & Nilai Bahasa', 4 => 'Pernyataan Biodata Dummy Ijazah'];
@@ -118,6 +116,16 @@
             </div>
         </section>
 
+        @if($registrationClosed)
+            <div data-registration-window-closed role="alert" class="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+                Pendaftaran pada periode ini tidak terbuka. Penyimpanan dan pengiriman ditutup. Draft yang melewati tenggat akan dihapus otomatis.
+            </div>
+        @endif
+        @if($revisionDisabled)
+            <p data-revision-disabled role="alert" class="rounded-lg bg-amber-50 p-3 text-sm text-amber-900">
+                {{ \App\Support\SidangTaRevisionDeadline::DISABLED_MESSAGE }}
+            </p>
+        @endif
         @if($revisionNotStarted)
             <div data-revision-not-started role="alert" class="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
                 Verifikasi berkas belum dibuka. Draft dan berkas dapat dilihat; penyimpanan, unggah pengganti, tinjauan baru, dan pengiriman revisi tersedia mulai jadwal verifikasi.
@@ -130,12 +138,9 @@
             </div>
         @endif
 
-{{--        <div class="campus-card space-y-3 p-4">--}}
 {{--            @foreach($periods as $schedulePeriod)--}}
 {{--                @include('sidang_ta_registrations.partials.period-schedule', ['dynamicSchedule' => true])--}}
 {{--            @endforeach--}}
-{{--            <p x-show="!selectedPeriodId" class="text-sm text-slate-500">Pilih periode untuk melihat jadwal pendaftaran dan verifikasi berkas.</p>--}}
-{{--        </div>--}}
         <div class="grid items-start gap-6 xl:grid-cols-12">
             <div class="min-w-0 space-y-5 xl:col-span-8">
                 @if($draft?->sourceRegistration?->review_notes)
@@ -156,12 +161,12 @@
                       class="campus-card space-y-5 p-5 sm:p-6"
                       action="{{ $draft ? route('sidang-ta-drafts.steps.store', ['draft' => $draft, 'step' => $step]) : route('sidang-ta-drafts.store') }}"
                       @input="dirty = true" @change="dirty = true"
-                      @submit="if (!validateContacts($el) || busy || {{ $revisionBlocked ? 'true' : 'false' }}) { $event.preventDefault(); } else { busy = true; }">
+                      @submit="if (!validateContacts($el) || busy || {{ $writeBlocked ? 'true' : 'false' }}) { $event.preventDefault(); } else { busy = true; }">
                     @csrf
                     @if($draft)
                         <input type="hidden" name="version" value="{{ old('version', $draft->version) }}">
                     @endif
-                    <fieldset data-revision-write-fields @disabled($revisionBlocked) class="min-w-0 space-y-5">
+                    <fieldset data-revision-write-fields @disabled($writeBlocked) class="min-w-0 space-y-5">
                     <header class="space-y-1.5 border-b border-slate-100 pb-4">
                         <h2 class="text-lg font-bold text-slate-900">Tahap {{ $step }} - {{ $titles[$step] }}</h2>
                         <p class="text-xs text-slate-500">
@@ -201,26 +206,23 @@
                                 <p id="sidang-ta-period-id" tabindex="-1"
                                    class="rounded-lg bg-slate-50 p-3 text-sm font-medium text-slate-800"
                                    aria-invalid="{{ $errors->has('sidang_ta_period_id') ? 'true' : 'false' }}"
-                                   aria-describedby="period-window error-sidang_ta_period_id">
+                                   aria-describedby="error-sidang_ta_period_id">
                                     {{ $draft->period->name }}(periode pengajuan asal)
                                 </p>
                             @else
                                 <select id="sidang-ta-period-id" name="sidang_ta_period_id" required
                                         class="campus-input w-full {{ $errors->has('sidang_ta_period_id') ? '!border-rose-500' : '' }}"
                                         aria-invalid="{{ $errors->has('sidang_ta_period_id') ? 'true' : 'false' }}"
-                                        aria-describedby="period-window error-sidang_ta_period_id"
-                                        @change="updatePeriodHint($event.target)">
+                                        aria-describedby="error-sidang_ta_period_id">
                                     <option value="">Pilih periode terbuka</option>
                                     @foreach($periods as $period)
                                         <option value="{{ $period->id }}"
-                                                data-period-id="{{ $period->id }}" data-window="{{ $windowFor($period) }}" @selected($selectedPeriod === (string) $period->id)>
+                                                @selected($selectedPeriod === (string) $period->id)>
                                             {{ $period->name }}{{ $period->isOpen() ? '' : ' (ditutup)' }}
                                         </option>
                                     @endforeach
                                 </select>
                             @endif
-                            <p id="period-window" class="mt-1.5 text-xs leading-relaxed text-slate-500"
-                               x-text="periodHint || 'Pilih periode yang masih terbuka.'">{{ $initial['periodHint'] ?: 'Pilih periode yang masih terbuka.' }}</p>
                             @include('sidang_ta_registrations.partials.wizard-error', ['field' => 'sidang_ta_period_id'])
                         </div>
                         <div class="grid max-w-xl gap-4 sm:grid-cols-2">
@@ -334,7 +336,7 @@
                         @can($permission)
                             <div class="flex flex-wrap items-center gap-2">
                                 <button data-save-draft type="submit" class="btn btn-secondary disabled:cursor-not-allowed disabled:opacity-50"
-                                        @disabled($revisionBlocked) :disabled="busy || {{ $revisionBlocked ? 'true' : 'false' }}"
+                                        @disabled($writeBlocked) :disabled="busy || {{ $writeBlocked ? 'true' : 'false' }}"
                                         x-text="busy ? 'Sedang menyimpan…' : 'Simpan draft'">
                                     Simpan draft
                                 </button>

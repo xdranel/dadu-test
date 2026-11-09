@@ -2,7 +2,6 @@
     <x-slot name="header">Pendaftaran Sidang TA</x-slot>
     @php
         $canUpdateRegistration = auth()->user()->can('sidang_ta_registration_update');
-        $schedulePeriods = $openPeriods->concat($drafts->pluck('period'))->concat($registrations->pluck('period'))->concat(collect([$activeRegistration?->period]))->filter()->unique('id');
     @endphp
 
     <div class="space-y-5">
@@ -67,7 +66,12 @@
         @endif
         <div data-student-period-schedules class="grid gap-4 xl:grid-cols-2">
             @foreach($schedulePeriods as $schedulePeriod)
-                <div class="campus-card p-4">@include('sidang_ta_registrations.partials.period-schedule')</div>
+                @php
+                    $cardClose = $schedulePeriod->revisionIsConfigured() && $schedulePeriod->revision_close_at->gt($schedulePeriod->close_at)
+                        ? $schedulePeriod->revision_close_at : $schedulePeriod->close_at;
+                @endphp
+                <div class="campus-card p-4" x-data="sidangTaPeriodCountdown(0, @js($cardClose->getTimestampMs()))"
+                     x-show="status !== 'Ditutup'">@include('sidang_ta_registrations.partials.period-schedule')</div>
             @endforeach
         </div>
         <section data-testid="drafts-panel" class="campus-card w-full max-w-xl space-y-4 p-5">

@@ -58,6 +58,7 @@ class SidangTaDraftService
             if ($existing) {
                 Requirements::assertKnownVersion($existing);
                 abort_unless((string) $existing->owner_user_id === (string) $user->id, 409);
+                $this->access->check($user, $existing, true);
                 return $existing; // Retry start tidak menimpa draft; ubah lewat saveStep.
             }
 
@@ -90,7 +91,7 @@ class SidangTaDraftService
             Student::whereKey($student->id)->lockForUpdate()->firstOrFail();
             $locked = SidangTaRegistrationDraft::whereKey($draft->id)->lockForUpdate()->firstOrFail();
             Requirements::assertKnownVersion($locked);
-            $this->access->check($user, $locked, true);
+            $this->access->check($user, $locked, true, (int) $validated['sidang_ta_period_id']);
             abort_unless($locked->version === $expectedVersion, 409, 'Draft berubah. Muat ulang terlebih dahulu.');
             if (Revision::isTargeted($locked)) {
                 Revision::assertPayloadUnchanged($locked, array_replace($locked->payload ?? [], [

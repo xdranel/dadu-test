@@ -498,3 +498,115 @@ test('revision_window85_before_start_blocks_HTTP_save_review_and_submit_without_
     expect(Storage::disk('local')->allFiles())->toBe($files);
     expect($source->fresh()->status)->toBe('needs_review');
 });
+
+test('closure87 initial deadline blocks upload save review submit and retry before cleanup', function () {
+    $draft = ($this->markReviewed)(($this->meetDraft)());
+    $this->period->update(['close_at' => now()]);
+    ($this->replaceDocument)($draft)->assertOk();
+    $draft = ($this->markReviewed)($draft);
+    $this->travel(1)->seconds();
+    $before = $draft->fresh()->getAttributes();
+    $files = Storage::disk('local')->allFiles();
+    ($this->replaceDocument)($draft)->assertUnprocessable()->assertJsonValidationErrors('draft');
+    $this->postJson(route('sidang-ta-drafts.steps.store', ['draft'=>$draft,'step'=>1]), [
+        'version'=>$draft->version,'sidang_ta_period_id'=>$this->period->id,'student_phone'=>'081234567890','parent_phone'=>'081234567891',
+    ])->assertUnprocessable()->assertJsonValidationErrors('draft');
+    $this->postJson(route('sidang-ta-drafts.review',$draft),['version'=>$draft->version])->assertUnprocessable()->assertJsonValidationErrors('draft');
+    ($this->submitMeet)($draft)->assertUnprocessable()->assertJsonValidationErrors('draft');
+    $this->postJson(route('sidang-ta-drafts.store'),['sidang_ta_period_id'=>$this->period->id,'student_phone'=>'081234567890','parent_phone'=>'081234567891'])
+        ->assertUnprocessable()->assertJsonValidationErrors('draft');
+    $c = new Crawler($this->get(route('sidang-ta-drafts.edit', ['draft'=>$draft,'step'=>2]))->assertOk()->getContent());
+    expect($c->filter('[data-registration-window-closed]')->count())->toBe(1);
+    expect($c->filter('[data-save-draft]')->getNode(0)->hasAttribute('disabled'))->toBeTrue();
+    $c = new Crawler($this->get(route('sidang-ta-drafts.preview', $draft))->assertOk()->getContent());
+    expect($c->filter('[data-open-registration]')->getNode(0)->hasAttribute('disabled'))->toBeTrue();
+    expect($draft->fresh()->getAttributes())->toBe($before);
+    expect(Storage::disk('local')->allFiles())->toBe($files);
+    expect(SidangTaRegistration::count())->toBe(0);
+    expect(app(\App\Services\SidangTaExpiredDraftCleanup::class)->run()['deleted_drafts'])->toBe(1);
+    expect($draft->fresh())->toBeNull();
+});
+
+test('closure87 student schedules appear only on registration index not wizard review detail or recap', function () {
+    $this->period->update(['show_to_students'=>true]);
+    $draft = ($this->markReviewed)(($this->meetDraft)());
+    foreach ([1,2,3,4] as $step) {
+        $page=$this->get(route('sidang-ta-drafts.edit',['draft'=>$draft,'step'=>$step]))->assertOk();
+        $c=new Crawler($page->getContent());
+        expect($c->filter('[data-period-schedule], [data-period-countdown], #period-window, option[data-window]')->count())->toBe(0);
+    }
+    $c=new Crawler($this->get(route('sidang-ta-drafts.preview',$draft))->assertOk()->getContent());
+    expect($c->filter('[data-period-schedule], [data-period-countdown]')->count())->toBe(0);
+    $id=($this->submitMeet)($draft)->assertOk()->json('data.id');
+    $source=SidangTaRegistration::findOrFail($id);
+    $c=new Crawler($this->get(route('sidang-ta-registrations.show',$source))->assertOk()->getContent());
+    expect($c->filter('[data-period-schedule], [data-period-countdown]')->count())->toBe(0);
+    $revision=($this->prepareRevision)($source);
+    $c=new Crawler($this->get(route('sidang-ta-registrations.edit',$source))->assertOk()->getContent());
+    expect($c->filter('[data-period-schedule], [data-period-countdown]')->count())->toBe(0);
+    $c=new Crawler($this->get(route('sidang-ta-drafts.edit',['draft'=>$revision,'step'=>2]))->assertOk()->getContent());
+    expect($c->filter('[data-period-schedule], [data-period-countdown]')->count())->toBe(0);
+    $c=new Crawler($this->get(route('sidang-ta-registrations.index'))->assertOk()->getContent());
+    expect($c->filter('[data-period-schedule="'.$this->period->id.'"]')->count())->toBe(1);
+});
+
+
+test('closure87 changing between open periods still works in either ID direction', function (bool $reverse) {
+    $draft = ($this->meetDraft)();
+    $other = SidangTaPeriod::create(['name'=>'Another open period', 'is_active'=>true,
+        'open_at'=>now()->subHour(), 'close_at'=>now()->addDays(2)]);
+    if ($reverse) $draft->update(['sidang_ta_period_id'=>$other->id]);
+    $target = $reverse ? $this->period : $other;
+    $this->postJson(route('sidang-ta-drafts.steps.store', ['draft'=>$draft,'step'=>1]), [
+        'version'=>$draft->version,'sidang_ta_period_id'=>$target->id,
+        'student_phone'=>'081234567890','parent_phone'=>'081234567891',
+    ])->assertOk()->assertJsonPath('data.sidang_ta_period_id',$target->id);
+    expect($draft->fresh()->sidang_ta_period_id)->toBe($target->id);
+})->with([false,true]);
+
+
+test('controls87 disabling revision blocks every write and reactivation restores access', function () {
+    $source=($this->submittedSource)();
+    $draft=($this->prepareRevision)($source);
+    ($this->replaceDocument)($draft)->assertOk();
+    $draft=($this->markReviewed)($draft);
+    $this->period->update(['is_revision_active'=>false]);
+    $before=$draft->fresh()->getAttributes(); $paths=Storage::disk('local')->allFiles();
+    ($this->replaceDocument)($draft)->assertUnprocessable()->assertJsonValidationErrors('draft');
+    $this->postJson(route('sidang-ta-drafts.review',$draft),['version'=>$draft->version])->assertUnprocessable()->assertJsonValidationErrors('draft');
+    ($this->submitRevision)($source,$draft)->assertUnprocessable()->assertJsonValidationErrors('draft');
+    $this->postJson(route('sidang-ta-drafts.revision',$source))->assertUnprocessable()->assertJsonValidationErrors('draft');
+    expect($draft->fresh()->getAttributes())->toBe($before);
+    expect(Storage::disk('local')->allFiles())->toBe($paths);
+    foreach ([route('sidang-ta-drafts.edit',$draft),route('sidang-ta-drafts.preview',$draft),route('sidang-ta-registrations.edit',$source)] as $url) {
+        $page=$this->get($url)->assertOk()->assertSee('Revisi sedang dinonaktifkan');
+        expect((new Crawler($page->getContent()))->filter('[data-period-schedule], [data-period-countdown]')->count())->toBe(0);
+    }
+    $c=new Crawler($this->get(route('sidang-ta-drafts.edit',$draft))->getContent());
+    expect($c->filter('[data-revision-write-fields]')->getNode(0)->hasAttribute('disabled'))->toBeTrue();
+    $this->period->update(['is_revision_active'=>true]);
+    ($this->replaceDocument)($draft)->assertOk();
+});
+
+
+test('controls87 staff revision action explains disabled revision', function () {
+    $source=($this->submittedSource)();
+    ($this->asReviewer)();
+    $this->period->update(['is_revision_active'=>false]);
+    $this->get(route('admin.sidang-ta-registrations.show',$source))->assertOk()->assertSee('Revisi sedang dinonaktifkan');
+    $this->postJson(route('admin.sidang-ta-registrations.review',$source),[
+        'registration_version'=>$source->fresh()->lock_version,'action'=>'needs_review','review_notes'=>'Perbaiki berkas',
+    ])->assertUnprocessable()->assertJsonValidationErrors('action');
+    expect($source->fresh()->status)->toBe('submitted');
+});
+
+test('controls87 disabling revision does not defer configured expiry or draft cleanup', function () {
+    $source=($this->submittedSource)();
+    $draft=($this->prepareRevision)($source);
+    $this->period->update(['is_revision_active'=>false,'revision_close_at'=>now()->subSecond()]);
+    expect(app(SidangTaRevisionExpiry::class)->run())->toBe(1);
+    expect($source->fresh()->status)->toBe('rejected');
+    $this->artisan('sidang-ta:purge-expired-drafts')->assertSuccessful();
+    expect($draft->fresh())->toBeNull();
+    foreach ($source->documents()->get() as $doc) Storage::disk('local')->assertExists($doc->file_path);
+});

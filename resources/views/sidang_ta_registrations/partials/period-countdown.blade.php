@@ -27,9 +27,9 @@
             @endforeach
         </div>
         @else
-            <p class="mt-2 text-xs text-slate-500">Pendaftaran baru dinonaktifkan.</p>
+            <p class="mt-2 text-xs text-slate-500">{{ $scheduleKind === 'revision' ? 'Revisi dinonaktifkan.' : 'Pendaftaran baru dinonaktifkan.' }}</p>
         @endif
     @else
-        <p data-schedule-unconfigured class="mt-2 text-xs leading-relaxed text-slate-600">Jadwal belum diatur. Revisi tetap dapat dikerjakan tanpa tenggat otomatis sampai jadwal ditetapkan petugas.</p>
+        <p data-schedule-unconfigured class="mt-2 text-xs leading-relaxed text-slate-600">Jadwal belum diatur. {{ !$scheduleEnabled ? ($scheduleKind === 'revision' ? 'Revisi dinonaktifkan.' : 'Pendaftaran baru dinonaktifkan.') : ($scheduleKind === 'revision' ? 'Revisi tetap dapat dikerjakan tanpa tenggat otomatis sampai jadwal ditetapkan petugas.' : 'Hubungi petugas untuk informasi jadwal pendaftaran.') }}</p>
     @endif
 </div>

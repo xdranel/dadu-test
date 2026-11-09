@@ -7,9 +7,9 @@
                 'scheduleEnabled' => (bool) $schedulePeriod->is_active, 'scheduleKind' => 'registration', 'scheduleTitle' => 'Pendaftaran Sidang TA',
                 'scheduleOpen' => $schedulePeriod->open_at, 'scheduleClose' => $schedulePeriod->close_at])
             @include('sidang_ta_registrations.partials.period-countdown', [
-                'scheduleEnabled' => true, 'scheduleKind' => 'revision', 'scheduleTitle' => 'Tanggal Verifikasi Berkas',
+                'scheduleEnabled' => (bool) $schedulePeriod->is_revision_active, 'scheduleKind' => 'revision', 'scheduleTitle' => 'Tanggal Verifikasi Berkas',
                 'scheduleOpen' => $schedulePeriod->revision_open_at, 'scheduleClose' => $schedulePeriod->revision_close_at])
         </div>
-        <p class="text-xs text-slate-500">Pendaftaran baru {{ $schedulePeriod->is_active ? 'diaktifkan' : 'dinonaktifkan' }}. Jadwal verifikasi berkas berlaku untuk revisi pengajuan.</p>
+        <p class="text-xs text-slate-500">Pendaftaran baru {{ $schedulePeriod->is_active ? 'diaktifkan' : 'dinonaktifkan' }}. Revisi {{ $schedulePeriod->is_revision_active ? 'diaktifkan' : 'dinonaktifkan' }} dan mengikuti jadwal verifikasi berkas.</p>
     </section>
 @endif

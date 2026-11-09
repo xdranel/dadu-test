@@ -10,7 +10,6 @@
         };
     @endphp
     <div class="mx-auto max-w-6xl space-y-5">
-        <div class="campus-card p-4">@include('sidang_ta_registrations.partials.period-schedule', ['schedulePeriod' => $registration->period])</div>
         <section class="campus-card overflow-hidden">
             <div
                 class="flex flex-wrap items-start justify-between gap-4 border-b border-rose-100 bg-rose-50/60 p-5 sm:p-6">

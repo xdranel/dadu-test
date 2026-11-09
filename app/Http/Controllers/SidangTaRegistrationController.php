@@ -37,7 +37,8 @@ class SidangTaRegistrationController extends Controller
         foreach ($drafts as $draft) {
             \App\Support\SidangTaDocumentRequirements::assertKnownVersion($draft);
         }
-        return view('sidang_ta_registrations.index', compact('registrations', 'openPeriods', 'drafts', 'activeRegistration'));
+        $schedulePeriods = SidangTaPeriod::query()->visibleToStudents()->get();
+        return view('sidang_ta_registrations.index', compact('registrations', 'openPeriods', 'drafts', 'activeRegistration', 'schedulePeriods'));
     }
 
     public function create()
@@ -163,6 +164,9 @@ class SidangTaRegistrationController extends Controller
         $revisionBlockers = [];
         if ($reviewable) {
             try {
+                if (\App\Support\SidangTaRevisionDeadline::hasBeenDisabled($registration)) {
+                    throw ValidationException::withMessages(['action' => \App\Support\SidangTaRevisionDeadline::DISABLED_MESSAGE]);
+                }
                 if (\App\Support\SidangTaRevisionDeadline::hasNotStarted($registration)) {
                     throw ValidationException::withMessages(['action' => \App\Support\SidangTaRevisionDeadline::NOT_STARTED_MESSAGE]);
                 }
@@ -236,7 +240,7 @@ class SidangTaRegistrationController extends Controller
 
     private function validatedPeriodData(Request $request): array
     {
-        return $request->validate([
+        $data = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'open_at' => ['required', 'date'],
             'close_at' => ['required', 'date', 'after:open_at'],
@@ -251,19 +255,23 @@ class SidangTaRegistrationController extends Controller
             'revision_close_at.after' => 'Tenggat verifikasi harus setelah tanggal mulai verifikasi.',
             'revision_close_at.after_or_equal' => 'Tenggat verifikasi tidak boleh sebelum tenggat pendaftaran.',
         ]);
+        foreach (['is_active', 'is_revision_active', 'show_to_students'] as $flag) {
+            $data[$flag] = $request->boolean($flag);
+        }
+        return $data;
     }
 
     public function storePeriod(Request $request)
     {
         $data = $this->validatedPeriodData($request);
-        SidangTaPeriod::create($data + ['is_active' => $request->boolean('is_active')]);
+        SidangTaPeriod::create($data);
         return back()->with('success', 'Periode Sidang TA berhasil dibuat.');
     }
 
     public function updatePeriod(Request $request, SidangTaPeriod $period)
     {
         $data = $this->validatedPeriodData($request);
-        $period->update($data + ['is_active' => $request->boolean('is_active')]);
+        $period->update($data);
         return back()->with('success', 'Periode Sidang TA berhasil diperbarui.');
     }
 

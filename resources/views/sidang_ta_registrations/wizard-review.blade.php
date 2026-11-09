@@ -4,7 +4,9 @@
         $payload = $draft->payload;
         $revisionExpired = (bool) ($meetContext['revision_expired'] ?? false);
         $revisionNotStarted = (bool) ($meetContext['revision_not_started'] ?? false);
-        $sendBlocked = $revisionExpired || $revisionNotStarted || !($meetContext['can_submit'] ?? false);
+        $revisionDisabled = (bool) ($meetContext['revision_disabled'] ?? false);
+        $registrationClosed = (bool) ($meetContext['registration_closed'] ?? false);
+        $sendBlocked = $revisionDisabled || $registrationClosed || $revisionExpired || $revisionNotStarted || !($meetContext['can_submit'] ?? false);
         $accurate = (bool) $payload['diploma_biodata_accurate'];
         $isRevision = $draft->source_registration_id !== null;
         $permission = $isRevision ? 'sidang_ta_registration_update' : 'sidang_ta_registration_create';
@@ -29,7 +31,6 @@
             </div>
         @endif
 
-        <div class="campus-card p-4">@include('sidang_ta_registrations.partials.period-schedule', ['schedulePeriod' => $draft->period])</div>
         <section data-review-summary class="campus-card overflow-hidden">
             <header class="border-b border-rose-100 bg-rose-50/60 p-5 sm:p-6">
                 <div class="flex flex-wrap items-start justify-between gap-3">
@@ -199,9 +200,14 @@
             </div>
             @if($sendBlocked)
                 <p id="registration-send-readiness" data-meet-send-held @if($revisionNotStarted) data-revision-not-started @endif @if($revisionExpired) data-revision-deadline-expired @endif role="{{ $revisionExpired ? 'alert' : 'status' }}" class="rounded-lg bg-amber-50 p-3 text-sm text-amber-900">
-                    {{ $revisionNotStarted ? 'Verifikasi berkas belum dibuka. Pengiriman revisi tersedia mulai jadwal verifikasi.' : ($revisionExpired ? 'Batas waktu revisi telah berakhir. Pengiriman revisi sudah ditutup. Draft revisi akan dihapus otomatis; pengajuan yang sudah dikirim tetap tersimpan.'
-                        : ($isRevision ? 'Penuhi persyaratan akademik sebelum mengirim revisi. Data dan berkas tetap tersimpan.'
-                            : 'Penuhi persyaratan akademik dan EPRT sebelum mengirim. Draft dan berkas tetap tersimpan.')) }}
+                    {{ match (true) {
+                        $registrationClosed => 'Pendaftaran pada periode ini tidak terbuka. Pengiriman ditutup. Draft yang melewati tenggat akan dihapus otomatis.',
+                        $revisionExpired => 'Batas waktu revisi telah berakhir. Pengiriman revisi sudah ditutup. Draft revisi akan dihapus otomatis; pengajuan yang sudah dikirim tetap tersimpan.',
+                        $revisionDisabled => \App\Support\SidangTaRevisionDeadline::DISABLED_MESSAGE,
+                        $revisionNotStarted => 'Verifikasi berkas belum dibuka. Pengiriman revisi tersedia mulai jadwal verifikasi.',
+                        $isRevision => 'Penuhi persyaratan akademik sebelum mengirim revisi. Data dan berkas tetap tersimpan.',
+                        default => 'Penuhi persyaratan akademik dan EPRT sebelum mengirim. Draft dan berkas tetap tersimpan.',
+                    } }}
                 </p>
             @endif
             @if($readinessMessages !== [])

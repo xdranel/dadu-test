@@ -67,10 +67,13 @@ class SidangTaDraftController extends Controller
         $targeted = SidangTaRevisionContract::isTargeted($draft);
         $revisionExpired = false;
         $revisionNotStarted = false;
+        $revisionDisabled = false;
+        $registrationClosed = $draft->source_registration_id === null && !$draft->period()->firstOrFail()->isOpen();
         if ($targeted) {
             $source = SidangTaRevisionContract::source($draft);
             $revisionExpired = SidangTaRevisionDeadline::hasExpired($source);
             $revisionNotStarted = SidangTaRevisionDeadline::hasNotStarted($source);
+            $revisionDisabled = SidangTaRevisionDeadline::hasBeenDisabled($source);
         }
         $mode = $admission['eprt']['mode'];
         $payload = $draft->payload ?? [];
@@ -84,8 +87,9 @@ class SidangTaDraftController extends Controller
         return [
             'admission' => $admission, 'types' => $types, 'targeted' => $targeted,
             'revision_expired' => $revisionExpired, 'revision_not_started' => $revisionNotStarted,
+            'registration_closed' => $registrationClosed, 'revision_disabled' => $revisionDisabled,
             'editable_types' => $targeted ? SidangTaRevisionContract::editableTypes($draft, $admission) : [],
-            'can_submit' => !$revisionExpired && !$revisionNotStarted && ($draft->source_registration_id === null || $targeted)
+            'can_submit' => !$revisionDisabled && !$registrationClosed && !$revisionExpired && !$revisionNotStarted && ($draft->source_registration_id === null || $targeted)
                 && $admission['academic']['academic_passed']
                 && in_array($mode, ['automatic', 'waiver'], true),
             'waiver_ready' => $this->waiverReady($draft, $targeted, $admission),

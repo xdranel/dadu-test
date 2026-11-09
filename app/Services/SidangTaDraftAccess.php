@@ -3,12 +3,16 @@
 namespace App\Services;
 
 use App\Models\SidangTaRegistration;
+use App\Models\SidangTaPeriod;
+use Illuminate\Validation\ValidationException;
 use App\Models\SidangTaRegistrationDraft;
 use App\Models\Student;
 use App\Models\User;
 
 class SidangTaDraftAccess
 {
+    public const REGISTRATION_CLOSED_MESSAGE = 'Pendaftaran pada periode ini tidak terbuka. Draft tidak dapat disimpan atau dikirim.';
+
     public function __construct(private SidangTaStudentContext $context) {}
 
     public function owner(User $user, SidangTaRegistrationDraft $draft): Student
@@ -26,7 +30,7 @@ class SidangTaDraftAccess
         abort_unless($user->can($permission), 403);
     }
 
-    public function check(User $user, SidangTaRegistrationDraft $draft, bool $write = false): void
+    public function check(User $user, SidangTaRegistrationDraft $draft, bool $write = false, ?int $newPeriodId = null): void
     {
         $this->owner($user, $draft);
         \App\Support\SidangTaDocumentRequirements::assertKnownVersion($draft);
@@ -35,6 +39,15 @@ class SidangTaDraftAccess
             $this->assertCanWrite($user, $draft);
         }
         if ($draft->source_registration_id === null) {
+            if ($write) {
+                // Period changes lock both rows in ID order, avoiding opposite-order locks.
+                $ids = array_unique([(int) $draft->sidang_ta_period_id, $newPeriodId ?? (int) $draft->sidang_ta_period_id]);
+                $periods = SidangTaPeriod::whereIn('id', $ids)->orderBy('id')->lockForUpdate()->get()->keyBy('id');
+                $period = $periods->get((int) $draft->sidang_ta_period_id);
+                if (!$period || !$period->isOpen()) {
+                    throw ValidationException::withMessages(['draft' => self::REGISTRATION_CLOSED_MESSAGE]);
+                }
+            }
             return;
         }
 

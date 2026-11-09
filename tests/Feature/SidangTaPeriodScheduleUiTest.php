@@ -10,7 +10,7 @@ beforeEach(function () {
     foreach (['sidang_ta_registration_read','sidang_ta_registration_create','sidang_ta_registration_update','sidang_ta_registration_review','sidang_ta_period_read','sidang_ta_period_create','sidang_ta_period_update'] as $name) {
         $this->user->givePermissionTo(Permission::firstOrCreate(['name'=>$name,'guard_name'=>'web']));
     }
-    $this->period = SidangTaPeriod::create(['name'=>'Jadwal Legacy','is_active'=>true,'open_at'=>now()->subDay(),'close_at'=>now()->addDay()]);
+    $this->period = SidangTaPeriod::create(['name'=>'Jadwal Legacy','show_to_students'=>true,'is_active'=>true,'open_at'=>now()->subDay(),'close_at'=>now()->addDay()]);
     $this->actingAs($this->user);
 });
 
@@ -36,14 +36,12 @@ test('period forms require verification dates below registration dates', functio
     }
 });
 
-test('wizard carries both schedules when selected period changes', function () {
-    $response=$this->get(route('sidang-ta-registrations.create'))->assertOk();
-    $response->assertSee('Tanggal Verifikasi Berkas');
-    $c=new Crawler($response->getContent());
-    expect($c->filter('select[name="sidang_ta_period_id"] option[data-period-id="'.$this->period->id.'"]')->count())->toBe(1);
-    expect($c->filter('[data-period-schedule="'.$this->period->id.'"]')->attr('x-show'))->toContain('selectedPeriodId');
+test('wizard omits schedule cards while retaining the period selection', function () {
+    $page=$this->get(route('sidang-ta-registrations.create'))->assertOk();
+    $c=new Crawler($page->getContent());
+    expect($c->filter('select[name="sidang_ta_period_id"] option[value="'.$this->period->id.'"]')->count())->toBe(1);
+    expect($c->filter('[data-period-schedule], [data-period-countdown], #period-window, option[data-window]')->count())->toBe(0);
 });
-
 
 function scheduleUiRegistration85($test, string $status = 'needs_review'): SidangTaRegistration {
     return SidangTaRegistration::create(['student_number'=>$test->student->student_number,'student_name'=>$test->student->name,
@@ -52,7 +50,7 @@ function scheduleUiRegistration85($test, string $status = 'needs_review'): Sidan
         'academic_snapshot'=>['admission'=>['eprt'=>['mode'=>'automatic']]]])->fresh();
 }
 
-test('actual inactive registration period retains revision countdown on index and recap', function () {
+test('actual inactive registration period retains revision countdown only on index', function () {
     $this->period->update(['is_active'=>false,'open_at'=>now()->subDays(4),'close_at'=>now()->subDay(),
         'revision_open_at'=>now()->subHours(2),'revision_close_at'=>now()->addDay()]);
     $registration=scheduleUiRegistration85($this);
@@ -64,7 +62,7 @@ test('actual inactive registration period retains revision countdown on index an
     expect($c->filter('[data-schedule="registration"] [data-period-status]')->text())->toBe('Tidak aktif');
     expect($c->filter('[data-schedule="registration"] [data-period-countdown]')->count())->toBe(0);
     $recap=$this->get(route('sidang-ta-registrations.edit',$registration))->assertOk();
-    $recap->assertSee($this->period->revision_close_at->format('d/m/Y H:i'));
+    expect((new Crawler($recap->getContent()))->filter('[data-period-schedule], [data-period-countdown]')->count())->toBe(0);
     $c=new Crawler($recap->getContent());
     expect($c->filter('form[action="'.route('sidang-ta-drafts.revision',$registration).'"] button[type="submit"]')->getNode(0)->hasAttribute('disabled'))->toBeFalse();
 });
@@ -91,3 +89,79 @@ test('submitted application retains the active application button', function () 
     expect($c->filter('[data-registration-active]')->attr('href'))->toBe(route('sidang-ta-registrations.show',$registration));
     expect($c->filter('[data-registration-revise]')->count())->toBe(0);
 });
+
+
+test('controls87 period forms expose three independent checkboxes', function () {
+    $c=new Crawler($this->get(route('admin.sidang-ta-periods.index'))->assertOk()->getContent());
+    foreach (['data-ta-period-create','data-ta-period-update'] as $form) {
+        foreach (['is_active','is_revision_active','show_to_students'] as $field) {
+            expect($c->filter('['.$form.'] input[type="checkbox"][name="'.$field.'"]')->count())->toBe(1);
+        }
+    }
+});
+
+test('controls87 visibility alone controls cards without changing registration options', function ($active, $revision, $visible) {
+    $this->period->update(['is_active'=>$active,'is_revision_active'=>$revision,'show_to_students'=>$visible,
+        'revision_open_at'=>now()->subHour(),'revision_close_at'=>now()->addDay()]);
+    $c=new Crawler($this->get(route('sidang-ta-registrations.index'))->assertOk()->getContent());
+    expect($c->filter('[data-period-schedule="'.$this->period->id.'"]')->count())->toBe($visible ? 1 : 0);
+    expect($c->filter('[data-registration-start]')->count())->toBe($active ? 1 : 0);
+    $form=new Crawler($this->get(route('sidang-ta-registrations.create'))->assertOk()->getContent());
+    expect($form->filter('select[name="sidang_ta_period_id"] option[value="'.$this->period->id.'"]')->count())->toBe($active ? 1 : 0);
+})->with([
+    [false,false,false],[false,false,true],[false,true,false],[false,true,true],
+    [true,false,false],[true,false,true],[true,true,false],[true,true,true],
+]);
+
+test('controls87 hidden cards do not hide the students existing submission', function () {
+    $this->period->update(['show_to_students'=>false]);
+    $registration=scheduleUiRegistration85($this,'submitted');
+    $page=$this->get(route('sidang-ta-registrations.index'))->assertOk();
+    $c=new Crawler($page->getContent());
+    expect($c->filter('[data-period-schedule]')->count())->toBe(0);
+    expect($c->filter('[data-registration-active]')->attr('href'))->toBe(route('sidang-ta-registrations.show',$registration));
+});
+
+test('controls87 cards disappear only after both configured schedules end', function () {
+    $this->travelTo(now()->startOfSecond());
+    $this->period->update(['open_at'=>now()->subDays(3),'close_at'=>now()->subDay(),
+        'revision_open_at'=>now()->subDay(),'revision_close_at'=>now()]);
+    scheduleUiRegistration85($this,'approved');
+    $count=fn()=> (new Crawler($this->get(route('sidang-ta-registrations.index'))->assertOk()->getContent()))->filter('[data-period-schedule]')->count();
+    expect($count())->toBe(1);
+    $this->travel(1)->seconds();
+    expect($count())->toBe(0);
+    // An incomplete legacy revision schedule cannot keep an expired registration card forever.
+    $this->period->update(['revision_open_at'=>null,'revision_close_at'=>null]);
+    expect($count())->toBe(0);
+    // A future registration still keeps its announcement, independent of activity flags.
+    $this->period->update(['is_active'=>false,'open_at'=>now()->addDay(),'close_at'=>now()->addDays(2)]);
+    expect($count())->toBe(1);
+    $this->travelBack();
+});
+
+test('controls87 create and update persist checkbox values including unchecked false', function () {
+    $payload=['name'=>'Controls87','open_at'=>now()->subDay()->toDateTimeString(),'close_at'=>now()->addDay()->toDateTimeString(),
+        'revision_open_at'=>now()->subDay()->toDateTimeString(),'revision_close_at'=>now()->addDays(2)->toDateTimeString(),
+        'is_active'=>'1','show_to_students'=>'1'];
+    $this->post(route('admin.sidang-ta-periods.store'),$payload)->assertRedirect()->assertSessionHasNoErrors();
+    $p=SidangTaPeriod::where('name','Controls87')->firstOrFail();
+    expect([$p->is_active,$p->is_revision_active,$p->show_to_students])->toBe([true,false,true]);
+    unset($payload['is_active'],$payload['show_to_students']); $payload['is_revision_active']='1';
+    $this->put(route('admin.sidang-ta-periods.update',$p),$payload)->assertRedirect()->assertSessionHasNoErrors();
+    $p->refresh();
+    expect([$p->is_active,$p->is_revision_active,$p->show_to_students])->toBe([false,true,false]);
+});
+
+
+test('controls87 disabled revision cards describe revision without claiming access is open', function ($configured) {
+    $this->period->update(['is_revision_active'=>false,
+        'revision_open_at'=>$configured ? now()->subHour() : null,
+        'revision_close_at'=>$configured ? now()->addDay() : null]);
+    $c=new Crawler($this->get(route('sidang-ta-registrations.index'))->assertOk()->getContent());
+    $revision=$c->filter('[data-schedule="revision"]');
+    expect($revision->text())->toContain('Revisi dinonaktifkan.')->not->toContain('Pendaftaran baru dinonaktifkan.')->not->toContain('Revisi tetap dapat dikerjakan');
+    expect($revision->filter('[data-period-countdown]')->count())->toBe(0);
+    expect($c->filter('[data-student-period-schedules] [x-show]')->attr('x-show'))->toBe("status !== 'Ditutup'");
+    expect($c->filter('[data-registration-start]')->count())->toBe(1);
+})->with([true,false]);
