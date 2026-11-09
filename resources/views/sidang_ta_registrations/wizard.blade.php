@@ -131,9 +131,9 @@
         @endif
 
         <div class="campus-card space-y-3 p-4">
-            @foreach($periods as $schedulePeriod)
-                @include('sidang_ta_registrations.partials.period-schedule', ['dynamicSchedule' => true])
-            @endforeach
+{{--            @foreach($periods as $schedulePeriod)--}}
+{{--                @include('sidang_ta_registrations.partials.period-schedule', ['dynamicSchedule' => true])--}}
+{{--            @endforeach--}}
             <p x-show="!selectedPeriodId" class="text-sm text-slate-500">Pilih periode untuk melihat jadwal pendaftaran dan verifikasi berkas.</p>
         </div>
         <div class="grid items-start gap-6 xl:grid-cols-12">
