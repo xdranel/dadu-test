@@ -121,11 +121,11 @@ test('owner_without_update_permission_sees_no_revise_button_and_edit_is_forbidde
     $index = new Crawler($this->get(route('sidang-ta-registrations.index'))->assertOk()->getContent());
     $active = $index->filter('[data-registration-active]');
     $detail = $index->filter('table tbody tr td:last-child a:not([data-registration-history])');
-    expect($active->count())->toBe(1);
+    expect($active->count())->toBe(0);
     expect($detail->count())->toBe(1);
     expect($detail->text(null, true))->toBe('Detail');
     expect($index->filter('[data-registration-revise]')->count())->toBe(0);
-    foreach ([$active, $detail] as $link) {
+    foreach ([$detail] as $link) {
         expect($link->attr('href'))->toBe(route('sidang-ta-registrations.show', $registration));
         $this->get($link->attr('href'))->assertOk()->assertSee('Detail Pendaftaran Sidang TA');
     }

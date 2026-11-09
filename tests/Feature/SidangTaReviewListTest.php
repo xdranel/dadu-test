@@ -118,7 +118,7 @@ test('p2a_banner_lists_all_active_periods_and_selected_inactive_period', functio
         'open_at' => now()->subDays(2), 'close_at' => now()->subDay()]);
     $crawler = new Crawler(($this->listing)()->getContent());
     expect($crawler->filter('[data-ta-period-banner]')->count())->toBe(3);
-    expect($crawler->filter('[data-ta-period-banner="'.$this->a->id.'"]')->text(null, true))->toContain('Sedang terbuka');
+    expect($crawler->filter('[data-ta-period-banner="'.$this->a->id.'"]')->text(null, true))->toContain('Aktif');
     expect($crawler->filter('[data-ta-period-banner="'.$this->b->id.'"]')->text(null, true))->toContain('Belum dibuka');
     expect($crawler->filter('[data-ta-period-banner="'.$closed->id.'"]')->text(null, true))->toContain('Ditutup');
     $crawler = new Crawler(($this->listing)(['period' => $inactive->id])->getContent());

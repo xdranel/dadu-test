@@ -10,13 +10,13 @@ use Illuminate\Support\Facades\DB;
 
 class SidangTaRevisionExpiry
 {
-    public const NOTE = 'Ditolak otomatis karena revisi tidak dikirim sampai batas akhir periode Sidang TA.';
+    public const NOTE = 'Ditolak otomatis karena revisi tidak dikirim sampai batas akhir verifikasi berkas pendaftaran sidang.';
 
     public function run(): int
     {
         $count = 0;
         SidangTaRegistration::query()->where('requirements_version', 2)->where('status', 'needs_review')
-            ->whereHas('period', fn ($query) => $query->where('close_at', '<', now()))
+            ->whereHas('period', fn ($query) => $query->revisionExpired())
             ->select(['id'])->chunkById(100, function ($registrations) use (&$count) {
                 foreach ($registrations as $registration) {
                     if ($this->expire((int) $registration->id)) $count++;
@@ -48,7 +48,7 @@ class SidangTaRevisionExpiry
             $registration->lock_version++;
             $registration->save();
             $registration->logAction('rejected', 'needs_review', 'rejected', self::NOTE, null);
-            // Tidak mengubah draft, dokumen, snapshot, atau file. Discard tetap milik mahasiswa.
+            // Draft cleanup uses the same verification deadline; final documents/snapshots remain.
             return true;
         }, 3);
     }

@@ -18,14 +18,22 @@ export const periodCountdown = (openAt, closeAt, at = Date.now()) => {
 };
 
 export const sidangTaPeriodCountdown = (openAt, closeAt) => ({
-    status: '', label: '', timer: null,
+    status: '', label: '', timer: null, days: 0, hours: 0, minutes: 0, seconds: 0,
     init() { this.tick(); this.timer = setInterval(() => this.tick(), 1000); },
     destroy() { clearInterval(this.timer); },
     tick() {
         const countdown = periodCountdown(openAt, closeAt);
-        if (!countdown) { this.status = ''; this.label = ''; return; }
+        if (!countdown) {
+            this.status = 'Belum diatur'; this.label = 'Belum diatur';
+            this.days = this.hours = this.minutes = this.seconds = 0;
+            return;
+        }
         this.status = countdown.status;
         const seconds = countdown.seconds;
+        this.days = Math.floor(seconds / 86400);
+        this.hours = Math.floor(seconds % 86400 / 3600);
+        this.minutes = Math.floor(seconds % 3600 / 60);
+        this.seconds = seconds % 60;
         this.label = countdown.status === 'Ditutup' ? 'Ditutup' : `${countdown.status} · ${Math.floor(seconds / 86400)} hari ${Math.floor(seconds % 86400 / 3600)} jam ${Math.floor(seconds % 3600 / 60)} menit ${seconds % 60} detik`;
     },
 });
@@ -35,6 +43,7 @@ export default (initial = {}) => ({
     dirty: initial.dirty ?? false,
     busy: false,
     periodHint: initial.periodHint ?? '',
+    selectedPeriodId: initial.selectedPeriodId ?? '',
     init() {
         this.$nextTick(() => {
             const viewport = this.$root.querySelector('[data-progress-scroll]');
@@ -64,6 +73,7 @@ export default (initial = {}) => ({
     },
     updatePeriodHint(select) {
         this.periodHint = select.selectedOptions[0]?.dataset.window ?? '';
+        this.selectedPeriodId = select.selectedOptions[0]?.dataset.periodId ?? '';
     },
     leave(event) {
         if (!this.dirty) return;

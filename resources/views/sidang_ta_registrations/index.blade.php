@@ -2,6 +2,7 @@
     <x-slot name="header">Pendaftaran Sidang TA</x-slot>
     @php
         $canUpdateRegistration = auth()->user()->can('sidang_ta_registration_update');
+        $schedulePeriods = $openPeriods->concat($drafts->pluck('period'))->concat($registrations->pluck('period'))->concat(collect([$activeRegistration?->period]))->filter()->unique('id');
     @endphp
 
     <div class="space-y-5">
@@ -23,8 +24,10 @@
             </div>
             <div class="flex flex-wrap items-center gap-2">
                 @if($activeRegistration)
-                    <a data-registration-active class="btn btn-secondary"
-                       href="{{ route($activeRegistration->status === 'needs_review' && $canUpdateRegistration ? 'sidang-ta-registrations.edit' : 'sidang-ta-registrations.show', $activeRegistration) }}">Lihat pengajuan aktif</a>
+                    @if($activeRegistration->status !== 'needs_review')
+                        <a data-registration-active class="btn btn-secondary"
+                           href="{{ route('sidang-ta-registrations.show', $activeRegistration) }}">Lihat pengajuan aktif</a>
+                    @endif
                     @if($activeRegistration->status === 'needs_review')
                         @can('sidang_ta_registration_update')
                             <a data-registration-revise class="btn btn-primary"
@@ -62,6 +65,11 @@
             <p class="text-xs leading-relaxed text-slate-500">Pendaftaran baru belum tersedia. Draft tersimpan tetap
                 dapat dilihat di bawah.</p>
         @endif
+        <div data-student-period-schedules class="grid gap-4 xl:grid-cols-2">
+            @foreach($schedulePeriods as $schedulePeriod)
+                <div class="campus-card p-4">@include('sidang_ta_registrations.partials.period-schedule')</div>
+            @endforeach
+        </div>
         <section data-testid="drafts-panel" class="campus-card w-full max-w-xl space-y-4 p-5">
             <div>
                 <h3 class="text-base font-bold text-slate-800">Draft tersimpan</h3>

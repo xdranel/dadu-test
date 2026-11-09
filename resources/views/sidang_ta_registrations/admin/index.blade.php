@@ -37,28 +37,8 @@
                     @endcan
                     <div class="grid gap-3 lg:grid-cols-2">
                         @forelse($periodCards as $period)
-                            @php
-                                $state = match (true) { !$period->is_active => 'Tidak aktif', $at->lt($period->open_at) => 'Belum dibuka', $at->gt($period->close_at) => 'Ditutup', default => 'Sedang terbuka' };
-                            @endphp
-                            <article data-ta-period-banner="{{ $period->id }}"
-                                     @if($period->is_active) x-data="sidangTaPeriodCountdown(@js($period->open_at->getTimestampMs()), @js($period->close_at->getTimestampMs()))" @endif
-                                     class="rounded-xl border border-slate-200 bg-white p-4">
-                                <div class="flex flex-wrap items-start justify-between gap-2">
-                                    <h4 class="break-words font-bold text-slate-800">
-                                        {{ $period->name }}
-                                    </h4>
-                                    <span data-period-status @if($period->is_active) x-text="status" @endif class="rounded-full bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700">
-                                        {{ $state }}
-                                    </span>
-                                </div>
-                                <p class="mt-2 text-xs leading-relaxed text-slate-500">
-                                    Dibuka {{ $period->open_at->timezone('Asia/Jakarta')->format('d/m/Y H:i').' WIB' }} ·
-                                    Tenggat {{ $period->close_at->timezone('Asia/Jakarta')->format('d/m/Y H:i').' WIB' }}
-                                </p>
-                                @if($period->is_active)
-                                    <p data-period-countdown class="mt-3 text-sm font-semibold text-rose-800"
-                                       x-text="label" aria-live="off">{{ $state }}</p>
-                                @endif
+                            <article data-ta-period-banner="{{ $period->id }}" class="rounded-xl border border-slate-200 bg-white p-4">
+                                @include('sidang_ta_registrations.partials.period-schedule', ['schedulePeriod' => $period])
                             </article>
                         @empty
                             <p data-ta-no-period

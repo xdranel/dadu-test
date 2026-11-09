@@ -18,6 +18,7 @@
             ];
     @endphp
     <div class="mx-auto max-w-6xl space-y-5">
+        <div class="campus-card p-4">@include('sidang_ta_registrations.partials.period-schedule', ['schedulePeriod' => $registration->period])</div>
         <header class="flex flex-wrap items-start justify-between gap-3">
             <div>
                 <p class="text-xs font-semibold text-[#DA2D3B]">

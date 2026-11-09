@@ -197,3 +197,28 @@ test('confirmation needs explicit consent and disables again on uncheck or sendi
     state.accepted=true;state.submit({preventDefault(){prevented++;}});assert.equal(state.sending,true);assert.equal(state.canConfirm,false);
     const blocked=sidangTaConfirmation(true);blocked.accepted=true;assert.equal(blocked.canConfirm,false);
 });
+
+
+test('countdown exposes four numeric units and clears them for unconfigured schedules', () => {
+    const originalNow = Date.now;
+    try {
+        Date.now = () => 0;
+        const state = sidangTaPeriodCountdown(1000, 90062000);
+        state.tick();
+        assert.deepEqual([state.days, state.hours, state.minutes, state.seconds], [0, 0, 0, 1]);
+        Date.now = () => 1000; state.tick();
+        assert.deepEqual([state.days, state.hours, state.minutes, state.seconds], [1, 1, 1, 1]);
+        const empty = sidangTaPeriodCountdown(null, null); empty.tick();
+        assert.equal(empty.status, 'Belum diatur');
+        assert.deepEqual([empty.days, empty.hours, empty.minutes, empty.seconds], [0, 0, 0, 0]);
+    } finally { Date.now = originalNow; }
+});
+
+test('changing selected period updates registration and verification schedules together', () => {
+    const state = sidangTaWizard();
+    state.updatePeriodHint({selectedOptions: [{dataset: {window: 'Registration B', periodId: '2'}}]});
+    assert.equal(state.periodHint, 'Registration B');
+    assert.equal(state.selectedPeriodId, '2');
+    state.updatePeriodHint({selectedOptions: []});
+    assert.equal(state.selectedPeriodId, '');
+});

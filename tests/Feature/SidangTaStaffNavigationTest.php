@@ -39,7 +39,9 @@ beforeEach(function () {
     ])->fresh();
     $this->periodData = ['name' => 'Periode Baru P1', 'is_active' => 1,
         'open_at' => now()->subHour()->format('Y-m-d H:i:s'),
-        'close_at' => now()->addDays(2)->format('Y-m-d H:i:s')];
+        'close_at' => now()->addDays(2)->format('Y-m-d H:i:s'),
+        'revision_open_at' => now()->subHour()->format('Y-m-d H:i:s'),
+        'revision_close_at' => now()->addDays(3)->format('Y-m-d H:i:s')];
     $this->sidebarFor = function (string $html, string $route) {
         return (new Crawler($html))->filter('aside nav a')->reduce(
             fn (Crawler $node) => $node->attr('href') === route($route)

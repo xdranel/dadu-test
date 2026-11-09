@@ -33,7 +33,8 @@ beforeEach(function () {
     app(PermissionRegistrar::class)->forgetCachedPermissions();
     $this->actingAs($this->user);
     $this->period = SidangTaPeriod::create(['name' => 'Meet Final', 'is_active' => true,
-        'open_at' => now()->subDay(), 'close_at' => now()->addDay()]);
+        'open_at' => now()->subDay(), 'close_at' => now()->addDay(),
+        'revision_open_at' => now()->subDay(), 'revision_close_at' => now()->addDay()]);
     AcademicPeriod::query()->update(['is_active' => false]);
     $academic = AcademicPeriod::create(['year' => '2026/2027', 'semester' => 1, 'label' => 'Meet Final KRS',
         'start_date' => '2026-08-01', 'end_date' => '2027-01-31', 'is_active' => true]);
@@ -125,7 +126,7 @@ afterEach(function () { $this->travelBack(); });
 test('revision_deadline_exact_closing_instant_allows_save_but_one_second_later_blocks_it', function () {
     $source = ($this->submittedSource)();
     $draft = ($this->prepareRevision)($source);
-    $this->period->update(['close_at' => now()]);
+    $this->period->update(['revision_close_at' => now()]);
     expect(SidangTaRevisionDeadline::hasExpired($source))->toBeFalse();
     ($this->replaceDocument)($draft)->assertOk();
     $this->travel(1)->seconds();
@@ -144,7 +145,7 @@ test('revision_deadline_rejects_starting_a_new_revision_after_close_without_crea
     $count = SidangTaRegistrationDraft::count();
     $before = $source->fresh()->getAttributes();
     $paths = Storage::disk('local')->allFiles();
-    $this->period->update(['close_at' => now()->subSecond()]);
+    $this->period->update(['revision_close_at' => now()->subSecond()]);
     $this->postJson(route('sidang-ta-drafts.revision', $source))->assertUnprocessable()->assertJsonValidationErrors('draft');
     expect(SidangTaRegistrationDraft::count())->toBe($count);
     expect($source->fresh()->getAttributes())->toBe($before);
@@ -157,7 +158,7 @@ test('revision_deadline_blocks_remaining_partial_replacement_before_expiry_job',
     ($this->replaceDocument)($draft)->assertOk();
     $saved = $draft->documents()->orderBy('id')->get()->toArray();
     $paths = Storage::disk('local')->allFiles();
-    $this->period->update(['close_at' => now()->subSecond()]);
+    $this->period->update(['revision_close_at' => now()->subSecond()]);
     ($this->replaceDocument)($draft, 'online_supervision_capture')->assertUnprocessable()->assertJsonValidationErrors('draft');
     expect($draft->fresh()->version)->toBe(2);
     expect($draft->documents()->orderBy('id')->get()->toArray())->toBe($saved);
@@ -170,7 +171,7 @@ test('revision_deadline_blocks_unchanged_step_one_save_before_expiry_job', funct
     $draft = ($this->prepareRevision)($source);
     $before = $draft->fresh()->getAttributes();
     $paths = Storage::disk('local')->allFiles();
-    $this->period->update(['close_at' => now()->subSecond()]);
+    $this->period->update(['revision_close_at' => now()->subSecond()]);
     $this->postJson(route('sidang-ta-drafts.steps.store', ['draft' => $draft, 'step' => 1]), [
         'version' => $draft->version, 'sidang_ta_period_id' => $this->period->id,
         'student_phone' => $draft->payload['student_phone'], 'parent_phone' => $draft->payload['parent_phone'],
@@ -184,7 +185,7 @@ test('revision_deadline_blocks_mark_review_without_changing_review_marker', func
     $draft = ($this->prepareRevision)($source);
     ($this->replaceDocument)($draft)->assertOk();
     $before = $draft->fresh()->getAttributes();
-    $this->period->update(['close_at' => now()->subSecond()]);
+    $this->period->update(['revision_close_at' => now()->subSecond()]);
     $this->postJson(route('sidang-ta-drafts.review', $draft), ['version' => $draft->fresh()->version])
         ->assertUnprocessable()->assertJsonValidationErrors('draft');
     expect($draft->fresh()->getAttributes())->toBe($before);
@@ -202,7 +203,7 @@ test('revision_deadline_rechecks_finalization_after_a_successful_preview', funct
     $documents = $source->documents()->orderBy('id')->get()->toArray();
     $logs = $source->logs()->count();
     $paths = Storage::disk('local')->allFiles();
-    $this->period->update(['close_at' => now()->subSecond()]);
+    $this->period->update(['revision_close_at' => now()->subSecond()]);
     ($this->submitRevision)($source, $draft)->assertUnprocessable()->assertJsonValidationErrors('draft');
     expect($source->fresh()->getAttributes())->toBe($registration);
     expect($draft->fresh()->getAttributes())->toBe($draftBefore);
@@ -225,7 +226,7 @@ test('revision_expiry_rejects_once_and_preserves_snapshot_documents_draft_and_al
     expect($draft->documents()->whereNotNull('source_document_id')->count())->toBeGreaterThan(0);
     $logs = $source->logs()->count();
     $paths = Storage::disk('local')->allFiles();
-    $this->period->update(['close_at' => now()->subSecond()]);
+    $this->period->update(['revision_close_at' => now()->subSecond()]);
     expect(app(SidangTaRevisionExpiry::class)->run())->toBe(1);
     $rejected = $source->fresh();
     expect($rejected->status)->toBe('rejected');
@@ -233,7 +234,7 @@ test('revision_expiry_rejects_once_and_preserves_snapshot_documents_draft_and_al
     expect($rejected->reviewed_by)->toBeNull();
     expect($rejected->reviewed_at->equalTo(now()))->toBeTrue();
     expect($rejected->review_notes)->toBe(SidangTaRevisionExpiry::NOTE);
-    expect(SidangTaRevisionExpiry::NOTE)->toBe('Ditolak otomatis karena revisi tidak dikirim sampai batas akhir periode Sidang TA.');
+    expect(SidangTaRevisionExpiry::NOTE)->toBe('Ditolak otomatis karena revisi tidak dikirim sampai batas akhir verifikasi berkas pendaftaran sidang.');
     expect($rejected->academic_snapshot)->toBe($snapshot);
     expect($draft->fresh()->getAttributes())->toBe($draftBefore);
     expect($source->documents()->orderBy('id')->get()->toArray())->toBe($sourceDocuments);
@@ -257,7 +258,7 @@ test('revision_expiry_rejects_once_and_preserves_snapshot_documents_draft_and_al
 test('revision_expiry_skips_unsupported_marker_and_other_statuses', function (int $requirementsVersion, string $status) {
     $source = ($this->submittedSource)();
     $source->update(['requirements_version' => $requirementsVersion, 'status' => $status]);
-    $this->period->update(['close_at' => now()->subSecond()]);
+    $this->period->update(['revision_close_at' => now()->subSecond()]);
     $before = $source->fresh()->getAttributes();
     $logs = $source->logs()->count();
     expect(app(SidangTaRevisionExpiry::class)->run())->toBe(0);
@@ -280,7 +281,7 @@ test('revision_expiry_skips_unsupported_marker_and_other_statuses', function (in
 test('revision_expiry_artisan_reports_actual_count_then_zero_on_repeat', function () {
     $source = ($this->submittedSource)();
     ($this->prepareRevision)($source);
-    $this->period->update(['close_at' => now()->subSecond()]);
+    $this->period->update(['revision_close_at' => now()->subSecond()]);
     $this->artisan('sidang-ta:expire-revisions')->expectsOutput('Pengajuan revisi ditolak otomatis: 1.')->assertExitCode(0);
     $this->artisan('sidang-ta:expire-revisions')->expectsOutput('Pengajuan revisi ditolak otomatis: 0.')->assertExitCode(0);
     expect($source->fresh()->status)->toBe('rejected');
@@ -293,7 +294,7 @@ test('revision_deadline_ignores_inactive_flag_before_close_and_expiry_still_incl
     expect(SidangTaRevisionDeadline::hasExpired($source))->toBeFalse();
     ($this->replaceDocument)($draft)->assertOk();
     expect(app(SidangTaRevisionExpiry::class)->run())->toBe(0);
-    $this->period->update(['close_at' => now()->subSecond()]);
+    $this->period->update(['revision_close_at' => now()->subSecond()]);
     expect(app(SidangTaRevisionExpiry::class)->run())->toBe(1);
     expect($source->fresh()->status)->toBe('rejected');
 });
@@ -301,10 +302,10 @@ test('revision_deadline_ignores_inactive_flag_before_close_and_expiry_still_incl
 test('revision_deadline_reads_fresh_period_after_an_extension_before_expiry_runs', function () {
     $source = ($this->submittedSource)();
     $draft = ($this->prepareRevision)($source);
-    $this->period->update(['close_at' => now()->subSecond()]);
+    $this->period->update(['revision_close_at' => now()->subSecond()]);
     $source->load('period'); // Deliberately cache the old, already closed period.
     expect(SidangTaRevisionDeadline::hasExpired($source))->toBeTrue();
-    SidangTaPeriod::whereKey($this->period->id)->update(['close_at' => now()->addHour()]);
+    SidangTaPeriod::whereKey($this->period->id)->update(['revision_close_at' => now()->addHour()]);
     expect(SidangTaRevisionDeadline::hasExpired($source))->toBeFalse();
     expect(app(SidangTaRevisionExpiry::class)->expire($source->id))->toBeFalse();
     expect(app(SidangTaRevisionExpiry::class)->run())->toBe(0);
@@ -315,7 +316,7 @@ test('revision_deadline_reads_fresh_period_after_an_extension_before_expiry_runs
 test('revision_expiry_rechecks_status_when_a_previously_selected_source_has_changed', function () {
     $source = ($this->submittedSource)();
     ($this->prepareRevision)($source);
-    $this->period->update(['close_at' => now()->subSecond()]);
+    $this->period->update(['revision_close_at' => now()->subSecond()]);
     $candidateId = $source->id;
     $source->refresh()->update(['status' => 'submitted']);
     $before = $source->fresh()->getAttributes();
@@ -336,7 +337,7 @@ test('revision_submitted_before_deadline_wins_and_consumed_replay_after_close_re
     $version = $source->fresh()->lock_version;
     $logs = $source->logs()->count();
     $paths = Storage::disk('local')->allFiles();
-    $this->period->update(['close_at' => now()->subSecond()]);
+    $this->period->update(['revision_close_at' => now()->subSecond()]);
     expect(app(SidangTaRevisionExpiry::class)->expire($source->id))->toBeFalse();
     ($this->submitRevision)($source, $draft)->assertOk()->assertJsonPath('data.status', 'approved');
     expect($source->fresh()->getAttributes())->toBe($sourceBefore);
@@ -353,7 +354,7 @@ test('revision_expiry_wins_then_stale_draft_discard_removes_only_owned_replaceme
     ($this->replaceDocument)($draft)->assertOk();
     $owned = $draft->documents()->whereNull('source_document_id')->firstOrFail()->file_path;
     $draft = ($this->markReviewed)($draft);
-    $this->period->update(['close_at' => now()->subSecond()]);
+    $this->period->update(['revision_close_at' => now()->subSecond()]);
     expect(app(SidangTaRevisionExpiry::class)->expire($source->id))->toBeTrue();
     ($this->submitRevision)($source, $draft)->assertConflict();
     Storage::disk('local')->assertExists($owned);
@@ -377,7 +378,7 @@ test('revision_deadline_staff_cannot_request_revision_after_close', function () 
     $draft = ($this->prepareRevision)($source);
     $this->deleteJson(route('sidang-ta-drafts.destroy', $draft), ['version' => $draft->version])->assertNoContent();
     $source->refresh()->update(['status' => 'submitted']);
-    $this->period->update(['close_at' => now()->subSecond()]);
+    $this->period->update(['revision_close_at' => now()->subSecond()]);
     $this->actingAs($this->reviewer);
     $before = $source->fresh()->getAttributes();
     $logs = $source->logs()->count();
@@ -396,7 +397,7 @@ test('revision_deadline_expired_wizard_keeps_preview_and_disables_save_and_revie
     $source = ($this->submittedSource)();
     $draft = ($this->prepareRevision)($source);
     ($this->replaceDocument)($draft)->assertOk();
-    $this->period->update(['close_at' => now()->subSecond()]);
+    $this->period->update(['revision_close_at' => now()->subSecond()]);
     $response = $this->get(route('sidang-ta-drafts.edit', ['draft' => $draft, 'step' => 4]))->assertOk();
     $response->assertViewHas('meetContext', fn ($context) => $context['revision_expired'] === true && $context['can_submit'] === false);
     $crawler = new Crawler($response->getContent());
@@ -413,7 +414,7 @@ test('revision_deadline_expired_review_keeps_documents_readable_and_send_buttons
     $draft = ($this->prepareRevision)($source);
     ($this->replaceDocument)($draft)->assertOk();
     $draft = ($this->markReviewed)($draft);
-    $this->period->update(['close_at' => now()->subSecond()]);
+    $this->period->update(['revision_close_at' => now()->subSecond()]);
     $response = $this->get(route('sidang-ta-drafts.preview', $draft))->assertOk();
     $response->assertViewHas('meetContext', fn ($context) => $context['revision_expired'] === true && $context['can_submit'] === false);
     $crawler = new Crawler($response->getContent());
@@ -434,7 +435,7 @@ test('revision_expiry_also_rejects_overdue_source_when_student_never_keeps_a_rev
     expect(SidangTaRegistrationDraft::where('source_registration_id', $source->id)->where('status', 'active')->exists())->toBeFalse();
     $documents = $source->documents()->orderBy('id')->get()->toArray();
     $paths = Storage::disk('local')->allFiles();
-    $this->period->update(['close_at' => now()->subSecond()]);
+    $this->period->update(['revision_close_at' => now()->subSecond()]);
     expect(app(SidangTaRevisionExpiry::class)->run())->toBe(1);
     expect($source->fresh()->status)->toBe('rejected');
     expect($source->documents()->orderBy('id')->get()->toArray())->toBe($documents);
@@ -444,7 +445,7 @@ test('revision_expiry_also_rejects_overdue_source_when_student_never_keeps_a_rev
 test('revision_expiry_does_not_reject_at_exact_deadline_but_rejects_one_second_after', function () {
     $source = ($this->submittedSource)();
     ($this->prepareRevision)($source);
-    $this->period->update(['close_at' => now()]);
+    $this->period->update(['revision_close_at' => now()]);
     $before = $source->fresh()->getAttributes();
     expect(app(SidangTaRevisionExpiry::class)->expire($source->id))->toBeFalse();
     expect(app(SidangTaRevisionExpiry::class)->run())->toBe(0);
@@ -457,7 +458,7 @@ test('revision_expiry_does_not_reject_at_exact_deadline_but_rejects_one_second_a
 test('revision_deadline_expired_step_two_keeps_requested_document_preview_without_upload_input', function () {
     $source = ($this->submittedSource)();
     $draft = ($this->prepareRevision)($source);
-    $this->period->update(['close_at' => now()->subSecond()]);
+    $this->period->update(['revision_close_at' => now()->subSecond()]);
     $response = $this->get(route('sidang-ta-drafts.edit', ['draft' => $draft, 'step' => 2]))->assertOk();
     $crawler = new Crawler($response->getContent());
     expect($crawler->filter('[data-revision-deadline-expired][role="alert"]')->count())->toBe(1);
@@ -469,5 +470,31 @@ test('revision_deadline_expired_step_two_keeps_requested_document_preview_withou
     $this->get(route('sidang-ta-draft-documents.preview', $document))->assertOk();
     expect($crawler->filter('[data-save-draft]')->getNode(0)->hasAttribute('disabled'))->toBeTrue();
     expect($draft->fresh()->version)->toBe(1);
+    expect($source->fresh()->status)->toBe('needs_review');
+});
+
+
+test('revision_window85_full_revision_submit_works_after_registration_close', function () {
+    $source = ($this->submittedSource)();
+    $draft = ($this->prepareRevision)($source);
+    $this->period->update(['close_at' => now()->subSecond(), 'revision_close_at' => now()->addDay()]);
+    ($this->replaceDocument)($draft)->assertOk();
+    $draft = ($this->markReviewed)($draft);
+    ($this->submitRevision)($source, $draft)->assertOk();
+    expect($source->fresh()->status)->toBe('submitted');
+    expect($draft->fresh()->status)->toBe('consumed');
+});
+
+test('revision_window85_before_start_blocks_HTTP_save_review_and_submit_without_mutations', function () {
+    $source = ($this->submittedSource)();
+    $draft = ($this->prepareRevision)($source);
+    $this->period->update(['revision_open_at' => now()->addHour(), 'revision_close_at' => now()->addDay()]);
+    $before = $draft->fresh()->getAttributes();
+    $files = Storage::disk('local')->allFiles();
+    ($this->replaceDocument)($draft)->assertUnprocessable()->assertJsonValidationErrors('draft');
+    $this->postJson(route('sidang-ta-drafts.review', $draft), ['version' => $draft->version])->assertUnprocessable()->assertJsonValidationErrors('draft');
+    ($this->submitRevision)($source, $draft)->assertUnprocessable();
+    expect($draft->fresh()->getAttributes())->toBe($before);
+    expect(Storage::disk('local')->allFiles())->toBe($files);
     expect($source->fresh()->status)->toBe('needs_review');
 });

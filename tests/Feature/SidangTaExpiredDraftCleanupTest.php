@@ -12,7 +12,8 @@ beforeEach(function () {
     Student::create(['student_number' => '1202299078', 'name' => 'Cleanup', 'email' => $this->owner->email,
         'academic_year' => 2022, 'study_program' => 'Informatika', 'status' => 'Aktif']);
     $this->period = SidangTaPeriod::create(['name' => 'Cleanup', 'is_active' => false,
-        'open_at' => now()->subDay(), 'close_at' => now()->subSecond()]);
+        'open_at' => now()->subDay(), 'close_at' => now()->subSecond(),
+        'revision_open_at' => now()->subDay(), 'revision_close_at' => now()->subSecond()]);
     $this->draft = function (array $extra = [], string $path = 'owned.pdf') {
         $draft = SidangTaRegistrationDraft::create(array_replace(['owner_user_id' => $this->owner->id,
             'student_number' => '1202299078', 'sidang_ta_period_id' => $this->period->id, 'payload' => []], $extra));

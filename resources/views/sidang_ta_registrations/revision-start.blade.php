@@ -4,8 +4,10 @@
     </x-slot>
     @php
         $revisionExpired = \App\Support\SidangTaRevisionDeadline::hasExpired($registration);
+        $revisionNotStarted = \App\Support\SidangTaRevisionDeadline::hasNotStarted($registration);
     @endphp
     <section class="campus-card space-y-4 p-5">
+        @include('sidang_ta_registrations.partials.period-schedule', ['schedulePeriod' => $registration->period])
         <h2 class="font-bold">
             Perbaikan Pengajuan Anda
         </h2>
@@ -17,15 +19,20 @@
         </p>
         <h3 class="text-base font-bold text-slate-800">Detail Revisi</h3>
         @include('sidang_ta_registrations.partials.revision-feedback')
+        @if($revisionNotStarted)
+            <p data-revision-not-started role="alert" class="rounded-lg bg-amber-50 p-3 text-sm text-amber-900">
+                Verifikasi berkas belum dibuka. Anda dapat melihat detail revisi; mulai atau lanjutkan draft saat jadwal verifikasi dibuka.
+            </p>
+        @endif
         @if($revisionExpired)
             <p data-revision-deadline-expired role="alert" class="rounded-lg bg-amber-50 p-3 text-sm text-amber-900">
                 Batas waktu revisi telah berakhir. Memulai dan melanjutkan pengerjaan revisi sudah ditutup.
-                Draft yang sudah tersimpan tetap tersedia di daftar pendaftaran untuk dilihat atau dihapus.
+                Draft revisi akan dihapus otomatis. Pengajuan yang sudah dikirim tetap tersimpan.
             </p>
         @endif
         <form method="POST" action="{{ route('sidang-ta-drafts.revision', $registration) }}">
             @csrf
-            <button type="submit" @disabled($revisionExpired)
+            <button type="submit" @disabled($revisionExpired || $revisionNotStarted)
             class="btn btn-primary disabled:cursor-not-allowed disabled:opacity-50">
                 Mulai atau lanjutkan draft revisi
             </button>

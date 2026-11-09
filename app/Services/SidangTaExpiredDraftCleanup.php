@@ -19,7 +19,15 @@ class SidangTaExpiredDraftCleanup
     {
         $summary = ['eligible_drafts' => 0, 'deleted_drafts' => 0];
         SidangTaRegistrationDraft::where('status', SidangTaRegistrationDraft::STATUS_ACTIVE)
-            ->whereHas('period', fn ($query) => $query->where('close_at', '<', now()))
+            ->where(function ($query) {
+                $query->where(function ($initial) {
+                    $initial->whereNull('source_registration_id')
+                        ->whereHas('period', fn ($period) => $period->where('close_at', '<', now()));
+                })->orWhere(function ($revision) {
+                    $revision->whereNotNull('source_registration_id')
+                        ->whereHas('period', fn ($period) => $period->revisionExpired());
+                });
+            })
             ->select(['id', 'student_number'])->chunkById(100, function ($drafts) use ($dryRun, &$summary) {
                 foreach ($drafts as $candidate) {
                     $eligible = DB::transaction(function () use ($candidate, $dryRun) {
@@ -32,7 +40,10 @@ class SidangTaExpiredDraftCleanup
                             SidangTaRegistration::whereKey($draft->source_registration_id)->lockForUpdate()->first();
                         }
                         $period = SidangTaPeriod::whereKey($draft->sidang_ta_period_id)->lockForUpdate()->first();
-                        if (!$period || !$period->close_at->lt(now())) return false;
+                        if (!$period) return false;
+                        $expired = $draft->source_registration_id === null
+                            ? $period->close_at->lt(now()) : $period->revisionHasExpired();
+                        if (!$expired) return false;
                         if ($dryRun) return true;
 
                         $paths = $draft->documents()->whereNull('source_document_id')->pluck('file_path')->all();

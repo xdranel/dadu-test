@@ -6,6 +6,8 @@
         $payload = $draft?->payload ?? [];
         $targetedRevision = (bool) ($meetContext['targeted'] ?? false);
         $revisionExpired = (bool) ($meetContext['revision_expired'] ?? false);
+        $revisionNotStarted = (bool) ($meetContext['revision_not_started'] ?? false);
+        $revisionBlocked = $revisionExpired || $revisionNotStarted;
         $rawAccurate = $targetedRevision ? ($payload['diploma_biodata_accurate'] ?? null)
             : old('diploma_biodata_accurate', $payload['diploma_biodata_accurate'] ?? null);
         $accurate = match ($rawAccurate) {
@@ -23,8 +25,8 @@
         $windowFor = static fn ($period) => $period->open_at->format('d/m/Y H:i').' – '
             .$period->close_at->format('d/m/Y H:i').($period->isOpen() ? '' : ' (ditutup)');
         $initial = ['accurate' => $accurate, 'dirty' => $errors->any(), 'hasErrors' => $errors->any(),
-            'periodHint' => $selected ? $windowFor($selected) : ''];
-        $reviewReady = $draft && $completedThrough === 4 && !$revisionExpired;
+            'selectedPeriodId' => $selectedPeriod, 'periodHint' => $selected ? $windowFor($selected) : ''];
+        $reviewReady = $draft && $completedThrough === 4 && !$revisionBlocked;
         $permission = $draft?->source_registration_id ? 'sidang_ta_registration_update' : 'sidang_ta_registration_create';
         $titles = [1 => 'Data Mahasiswa', 2 => 'Data TA di Igracias',
             3 => 'Pembayaran & Nilai Bahasa', 4 => 'Pernyataan Biodata Dummy Ijazah'];
@@ -116,14 +118,24 @@
             </div>
         </section>
 
+        @if($revisionNotStarted)
+            <div data-revision-not-started role="alert" class="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+                Verifikasi berkas belum dibuka. Draft dan berkas dapat dilihat; penyimpanan, unggah pengganti, tinjauan baru, dan pengiriman revisi tersedia mulai jadwal verifikasi.
+            </div>
+        @endif
         @if($revisionExpired)
             <div data-revision-deadline-expired role="alert" class="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
-                Batas waktu revisi telah berakhir. Draft dan berkas tetap tersimpan untuk dilihat, tetapi penyimpanan,
-                unggah pengganti, tinjauan baru, dan pengiriman revisi sudah ditutup.
-                Anda tetap dapat kembali ke daftar pendaftaran untuk menghapus draft.
+                Batas waktu revisi telah berakhir. Penyimpanan, unggah pengganti, tinjauan baru, dan pengiriman revisi sudah ditutup.
+                Draft revisi akan dihapus otomatis. Pengajuan yang sudah dikirim tetap tersimpan.
             </div>
         @endif
 
+        <div class="campus-card space-y-3 p-4">
+            @foreach($periods as $schedulePeriod)
+                @include('sidang_ta_registrations.partials.period-schedule', ['dynamicSchedule' => true])
+            @endforeach
+            <p x-show="!selectedPeriodId" class="text-sm text-slate-500">Pilih periode untuk melihat jadwal pendaftaran dan verifikasi berkas.</p>
+        </div>
         <div class="grid items-start gap-6 xl:grid-cols-12">
             <div class="min-w-0 space-y-5 xl:col-span-8">
                 @if($draft?->sourceRegistration?->review_notes)
@@ -144,11 +156,12 @@
                       class="campus-card space-y-5 p-5 sm:p-6"
                       action="{{ $draft ? route('sidang-ta-drafts.steps.store', ['draft' => $draft, 'step' => $step]) : route('sidang-ta-drafts.store') }}"
                       @input="dirty = true" @change="dirty = true"
-                      @submit="if (!validateContacts($el) || busy || {{ $revisionExpired ? 'true' : 'false' }}) { $event.preventDefault(); } else { busy = true; }">
+                      @submit="if (!validateContacts($el) || busy || {{ $revisionBlocked ? 'true' : 'false' }}) { $event.preventDefault(); } else { busy = true; }">
                     @csrf
                     @if($draft)
                         <input type="hidden" name="version" value="{{ old('version', $draft->version) }}">
                     @endif
+                    <fieldset data-revision-write-fields @disabled($revisionBlocked) class="min-w-0 space-y-5">
                     <header class="space-y-1.5 border-b border-slate-100 pb-4">
                         <h2 class="text-lg font-bold text-slate-900">Tahap {{ $step }} - {{ $titles[$step] }}</h2>
                         <p class="text-xs text-slate-500">
@@ -200,7 +213,7 @@
                                     <option value="">Pilih periode terbuka</option>
                                     @foreach($periods as $period)
                                         <option value="{{ $period->id }}"
-                                                data-window="{{ $windowFor($period) }}" @selected($selectedPeriod === (string) $period->id)>
+                                                data-period-id="{{ $period->id }}" data-window="{{ $windowFor($period) }}" @selected($selectedPeriod === (string) $period->id)>
                                             {{ $period->name }}{{ $period->isOpen() ? '' : ' (ditutup)' }}
                                         </option>
                                     @endforeach
@@ -321,7 +334,7 @@
                         @can($permission)
                             <div class="flex flex-wrap items-center gap-2">
                                 <button data-save-draft type="submit" class="btn btn-secondary disabled:cursor-not-allowed disabled:opacity-50"
-                                        @disabled($revisionExpired) :disabled="busy || {{ $revisionExpired ? 'true' : 'false' }}"
+                                        @disabled($revisionBlocked) :disabled="busy || {{ $revisionBlocked ? 'true' : 'false' }}"
                                         x-text="busy ? 'Sedang menyimpan…' : 'Simpan draft'">
                                     Simpan draft
                                 </button>
@@ -345,6 +358,7 @@
                             </div>
                         @endcan
                     </div>
+                    </fieldset>
                 </form>
                 @if($draft && $step === 4)
                     @can($permission)
@@ -357,8 +371,8 @@
                                 dikirim setelah konfirmasi pada halaman tinjau.
                             </p>
                             <p id="review-readiness" class="text-xs text-slate-500">
-                                {{ $revisionExpired ? 'Batas waktu revisi telah berakhir. Tinjauan baru ditutup.'
-                                    : 'Lengkapi seluruh dokumen dan isian, lalu tekan Simpan draft untuk mengaktifkan tinjauan.' }}
+                                {{ $revisionNotStarted ? 'Verifikasi berkas belum dibuka. Tinjauan baru tersedia mulai jadwal verifikasi.' : ($revisionExpired ? 'Batas waktu revisi telah berakhir. Tinjauan baru ditutup.'
+                                    : 'Lengkapi seluruh dokumen dan isian, lalu tekan Simpan draft untuk mengaktifkan tinjauan.') }}
                             </p>
                             <button data-review-submit type="submit" aria-describedby="review-readiness"
                                     aria-disabled="{{ $reviewReady ? 'false' : 'true' }}"

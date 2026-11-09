@@ -7,7 +7,7 @@
         <header class="flex flex-wrap items-start justify-between gap-3">
             <div class="max-w-2xl">
                 <h2 class="text-xl font-bold text-slate-800">
-                    Periode & Tenggat Pendaftaran
+                    Periode & Jadwal Sidang TA
                 </h2>
                 <p class="mt-1 text-sm leading-relaxed text-slate-500">
                     Beberapa periode dapat aktif bersamaan. Mahasiswa memilih periode aktif yang sedang berada dalam rentang pendaftaran.
@@ -43,12 +43,21 @@
                 <label class="campus-label">Keterangan
                     <input class="campus-input mt-1" name="description" value="{{ old('description') }}" maxlength="2000">
                 </label>
+                <h4 class="font-semibold text-slate-800 md:col-span-2">Pendaftaran Sidang TA</h4>
                 <label class="campus-label">Dibuka
                     <input class="campus-input mt-1" type="datetime-local" name="open_at" value="{{ old('open_at') }}" required>
                 </label>
                 <label class="campus-label">Tenggat
                     <input class="campus-input mt-1" type="datetime-local" name="close_at" value="{{ old('close_at') }}" required>
                 </label>
+                <h4 class="border-t border-slate-200 pt-3 font-semibold text-slate-800 md:col-span-2">Tanggal Verifikasi Berkas</h4>
+                <label class="campus-label">Mulai verifikasi
+                    <input class="campus-input mt-1" type="datetime-local" name="revision_open_at" value="{{ old('revision_open_at') }}" required>
+                </label>
+                <label class="campus-label">Selesai verifikasi
+                    <input class="campus-input mt-1" type="datetime-local" name="revision_close_at" value="{{ old('revision_close_at') }}" required>
+                </label>
+                <p class="text-xs text-slate-500 md:col-span-2">Verifikasi boleh dimulai selama pendaftaran. Waktu selesai harus setelah mulai verifikasi dan tidak lebih awal dari tenggat pendaftaran.</p>
                 <label class="inline-flex items-center gap-2 text-sm text-slate-700">
                     <input type="checkbox" name="is_active" value="1" @checked(old('is_active'))>
                     Aktifkan setelah dibuat
@@ -86,6 +95,7 @@
                             {{ $stateLabel }}
                         </span>
                     </header>
+                    @include('sidang_ta_registrations.partials.period-schedule', ['schedulePeriod' => $period])
                     @can('sidang_ta_period_update')
                         <form data-ta-period-update method="POST"
                               action="{{ route('admin.sidang-ta-periods.update', $period) }}"
@@ -97,6 +107,7 @@
                             <label class="campus-label">Keterangan
                                 <input class="campus-input mt-1" name="description" value="{{ $period->description }}" maxlength="2000">
                             </label>
+                            <h4 class="font-semibold text-slate-800 md:col-span-2">Pendaftaran Sidang TA</h4>
                             <label class="campus-label">Dibuka
                                 <input class="campus-input mt-1" type="datetime-local" name="open_at"
                                        value="{{ $period->open_at->format('Y-m-d\TH:i') }}" required>
@@ -105,6 +116,14 @@
                                 <input class="campus-input mt-1" type="datetime-local" name="close_at"
                                        value="{{ $period->close_at->format('Y-m-d\TH:i') }}" required>
                             </label>
+                            <h4 class="border-t border-slate-200 pt-3 font-semibold text-slate-800 md:col-span-2">Tanggal Verifikasi Berkas</h4>
+                            <label class="campus-label">Mulai verifikasi
+                                <input class="campus-input mt-1" type="datetime-local" name="revision_open_at" value="{{ $period->revision_open_at?->format('Y-m-d\TH:i') }}" required>
+                            </label>
+                            <label class="campus-label">Selesai verifikasi
+                                <input class="campus-input mt-1" type="datetime-local" name="revision_close_at" value="{{ $period->revision_close_at?->format('Y-m-d\TH:i') }}" required>
+                            </label>
+                            <p class="text-xs text-slate-500 md:col-span-2">Verifikasi boleh dimulai selama pendaftaran. Waktu selesai harus setelah mulai verifikasi dan tidak lebih awal dari tenggat pendaftaran.</p>
                             <label class="inline-flex items-center gap-2 text-sm text-slate-700">
                                 <input type="checkbox" name="is_active" value="1" @checked($period->is_active)>
                                 Periode aktif

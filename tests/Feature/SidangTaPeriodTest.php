@@ -14,6 +14,8 @@ function sidangTaPeriodTestData(array $overrides = []): array
         'name' => 'Periode Sidang TA Test',
         'open_at' => now()->subDay()->format('Y-m-d H:i:s'),
         'close_at' => now()->addDay()->format('Y-m-d H:i:s'),
+        'revision_open_at' => now()->subDay()->format('Y-m-d H:i:s'),
+        'revision_close_at' => now()->addDays(2)->format('Y-m-d H:i:s'),
         'description' => 'Fixture pengujian, bukan data aplikasi.',
         'is_active' => true,
     ], $overrides);

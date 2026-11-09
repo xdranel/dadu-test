@@ -165,8 +165,7 @@ test('s2_index_active_registration_hides_start_and_respects_revision_permission'
     $crawler = new Crawler($this->get($url)->assertOk()->getContent());
     $header = $crawler->filter('[data-registration-header]');
     expect($header->filter('[data-registration-start]')->count())->toBe(0);
-    expect($header->filter('[data-registration-active]')->attr('href'))
-        ->toBe(route('sidang-ta-registrations.edit', $registration));
+    expect($header->filter('[data-registration-active]')->count())->toBe(0);
     expect($header->filter('[data-registration-revise]')->attr('href'))
         ->toBe(route('sidang-ta-registrations.edit', $registration));
     $this->user->revokePermissionTo('sidang_ta_registration_update');

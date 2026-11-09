@@ -84,10 +84,10 @@ test('meeting staff controls are placed in filter and period cards with honest c
     expect($c->filter('[data-ta-filters] [data-ta-export-empty]')->count())->toBe(1);
     expect($c->filter('[data-ta-period-card] [data-manage-ta-periods]')->count())->toBe(1);
     expect($c->filter('[data-ta-period-banner] [data-period-countdown]')->count())->toBe(1);
-    expect($c->filter('[data-ta-period-banner]')->getNode(0)->hasAttribute('x-data'))->toBeTrue();
-    expect($c->filter('[data-ta-period-banner]')->attr('x-data'))->toContain('sidangTaPeriodCountdown');
-    expect($c->filter('[data-ta-period-banner] [data-period-status]')->attr('x-text'))->toBe('status');
-    expect($c->filter('[data-period-countdown]')->getNode(0)->hasAttribute('x-data'))->toBeFalse();
+    expect($c->filter('[data-ta-period-banner] [data-schedule="registration"]')->attr('x-data'))->toContain('sidangTaPeriodCountdown');
+    expect($c->filter('[data-schedule="registration"] [data-period-status]')->attr('x-text'))->toBe('status');
+    expect($c->filter('[data-period-countdown] [data-countdown-unit]')->count())->toBe(4);
+    expect($c->filter('[data-schedule="revision"]')->text())->toContain('Belum diatur');
     $this->period->update(['is_active'=>false]);
     $c=new Crawler($this->get(route('admin.sidang-ta-registrations.index'))->assertOk()->getContent());
     expect($c->filter('[data-period-countdown]')->count())->toBe(0);
