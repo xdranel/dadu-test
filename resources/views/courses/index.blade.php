@@ -125,6 +125,7 @@
                                 {{ $mk->type }}
                             </td>
                             <td class="whitespace-nowrap text-center">
+                                @if($mk->id !== null)
                                 <div class="inline-flex items-center justify-center gap-1">
                                     {{-- Tombol Lihat --}}
                                     <a href="{{ route('courses.show', $mk->id) }}"
@@ -157,6 +158,9 @@
                                     </button>
                                     @endcan
                                 </div>
+                                @else
+                                    <span class="text-xs text-slate-500">Master mata kuliah belum tersedia</span>
+                                @endif
                             </td>
                         </tr>
                     @empty
