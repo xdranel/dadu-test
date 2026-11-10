@@ -11,11 +11,14 @@ class SyncLog extends Model
     protected $fillable = [
         'module', 'status', 'total_records',
         'processed_records', 'skipped_records',
-        'error_message', 'triggered_by',
+        'error_message', 'issue_details', 'triggered_by',
         'started_at', 'completed_at',
     ];
 
+    protected $attributes = ['issue_details' => '[]'];
+
     protected $casts = [
+        'issue_details' => 'array',
         'started_at'   => 'datetime',
         'completed_at' => 'datetime',
     ];

@@ -247,6 +247,8 @@ Route::middleware(['auth', 'password.changed'])->group(function () {
             ->middleware('permission:sync_read')->name('sync.settings');
         Route::put('sync/settings', [SyncController::class, 'saveSettings'])
             ->middleware('permission:sync_update')->name('sync.save-settings');
+        Route::get('sync/logs/{syncLog}/details', [SyncController::class, 'logDetails'])
+            ->middleware('permission:sync_read')->name('sync.logs.details');
         Route::get('sync/status', [SyncController::class, 'status'])
             ->middleware('permission:sync_read')->name('sync.status');
         Route::get('sync/data-stats', [SyncController::class, 'dataStats'])

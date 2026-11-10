@@ -295,6 +295,7 @@ class StudentController extends Controller
 
         $student->load([
             'courses' => fn($q) => $q->orderBy('semester')->orderBy('course_name'),
+            'courses.academicPeriod',
             'grades'  => fn($q) => $q->orderBy('level')->orderBy('course_name'),
             'attendances' => fn($q) => $q->orderBy('course_name'),
             'activities'  => fn($q) => $q->orderBy('date', 'desc'),
@@ -315,9 +316,8 @@ class StudentController extends Controller
             ->groupBy('level')
             ->sortKeys();
 
-        // Prefer the official TAK score imported from iGracias JSON; retain
-        // the local activity-points total as a fallback for older records.
-        $totalTak = $student->tak?->total_points ?? $student->activities->sum('points');
+        $detail = app(\App\Services\StudentAcademicDetail::class)->forStudent($student);
+        $totalTak = $detail['tak_score'];
 
         // KRS aktif mengikuti periode akademik yang dipilih admin.
         // `semester` tetap merupakan semester studi mahasiswa (mis. 8),
@@ -333,9 +333,7 @@ class StudentController extends Controller
 
         // Ambil nilai untuk mata kuliah di KRS aktif (untuk cek ada/tidaknya nilai)
         $krsCodes = $krsAktif->pluck('course_code')->toArray();
-        $studentGrades = $student->grades
-            ->whereIn('course_code', $krsCodes)
-            ->keyBy('course_code');
+        $activeCourseGrades = $student->grades->whereIn('course_code', $krsCodes)->values();
 
         return view('students.show', compact(
             'student',
@@ -345,7 +343,8 @@ class StudentController extends Controller
             'krsLabel',
             'krsStudySemester',
             'activeAcademicPeriod',
-            'studentGrades'
+            'activeCourseGrades',
+            'detail'
         ));
     }
 }

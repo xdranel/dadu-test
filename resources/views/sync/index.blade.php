@@ -272,14 +272,10 @@
                                 </td>
                                 <td class="text-xs text-slate-400">{{ $log->durasi }}</td>
                                 <td class="text-xs">
-                                    @if($log->status === 'failed' && $log->error_message)
-                                        <span class="text-rose-500 truncate block max-w-[200px]" title="{{ $log->error_message }}">
-                                            {{ $log->error_message }}
-                                        </span>
-                                    @elseif($log->status === 'completed' && $log->error_message)
-                                        <span class="text-amber-600 truncate block max-w-[200px]" title="{{ $log->error_message }}">
-                                            {{ $log->error_message }}
-                                        </span>
+                                    @if($log->has_issues)
+                                        <button type="button" class="text-amber-700 hover:underline font-semibold"
+                                            data-sync-issues-url="{{ route('sync.logs.details', $log->id) }}"
+                                            onclick="openSyncIssues(this)">Lihat catatan</button>
                                     @elseif($log->status === 'completed')
                                         <span class="text-emerald-600">Selesai</span>
                                     @elseif($log->status === 'processing')
@@ -295,6 +291,8 @@
             </div>
         @endif
     </div>
+
+@include('sync.issues-modal')
 
 <script>
 // Refresh Stats via AJAX

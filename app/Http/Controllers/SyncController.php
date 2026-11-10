@@ -24,6 +24,8 @@ use App\Models\StudentTak;
 use App\Models\SyncLog;
 use App\Models\SyncSetting;
 use App\Services\StudentAcademicProfileImportService;
+use App\Support\JsonSourceLocations;
+use App\Support\SyncImportIssues;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
@@ -37,7 +39,10 @@ class SyncController extends Controller
             ->orderBy('urutan')
             ->get();
 
-        $latestLogs = SyncLog::orderBy('created_at', 'desc')
+        $latestLogs = SyncLog::select(['id', 'module', 'status', 'total_records', 'processed_records',
+                'skipped_records', 'triggered_by', 'started_at', 'completed_at', 'created_at'])
+            ->selectRaw("CASE WHEN (error_message IS NOT NULL AND error_message <> '') OR (issue_details IS NOT NULL AND issue_details <> '[]') OR skipped_records > 0 OR status = 'failed' THEN 1 ELSE 0 END AS has_issues")
+            ->orderBy('created_at', 'desc')
             ->take(20)
             ->get()
             ->groupBy('module');
@@ -45,6 +50,24 @@ class SyncController extends Controller
         $dataStats = $this->getDataStats();
 
         return view('sync.index', compact('settings', 'latestLogs', 'dataStats'));
+    }
+
+    public function logDetails(SyncLog $syncLog)
+    {
+        $issues = $syncLog->issue_details ?? [];
+        if ($issues === [] && $syncLog->error_message) {
+            $issues = [['nim' => null, 'name' => null, 'record' => null, 'path' => null,
+                'line' => null, 'message' => $syncLog->error_message]];
+        }
+        if ($issues === [] && $syncLog->skipped_records > 0) {
+            $issues = [['nim' => null, 'name' => null, 'record' => null, 'path' => null,
+                'line' => null, 'message' => $syncLog->skipped_records.' data dilewati; rincian belum tersedia untuk log ini.']];
+        }
+        if ($issues === [] && $syncLog->status === 'failed') {
+            $issues = [['nim' => null, 'name' => null, 'record' => null, 'path' => null,
+                'line' => null, 'message' => 'Proses gagal; rincian belum tersedia untuk log ini.']];
+        }
+        return response()->json(['id' => $syncLog->id, 'issues' => $issues]);
     }
 
     /**
@@ -300,8 +323,11 @@ class SyncController extends Controller
         }
 
         if ($request->type === 'krs' && \App\Support\OfficialKrsJsonNormalizer::supports($data)) {
-            return $this->importOfficialKrs($data);
+            return $this->importOfficialKrs($data, JsonSourceLocations::rows($jsonString));
         }
+
+        $locations = JsonSourceLocations::rows($jsonString,
+            isset($data['aaData']) && is_array($data['aaData']) ? 'aaData' : null);
 
         // Handle case where root JSON contains the DataTables "aaData" key
         if (isset($data['aaData']) && is_array($data['aaData'])) {
@@ -326,10 +352,12 @@ class SyncController extends Controller
         try {
             $processed = 0;
             $skipped   = 0;
+            $errors = [];
 
-            foreach ($data as $row) {
+            foreach ($data as $index => $row) {
                 if (!is_array($row)) {
                     $skipped++;
+                    $errors[] = "Baris #{$index}: Record harus berupa objek atau daftar JSON.";
                     continue;
                 }
 
@@ -343,6 +371,7 @@ class SyncController extends Controller
                 };
 
                 $result ? $processed++ : $skipped++;
+                if (!$result) $errors[] = "Baris #{$index}: ".$this->skippedImportReason($request->type, $row);
             }
 
             if (in_array($request->type, ['krs', 'course'])) {
@@ -358,6 +387,8 @@ class SyncController extends Controller
                 'total_records'     => count($data),
                 'processed_records' => $processed,
                 'skipped_records'   => $skipped,
+                'issue_details' => SyncImportIssues::fromErrors($errors, $data, $locations, $request->type),
+                'error_message' => SyncImportIssues::summary($errors),
                 'completed_at'      => now(),
             ]);
 
@@ -374,20 +405,23 @@ class SyncController extends Controller
             return redirect()->route('sync.index')
                 ->with('success', "Import {$label} selesai: {$processed} data berhasil diimpor, {$skipped} data dilewati.");
 
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             Log::error("ImportJson [{$request->type}]: " . $e->getMessage());
 
+            $message = $e instanceof \InvalidArgumentException ? $e->getMessage() : 'Penyimpanan data gagal; periksa format dan log aplikasi.';
+            $errors[] = isset($index) ? "Baris #{$index}: {$message}" : $message;
             $log->update([
-                'status'        => 'failed',
-                'error_message' => $e->getMessage(),
-                'completed_at'  => now(),
+                'status' => 'failed', 'processed_records' => $processed, 'skipped_records' => $skipped,
+                'error_message' => SyncImportIssues::summary($errors),
+                'issue_details' => SyncImportIssues::fromErrors($errors, $data, $locations, $request->type),
+                'completed_at' => now(),
             ]);
 
-            return back()->with('error', 'Terjadi kesalahan saat mengimpor data: ' . $e->getMessage());
+            return back()->with('error', 'Terjadi kesalahan saat mengimpor data. Periksa catatan sinkronisasi.');
         }
     }
 
-    private function importOfficialKrs(array $payload)
+    private function importOfficialKrs(array $payload, array $locations = [])
     {
         try {
             $rows = (new \App\Support\OfficialKrsJsonNormalizer)->rows($payload);
@@ -404,7 +438,8 @@ class SyncController extends Controller
             $log->update([
                 'status' => 'completed', 'processed_records' => $result['processed'],
                 'skipped_records' => $skipped,
-                'error_message' => $result['errors'] === [] ? null : implode(' | ', array_slice($result['errors'], 0, 10)),
+                'error_message' => SyncImportIssues::summary($result['errors']),
+                'issue_details' => SyncImportIssues::fromErrors($result['errors'], $rows, $locations),
                 'completed_at' => now(),
             ]);
             $message = "Import KRS resmi selesai: {$result['processed']} mahasiswa diproses, "
@@ -417,6 +452,19 @@ class SyncController extends Controller
             $log->update(['status' => 'failed', 'error_message' => 'Import KRS resmi gagal.', 'completed_at' => now()]);
             return back()->with('error', 'Import KRS resmi gagal. Periksa log aplikasi.');
         }
+    }
+
+    private function skippedImportReason(string $type, array $row): string
+    {
+        if ($type === 'course') return 'Kode mata kuliah kosong; record dilewati.';
+        $nim = $row['nim'] ?? $row['student_number'] ?? ($type === 'krs' ? ($row[0] ?? null) : null);
+        if (empty($nim)) return 'NIM kosong; record dilewati.';
+        if (in_array($type, ['krs', 'attendance'], true)) {
+            $code = $row['kode_matakuliah'] ?? $row['course_code'] ?? null;
+            if (empty($code)) return 'Kode mata kuliah kosong; record dilewati.';
+            return 'Mahasiswa belum terdaftar; impor profil mahasiswa terlebih dahulu.';
+        }
+        return 'Record tidak dapat diimpor; periksa nilai wajib.';
     }
 
     private function importStudentRow(array $row): bool
@@ -961,11 +1009,14 @@ class SyncController extends Controller
         $request->validate([
             'json_file' => ['required', 'file', 'mimetypes:application/json,text/plain'],
         ]);
-        $payload = json_decode(file_get_contents($request->file('json_file')->getRealPath()), true);
+        $source = file_get_contents($request->file('json_file')->getRealPath());
+        $payload = json_decode($source, true);
         if (json_last_error() !== JSON_ERROR_NONE || !is_array($payload)) {
             return back()->withErrors(['json_file' => 'Format JSON tidak valid.']);
         }
 
+        $locations = JsonSourceLocations::rows($source, array_key_exists('data', $payload) ? 'data' : null);
+        unset($source);
         $wrapped = array_key_exists('data', $payload);
         $data = $wrapped ? $payload['data'] : $payload;
         if (!is_array($data)) return back()->withErrors(['json_file' => 'Data profil harus berupa array.']);
@@ -985,11 +1036,13 @@ class SyncController extends Controller
             $result = app(StudentAcademicProfileImportService::class)->import(
                 $data, $context['selected_menus'] ?? null, $context['finance_period'] ?? null
             );
+            $result['errors'] = SyncImportIssues::withSourceFailures($result['errors'], $data);
             $log->update([
                 'status' => 'completed', 'total_records' => count($data),
                 'processed_records' => $result['created'] + $result['updated'],
                 'skipped_records' => $result['skipped'] + $result['mismatched'],
-                'error_message' => $result['errors'] === [] ? null : implode(' | ', array_slice($result['errors'], 0, 10)),
+                'error_message' => SyncImportIssues::summary($result['errors']),
+                'issue_details' => SyncImportIssues::fromErrors($result['errors'], $data, $locations),
                 'completed_at' => now(),
             ]);
             $message = "Import Profil Akademik selesai: {$result['created']} baru, {$result['updated']} diperbarui, "

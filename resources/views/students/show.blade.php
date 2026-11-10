@@ -74,7 +74,7 @@
                         'eprt'      => 'EPRT',
                         'tak'       => 'TAK',
                         'kehadiran' => 'Kehadiran',
-                        'yudisium'  => 'Data Yudisium',
+                        'yudisium'  => 'Data Yudisium & Tugas Akhir',
                     ] as $tab => $label)
                         <button @click="activeTab = '{{ $tab }}'"
                                 :class="activeTab === '{{ $tab }}'
@@ -164,267 +164,16 @@
             </div>
         </div>
 
-        <!-- TAB 2: NILAI -->
-        <div x-show="activeTab === 'nilai'" x-transition>
-            <div class="campus-card overflow-hidden">
-
-                <!-- KRS Aktif -->
-                @if($krsAktif->count() > 0)
-                    <div class="p-6 border-b border-slate-100">
-                        <h3 class="text-base font-semibold text-slate-800 mb-1">Mata Kuliah Semester Ini (KRS Aktif)</h3>
-                        <p class="text-xs text-slate-400 mb-4">
-                            Periode akademik {{ $krsLabel }} · Semester studi {{ $krsStudySemester ?: '-' }}
-                        </p>
-                        <div class="overflow-x-auto">
-                            <table class="campus-table">
-                                <thead>
-                                    <tr>
-                                        <th>Kode MK</th>
-                                        <th>Nama Mata Kuliah</th>
-                                        <th class="text-center">SKS</th>
-                                        <th>Kelas</th>
-                                        <th>Dosen</th>
-                                        <th class="text-center">Nilai</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    @foreach ($krsAktif as $krs)
-                                        <tr>
-                                            <td class="font-mono text-sm font-semibold text-slate-700">
-                                                {{ $krs->course_code }}
-                                            </td>
-                                            <td class="font-medium text-slate-800">{{ $krs->course_name }}</td>
-                                            <td class="text-center text-slate-600">{{ $krs->credits }}</td>
-                                            <td class="text-slate-500">{{ $krs->course_class }}</td>
-                                            <td class="text-slate-500">{{ $krs->lecturer_name ?? $krs->lecturer_code ?? '-' }}</td>
-                                            <td class="text-center">
-                                                @if(isset($studentGrades[$krs->course_code]) && $studentGrades[$krs->course_code]->grade)
-                                                    @php
-                                                        $gradeVal = $studentGrades[$krs->course_code]->grade;
-                                                        $gradeColor = match(true) {
-                                                            in_array($gradeVal, ['A', 'AB']) => 'badge-success',
-                                                            in_array($gradeVal, ['B', 'BC']) => 'badge-info',
-                                                            in_array($gradeVal, ['C'])       => 'badge-warning',
-                                                            default                          => 'badge-danger',
-                                                        };
-                                                    @endphp
-                                                    <span class="badge {{ $gradeColor }}">{{ $gradeVal }}</span>
-                                                @else
-                                                    <span class="badge badge-warning" style="font-size: 0.65rem;">Belum Ada Nilai</span>
-                                                @endif
-                                            </td>
-                                        </tr>
-                                    @endforeach
-                                </tbody>
-                                <tfoot>
-                                    <tr class="bg-slate-50">
-                                        <td colspan="2" class="text-right text-sm font-semibold text-slate-600 px-4 py-3">
-                                            Total SKS:
-                                        </td>
-                                        <td class="text-center font-bold text-[#DA2D3B] px-4 py-3">
-                                            {{ $krsAktif->sum('credits') }}
-                                        </td>
-                                        <td colspan="3"></td>
-                                    </tr>
-                                </tfoot>
-                            </table>
-                        </div>
-                    </div>
-                @else
-                    <div class="p-6 border-b border-slate-100">
-                        <h3 class="text-base font-semibold text-slate-800 mb-1">Mata Kuliah Semester Ini (KRS Aktif)</h3>
-                        <p class="text-xs text-slate-500">
-                            {{ $activeAcademicPeriod
-                                ? 'Belum ada data KRS yang tertaut ke periode akademik aktif (' . $activeAcademicPeriod->label . ').'
-                                : 'Periode akademik aktif belum ditentukan oleh admin.' }}
-                        </p>
-                    </div>
-                @endif
-
-                <!-- Histori Nilai -->
-                <div class="p-6">
-                    <h3 class="text-base font-semibold text-slate-800 mb-4">Histori Nilai</h3>
-
-                    @forelse ($nilaiPerTingkat as $tingkat => $nilais)
-                        <div class="mb-6">
-                            <div class="flex items-center gap-3 mb-3">
-                                <span class="px-3 py-1 bg-[#DA2D3B]/10 text-[#DA2D3B] text-xs font-bold rounded-full">
-                                    Tingkat {{ $tingkat }}
-                                </span>
-                                <span class="text-xs text-slate-400">
-                                    {{ $nilais->count() }} mata kuliah
-                                </span>
-                            </div>
-                            <div class="overflow-x-auto">
-                                <table class="campus-table">
-                                    <thead>
-                                        <tr>
-                                            <th>Kode MK</th>
-                                            <th>Nama Mata Kuliah</th>
-                                            <th class="text-center">SKS</th>
-                                            <th>Jenis</th>
-                                            <th class="text-center">Nilai</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        @foreach ($nilais as $nilai)
-                                            <tr>
-                                                <td class="font-mono text-xs text-slate-500">
-                                                    {{ $nilai->course_code }}
-                                                </td>
-                                                <td class="text-slate-800">{{ $nilai->course_name }}</td>
-                                                <td class="text-center text-slate-600">{{ $nilai->credits }}</td>
-                                                <td class="text-xs text-slate-500">{{ $nilai->type ?? '-' }}</td>
-                                                <td class="text-center">
-                                                    @if($nilai->grade)
-                                                        @php
-                                                            $nilaiColor = match(true) {
-                                                                in_array($nilai->grade, ['A', 'AB']) => 'badge-success',
-                                                                in_array($nilai->grade, ['B', 'BC']) => 'badge-info',
-                                                                in_array($nilai->grade, ['C'])        => 'badge-warning',
-                                                                default                              => 'badge-danger',
-                                                            };
-                                                        @endphp
-                                                        <span class="badge {{ $nilaiColor }}">{{ $nilai->grade }}</span>
-                                                    @else
-                                                        <span class="text-xs text-slate-300">—</span>
-                                                    @endif
-                                                </td>
-                                            </tr>
-                                        @endforeach
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-                    @empty
-                        <div class="empty-state">
-                            <p class="empty-state-text">Belum ada data nilai.</p>
-                        </div>
-                    @endforelse
-                </div>
-            </div>
-        </div>
-
-        <!-- TAB: EPRT -->
-        <div x-show="activeTab === 'eprt'" x-transition>
-            <div class="campus-card p-6">
-                <h3 class="text-base font-semibold text-slate-800 mb-4">Riwayat Tes EPRT</h3>
-
-                @if($student->eprts->count() > 0)
-                    <!-- Summary EPRT -->
-                    @php $bestEprt = $student->eprts->first(); @endphp
-                    <div class="bg-violet-50 border border-violet-200 rounded-xl p-4 mb-6 flex items-center gap-4">
-                        <div class="w-14 h-14 bg-violet-600 rounded-xl flex items-center justify-center flex-shrink-0">
-                            <span class="text-white text-lg font-bold">{{ $bestEprt->total_score ?? '-' }}</span>
-                        </div>
-                        <div>
-                            <p class="text-sm font-semibold text-slate-800">Skor Tertinggi EPRT</p>
-                            <p class="text-xs text-violet-600">dari {{ $student->eprts->count() }} kali tes</p>
-                        </div>
-                    </div>
-
-                    <div class="overflow-x-auto">
-                        <table class="campus-table">
-                            <thead>
-                                <tr>
-                                    <th class="w-10 text-center">No</th>
-                                    <th class="text-center">Listening</th>
-                                    <th class="text-center">Structure</th>
-                                    <th class="text-center">Reading</th>
-                                    <th class="text-center">Total</th>
-                                    <th>Keterangan</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                @foreach ($student->eprts as $i => $eprt)
-                                    <tr>
-                                        <td class="text-center text-slate-400">{{ $i + 1 }}</td>
-                                        <td class="text-center text-slate-700">{{ $eprt->listening ?? '-' }}</td>
-                                        <td class="text-center text-slate-700">{{ $eprt->structure ?? '-' }}</td>
-                                        <td class="text-center text-slate-700">{{ $eprt->reading ?? '-' }}</td>
-                                        <td class="text-center font-bold text-violet-700">{{ $eprt->total_score ?? '-' }}</td>
-                                        <td>
-                                            @if($eprt->details)
-                                                <span class="badge {{ stripos($eprt->details, 'LULUS') !== false || stripos($eprt->details, 'PASS') !== false ? 'badge-success' : 'badge-warning' }}">
-                                                    {{ $eprt->details }}
-                                                </span>
-                                            @else
-                                                <span class="text-xs text-slate-300">—</span>
-                                            @endif
-                                        </td>
-                                    </tr>
-                                @endforeach
-                            </tbody>
-                        </table>
-                    </div>
-                @else
-                    <div class="empty-state">
-                        <p class="empty-state-text">Belum ada data EPRT.</p>
-                    </div>
-                @endif
-            </div>
-        </div>
-
-        <!-- TAB 3: TAK -->
-        <div x-show="activeTab === 'tak'" x-transition>
-            <div class="campus-card p-6">
-
-                <!--  Summary TAK -->
-                <div class="bg-[#DA2D3B]/5 border border-[#DA2D3B]/20 rounded-xl p-4 mb-6 flex items-center gap-4">
-                    <div class="w-14 h-14 bg-[#DA2D3B] rounded-xl flex items-center justify-center flex-shrink-0">
-                        <span class="text-white text-xl font-bold">{{ $totalTak }}</span>
-                    </div>
-                    <div>
-                        <p class="text-sm font-semibold text-slate-800">{{ $student->tak ? 'Skor TAK iGracias' : 'Total Poin TAK' }}</p>
-                        <p class="text-xs text-[#DA2D3B]">
-                            {{ $student->tak ? 'Skor resmi dari JSON; kegiatan lokal tercantum di bawah' : 'dari ' . $student->activities->count() . ' kegiatan' }}
-                        </p>
-                    </div>
-                </div>
-
-                <div class="overflow-x-auto">
-                    <table class="campus-table">
-                        <thead>
-                            <tr>
-                                <th class="w-10 text-center">No</th>
-                                <th>Nama Kegiatan</th>
-                                <th>Jenis</th>
-                                <th>Peran</th>
-                                <th class="text-center">Poin</th>
-                                <th>Tanggal</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @forelse ($student->activities as $i => $activity)
-                                <tr>
-                                    <td class="text-center text-slate-400">{{ $i + 1 }}</td>
-                                    <td class="font-medium text-slate-800">{{ $activity->activity_name }}</td>
-                                    <td class="text-xs text-slate-500">{{ $activity->activity_type ?? '-' }}</td>
-                                    <td class="text-xs text-slate-500">{{ $activity->role ?? '-' }}</td>
-                                    <td class="text-center">
-                                        <span class="badge badge-info">+{{ $activity->points }}</span>
-                                    </td>
-                                    <td class="text-xs text-slate-500">
-                                        {{ $activity->date?->format('d M Y') ?? '-' }}
-                                    </td>
-                                </tr>
-                            @empty
-                                <tr>
-                                    <td colspan="6" class="empty-state">
-                                        <p class="empty-state-text">Belum ada data TAK.</p>
-                                    </td>
-                                </tr>
-                            @endforelse
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
+        <!-- Rencana studi dan riwayat akademik -->
+        <div x-show="activeTab === 'nilai'" x-transition>@include('students.partials.study-records')</div>
+        <div x-show="activeTab === 'eprt'" x-transition>@include('students.partials.language')</div>
+        <div x-show="activeTab === 'tak'" x-transition>@include('students.partials.tak')</div>
 
         <!-- TAB 4: KEHADIRAN -->
-        <div x-show="activeTab === 'kehadiran'" x-transition>
+        <div data-student-attendance x-show="activeTab === 'kehadiran'" x-transition>
             <div class="campus-card p-6">
 
+                @if($student->attendances->isNotEmpty())
                 <!-- Summary Kehadiran -->
                 <div class="grid grid-cols-3 gap-4 mb-6">
                     @php
@@ -448,6 +197,7 @@
                     </div>
                 </div>
 
+                @endif
                 <div class="overflow-x-auto">
                     <table class="campus-table">
                         <thead>
@@ -571,8 +321,8 @@
                     <!-- TAK dari JSON -->
                     <div class="campus-card p-6 text-center">
                         <p class="text-xs text-slate-500 mb-2">Total TAK (JSON)</p>
-                        @if($student->tak)
-                            <p class="text-2xl font-bold text-[#DA2D3B]">{{ $student->tak->total_points ?? '—' }}</p>
+                        @if($totalTak !== null)
+                            <p class="text-2xl font-bold text-[#DA2D3B]">{{ (float) $totalTak }}</p>
                         @else
                             <span class="text-slate-300">—</span>
                         @endif
@@ -639,18 +389,7 @@
 
                 <!-- Status Pembayaran -->
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                    <!-- BPP -->
-                    <div class="campus-card p-6">
-                        <h3 class="text-base font-semibold text-slate-800 mb-4 pb-2 border-b border-slate-100">Status Pembayaran BPP</h3>
-                        @if($student->bppPayment)
-                            <div class="flex gap-3 py-2">
-                                <span class="text-sm text-slate-400 w-24 flex-shrink-0">Status</span>
-                                <span class="text-sm font-medium text-slate-700">{{ $student->bppPayment->status ?? '-' }}</span>
-                            </div>
-                        @else
-                            <div class="empty-state"><p class="empty-state-text">Belum ada data.</p></div>
-                        @endif
-                    </div>
+                    @include('students.partials.bpp')
 
                     <!-- Wisuda (placeholder) -->
                     <div class="campus-card p-6">
@@ -666,15 +405,7 @@
                     </div>
                 </div>
 
-                <!-- SKPI (placeholder) -->
-                <div class="campus-card p-6">
-                    <h3 class="text-base font-semibold text-slate-800 mb-4 pb-2 border-b border-slate-100">SKPI</h3>
-                    @if($student->skpi && $student->skpi->raw_data)
-                        <pre class="bg-slate-50 p-3 rounded-lg border border-slate-200 text-xs font-mono text-slate-600 overflow-x-auto max-h-48">{{ json_encode($student->skpi->raw_data, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE) }}</pre>
-                    @else
-                        <div class="empty-state"><p class="empty-state-text">Belum ada data SKPI.</p></div>
-                    @endif
-                </div>
+                @include('students.partials.skpi')
 
             </div>
         </div>
