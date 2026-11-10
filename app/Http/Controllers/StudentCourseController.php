@@ -11,12 +11,13 @@ class StudentCourseController extends Controller
 {
     public function index(Request $request)
     {
-        $krs = StudentCourse::leftJoin('students', 'student_courses.student_number', '=', 'students.student_number')
+        $krs = StudentCourse::with('academicPeriod')->leftJoin('students', 'student_courses.student_number', '=', 'students.student_number')
             ->select(
                 'student_courses.course_code',
                 'student_courses.course_name',
                 'student_courses.course_class',
                 'student_courses.academic_year',
+                'student_courses.academic_period_id',
                 'student_courses.semester',
                 'student_courses.credits',
                 'student_courses.lecturer_code',
@@ -43,6 +44,7 @@ class StudentCourseController extends Controller
                 'student_courses.course_name',
                 'student_courses.course_class',
                 'student_courses.academic_year',
+                'student_courses.academic_period_id',
                 'student_courses.semester',
                 'student_courses.credits',
                 'student_courses.lecturer_code',
@@ -78,15 +80,7 @@ class StudentCourseController extends Controller
             $spRaw = $item->student_study_program ?: $item->krs_study_program;
             $item->study_program_display = $spRaw ? trim(str_replace(' - Kampus Surabaya', '', $spRaw)) : '-';
 
-            // semester
-            $sem = $item->semester;
-            if ($sem == '1' || strtolower($sem) === 'ganjil') {
-                $item->semester_display = 'Ganjil';
-            } elseif ($sem == '2' || strtolower($sem) === 'genap') {
-                $item->semester_display = 'Genap';
-            } else {
-                $item->semester_display = $sem ?: '-';
-            }
+            $item->semester_display = $item->semester ?: '-';
 
             // Resolve lecturers
             $list = [];
@@ -228,6 +222,7 @@ class StudentCourseController extends Controller
             ->where('course_code', $studentCourse->course_code)
             ->where('course_class', $studentCourse->course_class)
             ->where('academic_year', $studentCourse->academic_year)
+            ->where('academic_period_id', $studentCourse->academic_period_id)
             ->where('semester', $studentCourse->semester)
             ->get();
 

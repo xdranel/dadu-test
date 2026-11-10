@@ -301,6 +301,7 @@ class SyncController extends Controller
     {
         $request->validate([
             'type'      => ['required', 'string', 'in:student,krs,attendance,course,academic_profile'],
+            'krs_semester_mode' => ['nullable', 'in:study,term'],
             'json_file' => ['required', 'file', 'mimetypes:application/json,text/plain'],
         ]);
 
@@ -324,6 +325,10 @@ class SyncController extends Controller
 
         if ($request->type === 'krs' && \App\Support\OfficialKrsJsonNormalizer::supports($data)) {
             return $this->importOfficialKrs($data, JsonSourceLocations::rows($jsonString));
+        }
+
+        if ($request->type === 'krs' && $request->input('krs_semester_mode', 'study') === 'term') {
+            return $this->previewFlatTermKrs($request, $data, $jsonString);
         }
 
         $locations = JsonSourceLocations::rows($jsonString,
@@ -419,6 +424,47 @@ class SyncController extends Controller
 
             return back()->with('error', 'Terjadi kesalahan saat mengimpor data. Periksa catatan sinkronisasi.');
         }
+    }
+
+    private function previewFlatTermKrs(Request $request, array $payload, string $jsonString)
+    {
+        $root = isset($payload['data']) && is_array($payload['data']) ? 'data' : null;
+        $rows = $root ? $payload['data'] : $payload;
+        if (!array_is_list($rows) || $rows === []) {
+            return back()->withErrors(['json_file' => 'Mode term memerlukan daftar objek KRS yang tidak kosong.']);
+        }
+        $plans = app(\App\Services\FlatTermKrsImportService::class)->preview($rows);
+        $token = \Illuminate\Support\Str::random(48);
+        $request->session()->put('krs_term_preview', ['token' => $token, 'user_id' => auth()->id(),
+            'expires_at' => now()->addMinutes(30)->timestamp, 'rows' => $rows, 'plans' => $plans,
+            'locations' => JsonSourceLocations::rows($jsonString, $root)]);
+        return response()->view('sync.krs-term-preview', compact('plans', 'token'));
+    }
+
+    public function applyFlatTermKrs(Request $request)
+    {
+        $request->validate(['preview_token' => ['required', 'string'], 'confirmed' => ['accepted']]);
+        $preview = $request->session()->get('krs_term_preview');
+        if (!$preview || $preview['user_id'] !== auth()->id() || $preview['expires_at'] < now()->timestamp
+            || !hash_equals($preview['token'], $request->input('preview_token'))) {
+            return back()->withErrors(['preview_token' => 'Pratinjau tidak berlaku. Unggah ulang dan tinjau KRS terlebih dahulu.']);
+        }
+        try {
+            $result = app(\App\Services\FlatTermKrsImportService::class)->apply($preview['rows'], $preview['plans']);
+        } catch (\InvalidArgumentException $exception) {
+            $request->session()->forget('krs_term_preview');
+            return redirect()->route('sync.index')->withErrors(['preview_token' => $exception->getMessage()]);
+        } catch (\Throwable $exception) {
+            Log::warning('Flat term KRS import rolled back', ['exception' => $exception::class]);
+            return redirect()->route('sync.index')->with('error', 'Penyimpanan KRS dibatalkan. Periksa data lalu unggah ulang.');
+        }
+        $request->session()->forget('krs_term_preview');
+        SyncLog::create(['module' => 'krs', 'status' => 'completed', 'total_records' => count($preview['rows']),
+            'processed_records' => $result['processed'], 'skipped_records' => $result['skipped'],
+            'triggered_by' => auth()->user()->email, 'started_at' => now(), 'completed_at' => now(),
+            'error_message' => SyncImportIssues::summary($result['errors']),
+            'issue_details' => SyncImportIssues::fromErrors($result['errors'], $preview['rows'], $preview['locations'], 'krs')]);
+        return redirect()->route('sync.index')->with('success', "Import KRS selesai: {$result['processed']} disimpan, {$result['repaired']} tautan diperbaiki, {$result['skipped']} dilewati.");
     }
 
     private function importOfficialKrs(array $payload, array $locations = [])

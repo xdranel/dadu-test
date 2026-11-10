@@ -331,10 +331,6 @@ class StudentController extends Controller
         $krsLabel = $activeAcademicPeriod?->label;
         $krsStudySemester = $krsAktif->pluck('semester')->filter()->unique()->sort()->implode(', ');
 
-        // Ambil nilai untuk mata kuliah di KRS aktif (untuk cek ada/tidaknya nilai)
-        $krsCodes = $krsAktif->pluck('course_code')->toArray();
-        $activeCourseGrades = $student->grades->whereIn('course_code', $krsCodes)->values();
-
         return view('students.show', compact(
             'student',
             'nilaiPerTingkat',
@@ -343,7 +339,6 @@ class StudentController extends Controller
             'krsLabel',
             'krsStudySemester',
             'activeAcademicPeriod',
-            'activeCourseGrades',
             'detail'
         ));
     }

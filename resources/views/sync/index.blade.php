@@ -38,6 +38,16 @@
                         </div>
                     </div>
 
+                    <div x-show="importType === 'krs'" x-cloak class="space-y-2">
+                        <label for="krs_semester_mode" class="campus-label">Arti semester pada file KRS datar</label>
+                        <select id="krs_semester_mode" name="krs_semester_mode" class="campus-select w-full">
+                            <option value="study">Semester studi mahasiswa (format lama)</option>
+                            <option value="term">Term akademik: 1 Ganjil / 2 Genap (pratinjau dahulu)</option>
+                        </select>
+                        <p class="text-xs text-slate-500">Untuk rekap KRS datar dengan semester 1 = Ganjil, pilih Term akademik. Semester studi diambil dari profil mahasiswa. Baris lama yang cocok akan ditampilkan sebagai perbaikan tautan sebelum disimpan.</p>
+                        <a href="{{ route('academic_periods.index') }}" class="text-xs text-blue-600 underline">Pengaturan periode akademik KRS</a>
+                    </div>
+
                     <!-- Catatan Khusus Profil Akademik -->
                     <div x-show="importType === 'academic_profile'" x-cloak class="bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs text-amber-700">
                         <span class="font-semibold">Catatan Profil Akademik:</span> File JSON harus berformat <code class="bg-amber-100 px-1 rounded">{"data": [...]}</code> dari sumber iGracias + BASILA (sidang tingkat, tugas akhir, TAK, nilai TA, MK mengulang/belum lulus, approval BASILA, dan status BPP). Matching dilakukan berdasarkan NIM + nama.
@@ -121,7 +131,7 @@
   }
 ]</pre>
                         <p class="mt-2 text-[10px] leading-relaxed text-amber-700">
-                            Nilai <code>semester</code> adalah semester studi mahasiswa (misalnya 4 atau 8), bukan semester ganjil/genap. Untuk memenuhi syarat yudisium, impor baris KRS TA2 yang sebenarnya dari iGracias. Kode/nama contoh IF-101 dan Pemrograman Web bukan TA2. Tahun akademik harus sama dengan periode akademik aktif.
+                            Pada mode format lama, <code>semester</code> adalah semester studi (misalnya 4 atau 8). Pada mode Term akademik, <code>semester</code> adalah 1 (Ganjil) atau 2 (Genap) dan tahun akademik harus mempunyai periode terdaftar. Untuk memenuhi syarat yudisium, impor baris KRS TA2 yang sebenarnya dari iGracias. Kode/nama contoh IF-101 dan Pemrograman Web bukan TA2. Tahun akademik harus sama dengan periode akademik aktif.
                         </p>
                     </div>
 

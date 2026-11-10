@@ -1,0 +1,38 @@
+--- a/routes/web.php
++++ b/routes/web.php
+@@ -132,6 +132,10 @@
+         Route::post('students/scrape-portal', [StudentController::class, 'scrapePortal'])
+             ->middleware(['permission:student_create', 'throttle:5,1'])
+             ->name('students.scrape-portal');
++        Route::get('students/{student}/academic-data/edit', [\App\Http\Controllers\StudentAcademicDataController::class, 'edit'])
++            ->middleware('permission:student_update')->name('students.academic-data.edit');
++        Route::put('students/{student}/academic-data', [\App\Http\Controllers\StudentAcademicDataController::class, 'update'])
++            ->middleware('permission:student_update')->name('students.academic-data.update');
+         registerResourceWithPermissions('students', StudentController::class, 'student');
+ 
+         // Dosen (Lecturers)
+@@ -259,6 +263,8 @@
+             ->middleware(['permission:sync_execute', 'throttle:5,1'])->name('sync.dispatch');
+         Route::post('sync/import-json', [SyncController::class, 'importJson'])
+             ->middleware('permission:sync_execute')->name('sync.import-json');
++        Route::post('sync/krs-term-apply', [SyncController::class, 'applyFlatTermKrs'])
++            ->middleware('permission:sync_execute')->name('sync.krs-term-apply');
+         Route::post('sync/import-academic-profile', [SyncController::class, 'importAcademicProfile'])
+             ->middleware('permission:sync_execute')->name('sync.import-academic-profile');
+ 
+@@ -272,6 +278,15 @@
+         Route::resource('krs', KrsController::class)
+             ->middleware('permission:student_read')
+             ->only(['index']);
++
++        Route::get('student-courses/periods', [\App\Http\Controllers\AcademicPeriodController::class, 'index'])
++            ->middleware('permission:student_read')->name('academic_periods.index');
++        Route::post('student-courses/periods', [\App\Http\Controllers\AcademicPeriodController::class, 'store'])
++            ->middleware('permission:student_update')->name('academic_periods.store');
++        Route::put('student-courses/periods/{academicPeriod}', [\App\Http\Controllers\AcademicPeriodController::class, 'update'])
++            ->middleware('permission:student_update')->name('academic_periods.update');
++        Route::post('student-courses/periods/{academicPeriod}/activate', [\App\Http\Controllers\AcademicPeriodController::class, 'activate'])
++            ->middleware('permission:student_update')->name('academic_periods.activate');
+ 
+         // Student Courses (KRS Module)
+         Route::get('student_courses/template', [StudentCourseController::class, 'downloadTemplate'])

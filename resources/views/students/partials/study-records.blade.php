@@ -17,26 +17,6 @@
 @endif
 </div>
     </details>
-    <details data-study-section="active-grades" class="group border-b border-slate-100 last:border-0" >
-        <summary class="flex cursor-pointer list-none items-center justify-between gap-4 p-6 [&::-webkit-details-marker]:hidden">
-            <div><h3 class="text-base font-semibold text-slate-800">History Nilai (KRS Aktif)</h3><p class="mt-1 text-xs text-slate-500">Nilai tersimpan untuk mata kuliah yang tercantum pada KRS aktif.</p></div>
-            <svg aria-hidden="true" class="h-5 w-5 shrink-0 self-end text-slate-400 transition-transform group-open:rotate-90" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m9 5 7 7-7 7"/></svg>
-        </summary>
-        <div class="px-6 pb-6">@php($gradeRows = $activeCourseGrades)
-
-@if($gradeRows->isNotEmpty())
-    <div class="overflow-x-auto"><table class="campus-table">
-        <thead><tr><th>Kode MK</th><th>Mata Kuliah</th><th>SKS</th><th>Jenis</th><th>Tingkat</th><th>Tahun akademik</th><th>Nilai</th></tr></thead>
-        <tbody>@foreach($gradeRows as $grade)
-            <tr><td class="font-mono">{{ $grade->course_code }}</td><td>{{ $grade->course_name }}</td><td>{{ $grade->credits ?? '-' }}</td><td>{{ $grade->type ?? '-' }}</td><td>{{ $grade->level ?? '-' }}</td><td>{{ $grade->academic_year ?? 'Belum tersedia' }}</td>
-                <td><span class="badge {{ in_array($grade->grade,['A','AB']) ? 'badge-success' : (in_array($grade->grade,['B','BC']) ? 'badge-info' : ($grade->grade === 'C' ? 'badge-warning' : ($grade->grade ? 'badge-danger' : 'bg-slate-100 text-slate-600'))) }}">{{ $grade->grade ?? 'Belum ada nilai' }}</span></td></tr>
-        @endforeach</tbody>
-    </table></div>
-@else
-    <p class="text-sm text-slate-500">Belum ada data nilai.</p>
-@endif
-</div>
-    </details>
     <details data-study-section="all-courses" class="group border-b border-slate-100 last:border-0" >
         <summary class="flex cursor-pointer list-none items-center justify-between gap-4 p-6 [&::-webkit-details-marker]:hidden">
             <div><h3 class="text-base font-semibold text-slate-800">Mata Kuliah Semua Semester</h3></div>

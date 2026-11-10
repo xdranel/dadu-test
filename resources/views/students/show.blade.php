@@ -1,7 +1,8 @@
 <x-app-layout>
     <x-slot name="header">Profil Mahasiswa</x-slot>
 
-    <div x-data="{ activeTab: 'profil' }">
+    <div x-data="{ activeTab: @js(request('tab') === 'yudisium' ? 'yudisium' : 'profil') }">
+        @if(session('success'))<p role="status" class="mb-4 rounded-xl bg-emerald-50 p-4 text-sm text-emerald-800">{{ session('success') }}</p>@endif
 
         <!-- Header Profil-->
         <div class="campus-card mb-5 overflow-hidden">
@@ -249,6 +250,11 @@
         <!-- TAB 6: DATA YUDISIUM -->
         <div x-show="activeTab === 'yudisium'" x-transition>
             <div class="space-y-5">
+                @can('student_update')
+                    @can('update', $student)
+                        <div class="flex justify-end"><a data-edit-academic-data class="btn btn-primary" href="{{ route('students.academic-data.edit',$student) }}">Edit Data Yudisium &amp; TA</a></div>
+                    @endcan
+                @endcan
 
                 <!-- Sidang Tingkat -->
                 <div class="campus-card p-6">
@@ -256,10 +262,11 @@
                     @if($student->sidangTingkat)
                         <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
                             @foreach (['tingkat_1' => 'Tingkat 1', 'tingkat_2' => 'Tingkat 2', 'tingkat_3' => 'Tingkat 3', 'tingkat_4' => 'Tingkat 4'] as $field => $label)
+                                @php $levelPassed = $student->sidangTingkat->$field; @endphp
                                 <div class="border rounded-xl p-4 text-center {{ $student->sidangTingkat->$field ? 'bg-emerald-50 border-emerald-200' : 'bg-slate-50 border-slate-200' }}">
                                     <p class="text-xs text-slate-500 mb-1">{{ $label }}</p>
-                                    <span class="badge {{ $student->sidangTingkat->$field ? 'badge-success' : 'badge-danger' }}">
-                                        {{ $student->sidangTingkat->$field ? 'Lulus' : 'Belum' }}
+                                    <span class="badge {{ $levelPassed === null ? 'bg-slate-100 text-slate-600' : ($levelPassed ? 'badge-success' : 'badge-danger') }}">
+                                        {{ $levelPassed === null ? 'Belum tersedia' : ($levelPassed ? 'Lulus' : 'Belum') }}
                                     </span>
                                 </div>
                             @endforeach
@@ -276,6 +283,8 @@
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-3">
                             @php
                                 $fpData = [
+                                    'Judul TA (Indonesia)' => $student->finalProject->thesis_title_id ?? '-',
+                                    'Judul TA (Inggris)' => $student->finalProject->thesis_title_en ?? '-',
                                     'Pembimbing 1' => $student->finalProject->advisor_1 ?? '-',
                                     'Pembimbing 2' => $student->finalProject->advisor_2 ?? '-',
                                     'Penguji 1'    => $student->finalProject->examiner_1 ?? '-',
@@ -332,8 +341,8 @@
                     <div class="campus-card p-6 text-center">
                         <p class="text-xs text-slate-500 mb-2">Approval Foto BASILA</p>
                         @if($student->basilaApproval)
-                            <span class="badge {{ $student->basilaApproval->photo_approval ? 'badge-success' : 'badge-danger' }} text-sm px-3 py-1">
-                                {{ $student->basilaApproval->photo_approval ? 'Disetujui' : 'Belum' }}
+                            <span class="badge {{ $student->basilaApproval->photo_approval === null ? 'bg-slate-100 text-slate-600' : ($student->basilaApproval->photo_approval ? 'badge-success' : 'badge-danger') }} text-sm px-3 py-1">
+                                {{ $student->basilaApproval->photo_approval === null ? 'Belum tersedia' : ($student->basilaApproval->photo_approval ? 'Disetujui' : 'Belum') }}
                             </span>
                         @else
                             <span class="text-slate-300">—</span>

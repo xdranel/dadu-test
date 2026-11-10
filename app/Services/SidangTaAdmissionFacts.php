@@ -76,7 +76,7 @@ class SidangTaAdmissionFacts
         ];
     }
 
-    private function skpiApproval(array $raw): ?bool
+    public function skpiApproval(array $raw): ?bool
     {
         $values = [];
         foreach (['status', 'approval_status', 'is_approved'] as $key) {
@@ -100,7 +100,7 @@ class SidangTaAdmissionFacts
         return $values[0];
     }
 
-    private function legacyEprtFacts(Student $student): array
+    public function legacyEprtFacts(Student $student): array
     {
         $rows = StudentEprt::where('student_number', $student->student_number)
             ->where(function ($query) { $query->whereNull('category')->orWhere('category', ''); })

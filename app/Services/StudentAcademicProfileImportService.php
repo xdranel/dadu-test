@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Student;
+use App\Models\StudentAcademicProfile;
 use App\Models\StudentBppPayment;
 use App\Models\StudentBasilaApproval;
 use App\Models\StudentCourseIssue;
@@ -121,6 +122,7 @@ class StudentAcademicProfileImportService
             // ─── NIM + Nama cocok → lanjut upsert ──────────────────────
             try {
                 DB::transaction(function () use ($row, $nim, $student, &$summary) {
+                    $student = Student::whereKey($student->id)->lockForUpdate()->firstOrFail();
                     $isNew = $this->upsertAllTables($row, $nim, $student);
                     $isNew ? $summary['created']++ : $summary['updated']++;
                 });
@@ -145,6 +147,8 @@ class StudentAcademicProfileImportService
      */
     private function upsertAllTables(array $row, string $nim, Student $student): bool
     {
+        $profile = StudentAcademicProfile::where('student_number', $nim)->first();
+        $preserveMissing = $profile !== null;
         $thesis = is_array($row['tugas_akhir'] ?? null) ? $row['tugas_akhir'] : [];
         $tak = is_array($row['tak'] ?? null) ? $row['tak'] : [];
         $basila = is_array($row['basila'] ?? null) ? $row['basila'] : [];
@@ -158,7 +162,7 @@ class StudentAcademicProfileImportService
         $eprt = is_array($row['eprt'] ?? null) ? $row['eprt'] : [];
 
         // Track apakah ini pertama kali (semua tabel baru → created)
-        $wasNew = !StudentSidangTingkat::where('student_number', $nim)->exists();
+        $wasNew = !$preserveMissing && !StudentSidangTingkat::where('student_number', $nim)->exists();
 
         // ─── Update tabel `students` (field duplikat dari JSON) ─────────
         $studentUpdates = [];
@@ -245,16 +249,15 @@ class StudentAcademicProfileImportService
             );
         }
 
-        // ─── Sidang Tingkat 1-4 ─────────────────────────────────────────
-        StudentSidangTingkat::updateOrCreate(
-            ['student_number' => $nim],
-            [
-                'tingkat_1' => $this->toBool((string) ($sidang['tingkat_1'] ?? $sidang['1'] ?? $row['sidang_tingkat_1'] ?? null)),
-                'tingkat_2' => $this->toBool((string) ($sidang['tingkat_2'] ?? $sidang['2'] ?? $row['sidang_tingkat_2'] ?? null)),
-                'tingkat_3' => $this->toBool((string) ($sidang['tingkat_3'] ?? $sidang['3'] ?? $row['sidang_tingkat_3'] ?? null)),
-                'tingkat_4' => $this->toBool((string) ($sidang['tingkat_4'] ?? $sidang['4'] ?? $row['sidang_tingkat_4'] ?? null)),
-            ]
-        );
+        // Partial legacy imports must not clear unrelated manual corrections.
+        $levels = [];
+        foreach (range(1, 4) as $level) {
+            $key = 'tingkat_'.$level;
+            if (!$preserveMissing || array_key_exists($key, $sidang) || array_key_exists((string) $level, $sidang) || array_key_exists('sidang_'.$key, $row)) {
+                $levels[$key] = $this->toBool($sidang[$key] ?? $sidang[(string) $level] ?? $row['sidang_'.$key] ?? null);
+            }
+        }
+        if ($levels !== []) StudentSidangTingkat::updateOrCreate(['student_number' => $nim], $levels);
 
         // ─── Approval BASILA ────────────────────────────────────────────
         $rawBasilaStatus = strtolower((string) ($basila['status'] ?? $basila['approval_status'] ?? $row['basila_status'] ?? ''));
@@ -265,6 +268,7 @@ class StudentAcademicProfileImportService
             default => 'pending',
         };
 
+        if (!$preserveMissing || array_key_exists('basila', $row) || array_key_exists('basila_status', $row) || array_key_exists('approval_foto_dosen_wali_basila', $row)) {
         StudentBasilaApproval::updateOrCreate(
             ['student_number' => $nim],
             [
@@ -272,6 +276,8 @@ class StudentAcademicProfileImportService
                 'status'         => $basilaStatus,
             ]
         );
+
+        }
 
         // ─── Nilai Tugas Akhir (indeks) ─────────────────────────────────
         $grade = $row['indeks_nilai_tugas_akhir'] ?? $thesisGrade['indeks'] ?? $thesisGrade['grade'] ?? null;
@@ -283,20 +289,20 @@ class StudentAcademicProfileImportService
         }
 
         // ─── MK Mengulang & MK Belum Lulus + SKS ───────────────────────
-        StudentCourseIssue::updateOrCreate(
-            ['student_number' => $nim],
-            [
-                'retaking_courses'  => $this->toJsonArray($courseIssues['mk_mengulang'] ?? $row['mk_mengulang'] ?? null),
-                'failed_courses'    => $this->toJsonArray($courseIssues['mk_belum_lulus'] ?? $row['mk_belum_lulus'] ?? null),
-                'credits_passed'    => $this->toNumeric((string) ($courseIssues['sks_lulus'] ?? $row['sks_lulus'] ?? '')),
-                'credits_remaining' => $this->toNumeric((string) ($courseIssues['sks_belum_lulus'] ?? $row['sks_belum_lulus'] ?? '')),
-            ]
-        );
+        $issueUpdates = [];
+        foreach (['retaking_courses' => 'mk_mengulang', 'failed_courses' => 'mk_belum_lulus',
+            'credits_passed' => 'sks_lulus', 'credits_remaining' => 'sks_belum_lulus'] as $field => $key) {
+            if (!$preserveMissing || array_key_exists($key, $courseIssues) || array_key_exists($key, $row)) {
+                $value = $courseIssues[$key] ?? $row[$key] ?? null;
+                $issueUpdates[$field] = str_starts_with($field, 'credits_') ? $this->toNumeric($value) : $this->toJsonArray($value);
+            }
+        }
+        if ($issueUpdates !== []) StudentCourseIssue::updateOrCreate(['student_number' => $nim], $issueUpdates);
+        if (array_key_exists('credits_passed', $issueUpdates)) $student->update(['total_credits' => $issueUpdates['credits_passed']]);
 
-        // ─── Status Pembayaran BPP (dari field status_keuangan) ─────────
-        StudentBppPayment::updateOrCreate(
-            ['student_number' => $nim],
-            ['status' => $bpp['status'] ?? $row['status_keuangan'] ?? null]
+        $hasBpp = array_key_exists('bpp', $row) || array_key_exists('status_keuangan', $row);
+        if (!$preserveMissing || $hasBpp) StudentBppPayment::updateOrCreate(
+            ['student_number' => $nim], ['status' => $bpp['status'] ?? $row['status_keuangan'] ?? null]
         );
 
         // ─── Status Pembayaran Wisuda ───────────────────────────────────
@@ -314,6 +320,43 @@ class StudentAcademicProfileImportService
         $skpi = is_array($row['skpi'] ?? null) ? $row['skpi'] : null;
         if ($skpi !== null) {
             StudentSkpi::updateOrCreate(['student_number' => $nim], ['raw_data' => $skpi]);
+        }
+
+        // Keep official readers in sync when a manual edit has already created a profile.
+        if ($profile !== null) {
+            $groups = $profile->groups ?? [];
+            $academic = $groups['academic'] ?? [];
+            if (array_key_exists('ipk', $row)) $academic['gpa'] = $this->toNumeric($row['ipk']);
+            if (array_key_exists('credits_passed', $issueUpdates)) $academic['passed_credits'] = $issueUpdates['credits_passed'];
+            if (array_key_exists('tingkat_2', $levels)) $academic['level_2_passed'] = $levels['tingkat_2'];
+            if ($academic !== []) $groups['academic'] = $academic;
+            if ($takRecords !== []) {
+                $score = StudentTak::where('student_number', $nim)
+                    ->where(fn ($q) => $q->whereNull('test_date')->orWhereDate('test_date', '<=', today()))
+                    ->where(fn ($q) => $q->whereNull('expiry_date')->orWhereDate('expiry_date', '>=', today()))->max('total_points');
+                $groups['tak'] = array_replace($groups['tak'] ?? [], ['score' => $this->toNumeric($score)]);
+            }
+            $facts = app(SidangTaAdmissionFacts::class);
+            if ($skpi !== null) {
+                $approved = $facts->skpiApproval($skpi);
+                $groups['skpi'] = array_replace($groups['skpi'] ?? [], ['approved' => $approved,
+                    'status' => match ($approved) { true => 'Disetujui', false => 'Belum Disetujui', default => null }]);
+            }
+            if ($eprtRecords !== []) {
+                $language = $facts->legacyEprtFacts($student);
+                $groups['language'] = array_replace($groups['language'] ?? [], ['score' => $language['score'],
+                    'attempts' => $language['confirmed_attempts'], 'type' => 'EPrT',
+                    'history' => array_map(fn ($entry) => $entry['source'], $language['history'])]);
+            }
+            $periods = $profile->bpp_periods ?? [];
+            if ($hasBpp) {
+                $period = $bpp['period'] ?? $row['periode_keuangan'] ?? null;
+                $period = is_string($period) && preg_match('/^\d{4}\/[12]$/D', $period) ? $period : null;
+                $payment = ['status' => $bpp['status'] ?? $row['status_keuangan'] ?? null, 'period' => $period];
+                $groups['bpp'] = array_replace($groups['bpp'] ?? [], $payment);
+                if ($period !== null) $periods[$period] = array_replace($periods[$period] ?? [], $payment);
+            }
+            $profile->fill(['groups' => $groups, 'bpp_periods' => $periods])->save();
         }
 
         // Invalidasi Cache per NIM setelah update

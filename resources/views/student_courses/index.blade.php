@@ -1,6 +1,11 @@
 <x-app-layout>
     <x-slot name="header">Modul KRS Mahasiswa</x-slot>
 
+    <div class="mb-4 flex flex-wrap items-center gap-3">
+        <a href="{{ route('academic_periods.index') }}" class="btn btn-secondary">Pengaturan Periode Akademik</a>
+        @can('sync_execute')<a href="{{ route('sync.index') }}" class="text-sm text-blue-600 underline">Import JSON KRS</a>@endcan
+    </div>
+
     <!-- Filter & Actions -->
     <div class="filter-card mb-4">
         <div class="flex flex-wrap gap-2.5 items-end justify-between">
@@ -28,14 +33,12 @@
                 </div>
 
                 <div class="min-w-[100px]">
-                    <label class="campus-label">Semester</label>
+                    <label class="campus-label">Semester Studi</label>
                     <select name="semester" class="campus-select">
                         <option value="">Semua</option>
-                        <option value="Ganjil" {{ request('semester') == 'Ganjil' ? 'selected' : '' }}>Ganjil</option>
-                        <option value="Genap" {{ request('semester') == 'Genap' ? 'selected' : '' }}>Genap</option>
-                        <option value="Antara" {{ request('semester') == 'Antara' ? 'selected' : '' }}>Antara</option>
-                        <option value="1" {{ request('semester') == '1' ? 'selected' : '' }}>1</option>
-                        <option value="2" {{ request('semester') == '2' ? 'selected' : '' }}>2</option>
+                        @for ($semester = 1; $semester <= 14; $semester++)
+                            <option value="{{ $semester }}" @selected((string)request('semester') === (string)$semester)>{{ $semester }}</option>
+                        @endfor
                     </select>
                 </div>
 
@@ -73,7 +76,7 @@
                     <tr>
                         <th>Mata Kuliah</th>
                         <th class="!text-center">Kelas & Prodi</th>
-                        <th class="!text-center">Semester / SKS</th>
+                        <th class="!text-center">Periode / Semester Studi / SKS</th>
                         <th class="!text-center">Dosen</th>
                         <th class="!text-center">JUMLAH MHS</th>
                         <th class="!text-center">Aksi</th>
@@ -91,7 +94,8 @@
                                 <div class="text-xs text-slate-500 mt-0.5">{{ $item->study_program_display }}</div>
                             </td>
                             <td class="text-center align-middle">
-                                <div class="text-slate-700">{{ $item->semester_display }}</div>
+                                <div class="text-slate-700">{{ $item->academicPeriod?->label ?? $item->academic_year }}</div>
+                                <div class="text-xs text-slate-500">Semester studi {{ $item->semester_display }}</div>
                                 <div class="text-xs font-semibold text-gray-500 mt-0.5">{{ $item->credits ?: '-' }} SKS</div>
                             </td>
                             <td class="text-center align-middle">

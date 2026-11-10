@@ -50,7 +50,7 @@ test('detail88 official JSON supplies language dates validity TAK BPP SKPI and s
     expect($c->filter('[data-student-sidang-approval]')->text())->toContain('APPROVED');
 });
 
-test('detail88 active courses active course grade history all courses and all grades stay separate', function () {
+test('detail88 active courses all courses and all grades stay separate', function () {
     $active=AcademicPeriod::create(['year'=>'2026/2027','semester'=>1,'label'=>'Ganjil 2026/2027','start_date'=>'2026-08-01','end_date'=>'2027-01-31','is_active'=>true]);
     $old=AcademicPeriod::create(['year'=>'2025/2026','semester'=>2,'label'=>'Genap 2025/2026','start_date'=>'2026-02-01','end_date'=>'2026-07-31','is_active'=>false]);
     foreach ([[$active,'TA88','TUGAS AKHIR 2',7],[$old,'OLD88','MATA KULIAH LAMA',6]] as [$period,$code,$name,$semester]) {
@@ -62,16 +62,14 @@ test('detail88 active courses active course grade history all courses and all gr
             'grade'=>$grade,'academic_year'=>$year,'level'=>4]);
     }
     $c=new Crawler(($this->detailPage)()->getContent());
-    expect($c->filter('[data-study-records] details')->count())->toBe(4);
-    foreach (['active-courses','active-grades','all-courses','all-grades'] as $section) {
+    expect($c->filter('[data-study-records] details')->count())->toBe(3);
+    foreach (['active-courses','all-courses','all-grades'] as $section) {
         expect($c->filter('details[data-study-section="'.$section.'"] summary svg')->count())->toBe(1);
     }
     $activeCourses=$c->filter('[data-study-section="active-courses"]');
     expect($activeCourses->getNode(0)->hasAttribute('open'))->toBeTrue();
     expect($activeCourses->text())->toContain('TA88')->toContain('Ganjil 2026/2027')->not->toContain('OLD88');
-    $activeGrades=$c->filter('[data-study-section="active-grades"]');
-    expect($activeGrades->filter('tbody tr')->count())->toBe(2);
-    expect($activeGrades->text())->toContain('2025/2026')->toContain('2026/2027')->not->toContain('OLD88');
+    expect($c->filter('[data-study-section="active-grades"]')->count())->toBe(0);
     expect($c->filter('[data-study-section="all-courses"]')->text())->toContain('TA88')->toContain('OLD88')->toContain('Genap 2025/2026');
     expect($c->filter('[data-study-section="all-grades"] tbody tr')->count())->toBe(3);
 });
@@ -109,11 +107,11 @@ test('detail88 legacy student language TAK and unknown-period BPP remain readabl
     expect($c->filter('[data-student-bpp-history]')->text())->toContain('LUNAS')->toContain('Periode belum tersedia');
 });
 
-test('detail88 empty grades keep four sections and do not invent attendance', function () {
+test('detail88 empty grades keep three sections and do not invent attendance', function () {
     $c=new Crawler(($this->detailPage)()->getContent());
-    expect($c->filter('[data-study-records] details')->count())->toBe(4);
+    expect($c->filter('[data-study-records] details')->count())->toBe(3);
     expect($c->filter('[data-study-section="active-courses"]')->text())->toContain('Periode akademik aktif belum ditentukan');
-    expect($c->filter('[data-study-section="active-grades"]')->text())->toContain('Belum ada');
+    expect($c->filter('[data-study-section="active-grades"]')->count())->toBe(0);
     expect($c->filter('[data-study-section="all-courses"]')->text())->toContain('Belum ada');
     expect($c->filter('[data-study-section="all-grades"]')->text())->toContain('Belum ada');
     expect($c->filter('[data-student-attendance]')->text())->toContain('Belum ada data kehadiran')->not->toContain('0%');
