@@ -29,14 +29,21 @@ beforeEach(function () {
         'label' => 'Dummy import', 'start_date' => '2026-08-01', 'end_date' => '2027-01-31', 'is_active' => true]);
     $this->importDummy = function (string $type, string $filename, ?array $payload = null) {
         $payload ??= meetDummyJson($filename);
-        return $this->from(route('sync.index'))->post(route('sync.import-json'), [
+        $response = $this->from(route('sync.index'))->post(route('sync.import-json'), [
             'type' => $type,
             'json_file' => UploadedFile::fake()->createWithContent($filename, json_encode($payload, JSON_THROW_ON_ERROR)),
-        ])->assertRedirect()->assertSessionHasNoErrors()->assertSessionHas('success');
+        ]);
+        if ($type === 'krs') {
+            $response->assertOk()->assertSee('Pratinjau KRS');
+            $response = $this->post(route('sync.krs-term-apply'), [
+                'preview_token' => session('krs_term_preview.token'), 'confirmed' => 1,
+            ]);
+        }
+        return $response->assertRedirect()->assertSessionHasNoErrors()->assertSessionHas('success');
     };
     $this->importAll = function () {
         ($this->importDummy)('student', '01-mahasiswa-dummy.json');
-        ($this->importDummy)('krs', '02-krs-ta2-dummy.json');
+        ($this->importDummy)('krs', '98-02-krs-ta2-term-dummy.json');
         ($this->importDummy)('academic_profile', '03-profil-akademik-dummy.json');
     };
 });
@@ -96,19 +103,18 @@ test('meet_dummy_academic_profile_name_mismatch_skips_without_writing_approval_o
     expect(Student::where('student_number', $row['nim'])->value('name'))->toBe('Dummy TA EPRT Otomatis');
 });
 
-test('meet_dummy_krs_can_be_linked_by_reimport_after_academic_period_is_initialized', function () {
+test('meet_dummy_krs_waits_for_registered_period_and_can_be_imported_after_initialization', function () {
     $this->academicPeriod->delete();
     ($this->importAll)();
     $student = Student::where('student_number', '1202299002')->firstOrFail();
-    $krs = StudentCourse::where('student_number', $student->student_number)->firstOrFail();
-    expect($krs->course_name)->toBe('TUGAS AKHIR 2');
-    expect($krs->academic_period_id)->toBeNull();
+    expect(StudentCourse::where('student_number', $student->student_number)->count())->toBe(0);
     expect(app(SidangTaAdmissionFacts::class)->forStudent($student)['krs_status'])->toBe('unknown');
     $period = AcademicPeriod::create(['year' => '2026/2027', 'semester' => 1,
         'label' => 'Ganjil 2026/2027', 'start_date' => '2026-08-01', 'end_date' => '2027-01-31', 'is_active' => true]);
-    ($this->importDummy)('krs', '02-krs-ta2-dummy.json');
+    ($this->importDummy)('krs', '98-02-krs-ta2-term-dummy.json');
     $facts = app(SidangTaAdmissionFacts::class)->forStudent($student);
-    expect((int) $krs->fresh()->academic_period_id)->toBe($period->id);
+    $krs = StudentCourse::where('student_number', $student->student_number)->firstOrFail();
+    expect((int) $krs->academic_period_id)->toBe($period->id);
     expect($facts['krs_status'])->toBe('eligible');
     expect($facts['academic']['academic_passed'])->toBeTrue();
     expect($facts['eprt']['mode'])->toBe('waiver');

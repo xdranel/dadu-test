@@ -4,7 +4,6 @@ namespace App\Http\Controllers;
 
 use App\Jobs\ProcessCampusScraping;
 use App\Jobs\SyncMasterDataJob;
-use App\Models\AcademicPeriod;
 use App\Models\Lecturer;
 use App\Models\Student;
 use App\Models\Course;
@@ -299,10 +298,16 @@ class SyncController extends Controller
 
     public function importJson(Request $request)
     {
-        $request->validate([
+        $rules = [
             'type'      => ['required', 'string', 'in:student,krs,attendance,course,academic_profile'],
-            'krs_semester_mode' => ['nullable', 'in:study,term'],
             'json_file' => ['required', 'file', 'mimetypes:application/json,text/plain'],
+        ];
+        if ($request->input('type') === 'krs') {
+            // Accept existing term clients, but never allow the retired study-semester fallback.
+            $rules['krs_semester_mode'] = ['nullable', 'in:term'];
+        }
+        $request->validate($rules, [
+            'krs_semester_mode.in' => 'Format semester studi tidak didukung. Gunakan KRS datar Ganjil/Genap atau format resmi krs_mata_kuliah.',
         ]);
 
         if ($request->type === 'academic_profile') {
@@ -327,7 +332,7 @@ class SyncController extends Controller
             return $this->importOfficialKrs($data, JsonSourceLocations::rows($jsonString));
         }
 
-        if ($request->type === 'krs' && $request->input('krs_semester_mode', 'study') === 'term') {
+        if ($request->type === 'krs') {
             return $this->previewFlatTermKrs($request, $data, $jsonString);
         }
 
@@ -368,7 +373,6 @@ class SyncController extends Controller
 
                 $result = match($request->type) {
                     'student'    => $this->importStudentRow($row),
-                    'krs'        => $this->importKrsRow($row),
                     'attendance' => $this->importAttendanceRow($row),
                     'course'     => $this->importCourseRow($row),
                     'graduation' => $this->importGraduationRow($row),
@@ -379,7 +383,7 @@ class SyncController extends Controller
                 if (!$result) $errors[] = "Baris #{$index}: ".$this->skippedImportReason($request->type, $row);
             }
 
-            if (in_array($request->type, ['krs', 'course'])) {
+            if ($request->type === 'course') {
                 try {
                     \Illuminate\Support\Facades\Artisan::call('courses:sync-study-program');
                 } catch (\Exception $e) {
@@ -547,289 +551,6 @@ class SyncController extends Controller
         );
 
         return true;
-    }
-
-    private function importKrsRow(array $row): bool
-    {
-        // If it's a flat list array (as in the user's example)
-        if (isset($row[0])) {
-            $nim = $row[0] ?? null;
-            if (empty($nim)) return false;
-
-            // 1. Automatically create or update the student profile
-            $gender = $row[3] ?? null;
-            if ($gender) {
-                $gender = (str_contains(strtoupper($gender), 'WANITA') || str_contains(strtoupper($gender), 'PEREMPUAN') || strtoupper($gender) === 'P')
-                    ? 'Perempuan'
-                    : 'Laki-laki';
-            }
-
-            $religion = $row[4] ?? null;
-            if ($religion) {
-                $religion = ucfirst(strtolower($religion));
-            }
-
-            $studyProgram = $row[5] ?? '';
-
-            $academicYearRaw = $row[10] ?? '';
-            $academicYear = $academicYearRaw;
-            if (strlen($academicYear) === 4 && is_numeric($academicYear)) {
-                $academicYear = '20' . substr($academicYear, 0, 2) . '/20' . substr($academicYear, 2, 2);
-            }
-
-            // Extract academic year from NIM using length-based suffix (e.g., 102052400067 -> 2024)
-            $entryYearSuffix = '';
-            if (strlen($nim) === 10) {
-                $entryYearSuffix = substr($nim, 4, 2);
-            } elseif (strlen($nim) === 12) {
-                $entryYearSuffix = substr($nim, 5, 2);
-            } else {
-                $entryYearSuffix = substr($nim, 4, 2);
-            }
-            $studentAcademicYear = '20' . $entryYearSuffix;
-            if (!is_numeric($studentAcademicYear) || (int)$studentAcademicYear < 2000 || (int)$studentAcademicYear > 2090) {
-                $studentAcademicYear = date('Y');
-            }
-
-            $academicPeriodId = $this->resolveKrsAcademicPeriodId($academicYear);
-
-            Student::updateOrCreate(
-                ['student_number' => $nim],
-                [
-                    'name'              => $row[1] ?? '',
-                    'gender'            => $gender,
-                    'religion'          => $religion,
-                    'study_program'     => $studyProgram,
-                    'class_name'        => $row[2] ?? null, // Index 2 is Kelas mahasiswa
-                    'academic_advisor'  => null, // Clear advisor since it is no longer mapped
-                    'academic_year'     => (int)$studentAcademicYear,
-                    'active_semester'   => $row[11] ?? 1,
-                    'email'             => null,
-                    'status'            => 'Aktif',
-                ]
-            );
-
-            // 2. Create or update the KRS (StudentCourse) record
-            $courseCode = $row[7] ?? null;
-            if (empty($courseCode)) return true; // student created, but no course code provided
-
-            // Check if course exists in Course master to get credits
-            $credits = 3;
-            $course = Course::where('course_code', $courseCode)->first();
-            if ($course) {
-                $credits = $course->credits;
-            } else {
-                $courseName = strtoupper($row[8] ?? '');
-                if (str_contains($courseName, 'AGAMA') || str_contains($courseName, 'RELIGION')) {
-                    $credits = 2;
-                }
-
-                // Auto-create stub Course agar Foreign Key constraint pada student_courses terpenuhi
-                $periodSemester = $academicPeriodId
-                    ? AcademicPeriod::find($academicPeriodId)?->semester
-                    : null;
-                $semesterTerm = $periodSemester === null
-                    ? null
-                    : ($periodSemester === 2 ? 'GENAP' : 'GANJIL');
-                Course::firstOrCreate(
-                    [
-                        'academic_year' => $academicYear ?: null,
-                        'semester_term' => $semesterTerm,
-                        'course_code'   => $courseCode,
-                    ],
-                    [
-                        'name'          => $row[8] ?? $courseCode,
-                        'study_program' => substr($studyProgram ?: 'Umum', 0, 50),
-                        'class'         => substr($row[14] ?? $row[2] ?? '-', 0, 10),
-                        'semester'      => (int) ($row[11] ?? 1),
-                        'credits'       => $credits,
-                        'type'          => 'Wajib',
-                        'status'        => 'Aktif',
-                    ]
-                );
-
-                // Auto-create stub Course agar Foreign Key constraint pada student_courses terpenuhi
-                $periodSemester = $academicPeriodId
-                    ? AcademicPeriod::find($academicPeriodId)?->semester
-                    : null;
-                $semesterTerm = $periodSemester === null
-                    ? null
-                    : ($periodSemester === 2 ? 'GENAP' : 'GANJIL');
-                Course::firstOrCreate(
-                    [
-                        'academic_year' => $academicYear ?: null,
-                        'semester_term' => $semesterTerm,
-                        'course_code'   => $courseCode,
-                    ],
-                    [
-                        'name'          => $row[8] ?? $courseCode,
-                        'study_program' => substr($studyProgram ?: 'Umum', 0, 50),
-                        'class'         => substr($row[14] ?? $row[2] ?? '-', 0, 10),
-                        'semester'      => (int) ($row[11] ?? 1),
-                        'credits'       => $credits,
-                        'type'          => 'Wajib',
-                        'status'        => 'Aktif',
-                    ]
-                );
-            }
-
-            StudentCourse::updateOrCreate(
-                [
-                    'student_number'  => $nim,
-                    'course_code'     => $courseCode,
-                    'academic_year'   => $academicYear,
-                    'semester'        => $row[11] ?? 1,
-                ],
-                [
-                    'course_name'     => $row[8]  ?? '',
-                    'course_class'    => $row[14] ?? '', // Index 14 is Kelas Mata Kuliah / KRS
-                    'lecturer_code'   => $row[9]  ?? null,
-                    'lecturer_name'   => null,
-                    'credits'         => $credits,
-                    'quota'           => null, // Index 12 is prodi ID and index 13 is studentType in this format
-                    'study_program'   => $studyProgram,
-                    'academic_period_id' => $academicPeriodId,
-                ]
-            );
-
-            return true;
-        }
-
-        // Original logic for associative array
-        $nim = $row['nim'] ?? $row['student_number'] ?? null;
-        $courseCode = $row['kode_matakuliah'] ?? $row['course_code'] ?? null;
-        if (empty($nim) || empty($courseCode)) return false;
-
-        $academicYear = $row['academic_year'] ?? $row['tahun_akademik'] ?? '';
-        $academicPeriodId = $this->resolveKrsAcademicPeriodId(
-            $academicYear,
-            $row['semester_term'] ?? $row['term'] ?? null,
-            $row['academic_period_id'] ?? null,
-        );
-
-        if (!Student::where('student_number', $nim)->exists()) return false;
-
-        $student = Student::where('student_number', $nim)->first();
-        $studyProgram = $row['prodi'] ?? $row['study_program'] ?? $row['program_studi'] ?? ($student ? $student->study_program : null);
-
-        // Auto-create stub Course jika belum ada agar FK tidak gagal
-        if (!Course::where('course_code', $courseCode)->exists()) {
-            $sem = (int) ($row['semester'] ?? 1);
-            $acadYear = $academicYear ?: null;
-            $periodSemester = $academicPeriodId
-                ? AcademicPeriod::find($academicPeriodId)?->semester
-                : null;
-            $semesterTerm = $row['semester_term'] ?? ($periodSemester === null
-                ? null
-                : ($periodSemester === 2 ? 'GENAP' : 'GANJIL'));
-            Course::firstOrCreate(
-                [
-                    'academic_year' => $acadYear,
-                    'semester_term' => $semesterTerm,
-                    'course_code'   => $courseCode,
-                ],
-                [
-                    'name'          => $row['nama_matakuliah'] ?? $row['course_name'] ?? $courseCode,
-                    'study_program' => substr($studyProgram ?: 'Umum', 0, 50),
-                    'class'         => substr($row['kelas_matakuliah'] ?? $row['course_class'] ?? '-', 0, 10),
-                    'semester'      => $sem,
-                    'credits'       => (int) ($row['sks'] ?? $row['credits'] ?? 3),
-                    'type'          => 'Wajib',
-                    'status'        => 'Aktif',
-                ]
-            );
-        }
-
-        // Auto-create stub Course jika belum ada agar FK tidak gagal
-        if (!Course::where('course_code', $courseCode)->exists()) {
-            $sem = (int) ($row['semester'] ?? 1);
-            $acadYear = $row['academic_year'] ?? $row['tahun_akademik'] ?? null;
-            $periodSemester = $academicPeriodId
-                ? AcademicPeriod::find($academicPeriodId)?->semester
-                : null;
-            $semesterTerm = $row['semester_term'] ?? ($periodSemester === null
-                ? null
-                : ($periodSemester === 2 ? 'GENAP' : 'GANJIL'));
-            Course::firstOrCreate(
-                [
-                    'academic_year' => $acadYear,
-                    'semester_term' => $semesterTerm,
-                    'course_code'   => $courseCode,
-                ],
-                [
-                    'name'          => $row['nama_matakuliah'] ?? $row['course_name'] ?? $courseCode,
-                    'study_program' => substr($studyProgram ?: 'Umum', 0, 50),
-                    'class'         => substr($row['kelas_matakuliah'] ?? $row['course_class'] ?? '-', 0, 10),
-                    'semester'      => $sem,
-                    'credits'       => (int) ($row['sks'] ?? $row['credits'] ?? 3),
-                    'type'          => 'Wajib',
-                    'status'        => 'Aktif',
-                ]
-            );
-        }
-
-        StudentCourse::updateOrCreate(
-            [
-                'student_number'  => $nim,
-                'course_code'     => $courseCode,
-                'academic_year'   => $academicYear,
-                'semester'        => $row['semester']       ?? 1,
-            ],
-            [
-                'course_name'     => $row['nama_matakuliah']  ?? $row['course_name']    ?? '',
-                'course_class'    => $row['kelas_matakuliah'] ?? $row['course_class']   ?? '',
-                'lecturer_code'   => $row['kode_dosen']       ?? $row['lecturer_code']  ?? null,
-                'lecturer_name'   => $row['nama_dosen']       ?? $row['lecturer_name']  ?? null,
-                'credits'         => $row['sks']              ?? $row['credits']        ?? 3,
-                'study_program'   => $studyProgram,
-                'academic_period_id' => $academicPeriodId,
-            ]
-        );
-        return true;
-    }
-
-    /**
-     * Associate imported KRS rows with the existing academic-period record.
-     * The KRS `semester` field is a student's study semester, not the 1/2 term
-     * stored by AcademicPeriod, so only an explicit term or current matching
-     * academic year can resolve the period.
-     */
-    private function resolveKrsAcademicPeriodId(?string $academicYear, mixed $term = null, mixed $periodId = null): ?int
-    {
-        if ($periodId !== null && is_numeric($periodId)) {
-            $period = AcademicPeriod::find((int) $periodId);
-            if ($period && (!$academicYear || $period->year === $academicYear)) {
-                return $period->id;
-            }
-        }
-
-        if ($academicYear === null || $academicYear === '') {
-            return null;
-        }
-
-        $query = AcademicPeriod::query();
-        $query->where('year', $academicYear);
-
-        if ($term !== null && $term !== '') {
-            $normalizedTerm = is_numeric($term)
-                ? (int) $term
-                : (in_array(strtolower(trim((string) $term)), ['ganjil', 'odd'], true) ? 1
-                    : (in_array(strtolower(trim((string) $term)), ['genap', 'even'], true) ? 2 : null));
-
-            if ($normalizedTerm === null || !in_array($normalizedTerm, [1, 2], true)) {
-                return null;
-            }
-
-            $query->where('semester', $normalizedTerm);
-            return $query->value('id');
-        }
-
-        $activePeriod = AcademicPeriod::current();
-        if ($activePeriod && $activePeriod->year === $academicYear) {
-            return $activePeriod->id;
-        }
-
-        return null;
     }
 
     private function importAttendanceRow(array $row): bool

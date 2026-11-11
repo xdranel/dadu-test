@@ -106,10 +106,11 @@ test('flat93_additive_import_preserves_other_periods_and_absent_courses', functi
         ->and($absent->fresh()->academic_period_id)->toBe($this->period93->id);
 });
 
-test('flat93_legacy_study_mode_remains_explicitly_supported', function () {
+test('flat98_legacy_study_mode_is_rejected_without_writes', function () {
     $this->period93->update(['is_active'=>true]);
-    ($this->upload93)([flatTerm93Row(['semester'=>4,'sks'=>3])],'study')->assertRedirect();
-    expect((int)StudentCourse::sole()->semester)->toBe(4);
+    ($this->upload93)([flatTerm93Row(['semester'=>4,'sks'=>3])],'study')
+        ->assertRedirect()->assertSessionHasErrors('krs_semester_mode');
+    expect(StudentCourse::count())->toBe(0)->and(\App\Models\Course::count())->toBe(0);
 });
 
 test('flat93_rosters_and_group_counts_separate_academic_period_identity', function () {

@@ -1,11 +1,11 @@
 <x-app-layout>
     <x-slot name="header">Sinkronisasi Data</x-slot>
 
-    <!-- ROW 1: Import JSON (kiri) + Status & Help (kanan) -->
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-5 mb-5" x-data="{ importType: 'student' }">
+    <!-- Import dan panduan di kiri; Status Data di kanan. -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 items-start gap-5 mb-5" x-data="{ importType: 'student' }">
         <!-- Panel Import JSON -->
-        <div class="lg:col-span-2">
-            <div class="campus-card p-6 h-full">
+        <div class="lg:col-span-2 space-y-5" data-sync-import-column>
+            <div class="campus-card p-6" data-import-json-card>
                 <div class="flex items-center justify-between mb-5">
                     <div>
                         <h3 class="text-base font-bold text-slate-800">
@@ -38,14 +38,10 @@
                         </div>
                     </div>
 
-                    <div x-show="importType === 'krs'" x-cloak class="space-y-2">
-                        <label for="krs_semester_mode" class="campus-label">Arti semester pada file KRS datar</label>
-                        <select id="krs_semester_mode" name="krs_semester_mode" class="campus-select w-full">
-                            <option value="study">Semester studi mahasiswa (format lama)</option>
-                            <option value="term">Term akademik: 1 Ganjil / 2 Genap (pratinjau dahulu)</option>
-                        </select>
-                        <p class="text-xs text-slate-500">Untuk rekap KRS datar dengan semester 1 = Ganjil, pilih Term akademik. Semester studi diambil dari profil mahasiswa. Baris lama yang cocok akan ditampilkan sebagai perbaikan tautan sebelum disimpan.</p>
-                        <a href="{{ route('academic_periods.index') }}" class="text-xs text-blue-600 underline">Pengaturan periode akademik KRS</a>
+                    <div x-show="importType === 'krs'" x-cloak class="space-y-2 rounded-lg bg-slate-50 p-3 text-xs text-slate-600">
+                        <p><strong>Format B — KRS datar:</strong> tambahan/perbaruan mata kuliah, melalui pratinjau sebelum disimpan. Semester 1 = Ganjil dan 2 = Genap.</p>
+                        <p><strong>Format C — daftar resmi:</strong> terdeteksi otomatis dari <code>krs_mata_kuliah</code>. Kirim daftar MK lengkap untuk mahasiswa dan periode yang disertakan; MK lama yang tidak tercantum dapat dihapus.</p>
+                        <a href="{{ route('academic_periods.index') }}" class="inline-block text-blue-600 underline">Pengaturan periode akademik KRS</a>
                     </div>
 
                     <!-- Catatan Khusus Profil Akademik -->
@@ -59,46 +55,12 @@
                     </button>
                 </form>
             </div>
-        </div>
-
-        <!-- Kolom Kanan: Status Data + Help Format JSON -->
-        <div class="space-y-5">
-            <!-- PANEL: Status Data di Database -->
-            <div class="campus-card p-5 flex flex-col">
-                <div class="flex items-center justify-between mb-4">
-                    <div>
-                        <h3 class="text-sm font-bold text-slate-800">Status Data</h3>
-                        <p class="text-xs text-slate-400 mt-0.5">Jumlah data di database</p>
-                    </div>
-                    <button id="refreshStatsBtn" onclick="refreshStats()"
-                            class="text-xs text-[#DA2D3B] hover:underline">
-                        Refresh
-                    </button>
-                </div>
-
-                <div id="statsGrid" class="grid grid-cols-2 gap-3 flex-1">
-                    @foreach ($dataStats as $stat)
-                        <div class="stat-card relative p-4 pl-5 bg-white rounded-xl border border-slate-200/60 shadow-sm hover:shadow-md hover:border-[#DA2D3B]/30 transition-all duration-300 flex flex-col justify-center overflow-hidden group"
-                             data-key="{{ $stat['key'] }}">
-                            <div class="absolute left-0 top-0 w-1 h-full bg-slate-100 group-hover:bg-[#DA2D3B] transition-colors duration-300"></div>
-                            <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">{{ $stat['label'] }}</p>
-                            <p class="text-2xl font-extrabold text-slate-800 stat-count tracking-tight">
-                                {{ number_format($stat['count']) }}
-                            </p>
-                        </div>
-                    @endforeach
-                </div>
-
-                <p class="text-[10px] text-slate-300 text-center mt-3" id="statsLastUpdate">
-                    Terakhir diperbarui: {{ now()->format('H:i:s') }}
-                </p>
-            </div>
 
             <!-- Panel Help / Format Template JSON -->
-            <div class="campus-card p-5 flex flex-col">
+            <div class="campus-card p-5 flex flex-col" data-json-format-card>
                 <h3 class="text-sm font-bold text-slate-800 mb-3">Format Data JSON</h3>
                 
-                <div class="overflow-y-auto text-xs space-y-3 max-h-[200px] pr-1">
+                <div class="overflow-y-auto text-xs space-y-3 max-h-[520px] pr-1">
                     <!-- Template Student -->
                     <div x-show="importType === 'student'">
                         <p class="font-semibold text-slate-600 mb-1">Format Profil Mahasiswa:</p>
@@ -114,25 +76,56 @@
 ]</pre>
                     </div>
 
-                    <!-- Template KRS -->
-                    <div x-show="importType === 'krs'">
-                        <p class="font-semibold text-slate-600 mb-1">Format KRS Mahasiswa:</p>
-                        <pre class="bg-slate-50 p-2.5 rounded-lg border border-slate-200 font-mono text-[10px] text-slate-700 overflow-x-auto select-all">[
+                    <!-- Dua kontrak sumber KRS: datar dan daftar resmi. -->
+                    <div x-show="importType === 'krs'" class="space-y-4">
+                        <p class="text-slate-500">Contoh berikut memakai data sintetis. Gunakan NIM dan data asli dari sumber saat mengimpor.</p>
+                        <section>
+                            <p class="font-semibold text-slate-700 mb-1">Format B — KRS datar: tambah/perbarui</p>
+                            <p class="mb-2 leading-relaxed text-slate-600">Boleh berisi MK yang kurang. Sistem menampilkan pratinjau sebelum menyimpan dan mempertahankan MK lain yang tidak disertakan. <code>tahun_akademik</code> memakai 2026/2027; <code>semester</code> 1 = Ganjil, 2 = Genap. SKS null tetap belum diketahui.</p>
+                            <pre data-krs-example="flat" class="bg-slate-50 p-2.5 rounded-lg border border-slate-200 font-mono text-[10px] text-slate-700 overflow-x-auto select-all">[
   {
-    "nim": "1202200001",
-    "kode_matakuliah": "IF-101",
+    "nim": "1298000001",
+    "kode_matakuliah": "DEMO-KRS-01",
     "nama_matakuliah": "Pemrograman Web",
-    "kelas_matakuliah": "IF-44-01",
-    "kode_dosen": "DSN001",
-    "nama_dosen": "Dosen A",
-    "sks": 3,
-    "tahun_akademik": "2025/2026",
-    "semester": 4
+    "kelas_matakuliah": "KELAS-A",
+    "kode_dosen": "D-CONTOH",
+    "nama_dosen": "Dosen Contoh",
+    "sks": null,
+    "tahun_akademik": "2026/2027",
+    "semester": 1
   }
 ]</pre>
-                        <p class="mt-2 text-[10px] leading-relaxed text-amber-700">
-                            Pada mode format lama, <code>semester</code> adalah semester studi (misalnya 4 atau 8). Pada mode Term akademik, <code>semester</code> adalah 1 (Ganjil) atau 2 (Genap) dan tahun akademik harus mempunyai periode terdaftar. Untuk memenuhi syarat yudisium, impor baris KRS TA2 yang sebenarnya dari iGracias. Kode/nama contoh IF-101 dan Pemrograman Web bukan TA2. Tahun akademik harus sama dengan periode akademik aktif.
-                        </p>
+                        </section>
+                        <section>
+                            <p class="font-semibold text-slate-700 mb-1">Format C — daftar resmi: pengganti daftar lengkap</p>
+                            <p class="mb-2 leading-relaxed text-slate-600">Terdeteksi otomatis dari <code>krs_mata_kuliah</code>. Boleh hanya satu mahasiswa, tetapi daftar MK-nya harus lengkap untuk setiap periode yang disertakan. <code>jumlah_mk_krs</code> harus sesuai jumlah item. <code>tahun_ajaran</code> 2627 berarti 2026/2027 dan <code>semester</code> memakai string "1" atau "2".</p>
+                            <pre data-krs-example="official" class="bg-slate-50 p-2.5 rounded-lg border border-slate-200 font-mono text-[10px] text-slate-700 overflow-x-auto select-all">{
+  "selected_menus": [
+    "krs_mk"
+  ],
+  "total": 1,
+  "data": [
+    {
+      "nim": "1298000001",
+      "nama": "Mahasiswa Contoh",
+      "jumlah_mk_krs": 1,
+      "krs_mata_kuliah": [
+        {
+          "kode_mk": "DEMO-KRS-01",
+          "nama_mk": "Pemrograman Web",
+          "kelas": "KELAS-A",
+          "kode_dosen": "D-CONTOH",
+          "tahun_ajaran": "2627",
+          "semester": "1",
+          "program_studi": "Informatika"
+        }
+      ]
+    }
+  ]
+}</pre>
+                            <p class="mt-2 leading-relaxed text-amber-700">Saat C disimpan, MK lama pada mahasiswa/periode yang sama yang tidak tercantum dapat dihapus. Deteksi format tidak membuktikan kelengkapan terhadap iGracias. Untuk tambahan parsial, gunakan ekspor B yang sesuai.</p>
+                        </section>
+                        <p class="leading-relaxed text-slate-600">Kedua format memerlukan mahasiswa dan periode sumber yang sudah terdaftar. Periode boleh tidak aktif untuk impor riwayat; agar KRS menjadi acuan aktif, tahun/term dan tautannya harus sesuai periode akademik aktif. Contoh Pemrograman Web bukan bukti KRS TA2.</p>
                     </div>
 
                     <!-- Template Attendance -->
@@ -210,6 +203,42 @@
                     </div>
                 </div>
             </div>
+        </div>
+
+        <!-- Kolom Kanan: Status Data -->
+        <div class="space-y-5" data-sync-status-column>
+            <!-- PANEL: Status Data di Database -->
+            <div class="campus-card p-5 flex flex-col">
+                <div class="flex items-center justify-between mb-4">
+                    <div>
+                        <h3 class="text-sm font-bold text-slate-800">Status Data</h3>
+                        <p class="text-xs text-slate-400 mt-0.5">Jumlah data di database</p>
+                    </div>
+                    <button id="refreshStatsBtn" onclick="refreshStats()"
+                            class="text-xs text-[#DA2D3B] hover:underline">
+                        Refresh
+                    </button>
+                </div>
+
+                <div id="statsGrid" class="grid grid-cols-2 gap-3 flex-1">
+                    @foreach ($dataStats as $stat)
+                        <div class="stat-card relative p-4 pl-5 bg-white rounded-xl border border-slate-200/60 shadow-sm hover:shadow-md hover:border-[#DA2D3B]/30 transition-all duration-300 flex flex-col justify-center overflow-hidden group"
+                             data-key="{{ $stat['key'] }}">
+                            <div class="absolute left-0 top-0 w-1 h-full bg-slate-100 group-hover:bg-[#DA2D3B] transition-colors duration-300"></div>
+                            <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">{{ $stat['label'] }}</p>
+                            <p class="text-2xl font-extrabold text-slate-800 stat-count tracking-tight">
+                                {{ number_format($stat['count']) }}
+                            </p>
+                        </div>
+                    @endforeach
+                </div>
+
+                <p class="text-[10px] text-slate-300 text-center mt-3" id="statsLastUpdate">
+                    Terakhir diperbarui: {{ now()->format('H:i:s') }}
+                </p>
+            </div>
+
+
         </div>
     </div>
 

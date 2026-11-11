@@ -185,15 +185,14 @@ test('official_krs70_invalid_study_semester_does_not_use_term_one_as_a_replaceme
     expect(StudentCourse::count())->toBe(0);
 });
 
-test('official_krs70_legacy_flat_krs_and_new_format_share_the_existing_record', function () {
-    ($this->upload70)(['data' => [['nim' => '1202270001', 'kode_matakuliah' => 'KRS70TA',
-        'nama_matakuliah' => 'TUGAS AKHIR', 'kelas_matakuliah' => 'OLD70', 'sks' => 4,
-        'tahun_akademik' => '2026/2027', 'semester_term' => 'GANJIL', 'semester' => 8]]])
-        ->assertSessionHas('success');
-    $id = ($this->enrollment70)()->id;
+test('official_krs98_historical_linked_krs_can_still_be_updated_without_the_retired_importer', function () {
+    $old = StudentCourse::create(['student_number' => '1202270001', 'course_code' => 'KRS70TA',
+        'course_name' => 'TUGAS AKHIR', 'course_class' => 'OLD70', 'credits' => 4,
+        'academic_year' => '2026/2027', 'academic_period_id' => $this->period->id, 'semester' => 8]);
     ($this->run70)([officialKrs70Row()]);
     expect(StudentCourse::where('student_number', '1202270001')->count())->toBe(1);
-    expect(($this->enrollment70)()->id)->toBe($id);
+    expect(($this->enrollment70)()->id)->toBe($old->id);
+    expect((int) ($this->enrollment70)()->semester)->toBe(8);
 });
 
 test('official_krs70_rejects_wrapper_count_mismatch_before_creating_a_sync_log', function () {

@@ -11,7 +11,7 @@ Missing required parameter for [Route: courses.show]
 [URI: dashboard/courses/{course}] [Missing parameter: course].
 ```
 
-Kondisi data ini menjelaskan mengapa lokal dapat dibuka sementara server gagal: kode view sama dapat berperilaku berbeda bila kelengkapan master MK berbeda. Impor KRS menyimpan pendaftaran MK dan tidak otomatis membuat data master MK. Error server sudah cocok; perbaikan tetap perlu dipasang agar runtime server menggunakannya.
+Kondisi data ini menjelaskan mengapa lokal dapat dibuka sementara server gagal: kode view sama dapat berperilaku berbeda bila kelengkapan master MK berbeda. Pada mode Term datar, impor KRS menyimpan pendaftaran MK tanpa otomatis membuat data master MK; jalur format lama dapat membuat master sementara. Perbedaan mode dijelaskan pada dokumen 95. Error server sudah cocok; perbaikan tetap perlu dipasang agar runtime server menggunakannya.
 
 ## Perubahan
 

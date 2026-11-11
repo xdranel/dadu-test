@@ -328,15 +328,22 @@ test('official67_demo_payload_imports_two_student_profiles_for_three_login_accou
             'academic_year' => 2022, 'active_semester' => 8, 'email' => $email, 'kelas' => 'DEMO67'];
         $courses[] = ['nim' => $nim, 'kode_matakuliah' => 'DEMO67-'.$nim,
             'nama_matakuliah' => $courseName, 'kelas_matakuliah' => 'DEMO67', 'sks' => 4,
-            'tahun_akademik' => '2026/2027', 'semester_term' => 'GANJIL', 'semester' => 8, 'prodi' => 'Informatika'];
+            'tahun_akademik' => '2026/2027', 'semester' => 1, 'prodi' => 'Informatika'];
         $profiles[] = officialAdmission67Row(['nim' => $nim, 'nama' => $name, 'nilai_bahasa' => $score,
             'jumlah_tes_bahasa' => $count, 'riwayat_nilai_bahasa' => [],
             'status_keuangan' => 'LUNAS', 'status_keuangan_asli' => 'SUDAH LUNAS', 'semester' => '8']);
     }
     $upload = function (array $payload, string $type) {
-        $this->post(route('sync.import-json'), ['type' => $type,
+        $response = $this->post(route('sync.import-json'), ['type' => $type,
             'json_file' => UploadedFile::fake()->createWithContent('demo67.json', json_encode($payload, JSON_THROW_ON_ERROR)),
-        ])->assertRedirect()->assertSessionHasNoErrors()->assertSessionHas('success');
+        ]);
+        if ($type === 'krs') {
+            $response->assertOk()->assertSee('Pratinjau KRS');
+            $response = $this->post(route('sync.krs-term-apply'), [
+                'preview_token' => session('krs_term_preview.token'), 'confirmed' => 1,
+            ]);
+        }
+        $response->assertRedirect()->assertSessionHasNoErrors()->assertSessionHas('success');
     };
     $upload(['data' => $students], 'student');
     $upload(['data' => $courses], 'krs');

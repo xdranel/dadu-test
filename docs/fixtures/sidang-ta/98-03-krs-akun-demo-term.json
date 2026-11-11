@@ -1,0 +1,26 @@
+{
+  "source": "DUMMY DEMO TA 67 - data sintetis, bukan data kampus resmi — format B, semester = term Ganjil/Genap",
+  "total": 2,
+  "data": [
+    {
+      "nim": "1202200001",
+      "kode_matakuliah": "DEMO67-TA",
+      "nama_matakuliah": "TUGAS AKHIR",
+      "kelas_matakuliah": "DEMO67",
+      "sks": 4,
+      "tahun_akademik": "2026/2027",
+      "semester": 1,
+      "prodi": "Informatika"
+    },
+    {
+      "nim": "1202299002",
+      "kode_matakuliah": "DEMO67-TA2",
+      "nama_matakuliah": "TUGAS AKHIR 2",
+      "kelas_matakuliah": "DEMO67",
+      "sks": 4,
+      "tahun_akademik": "2026/2027",
+      "semester": 1,
+      "prodi": "Informatika"
+    }
+  ]
+}

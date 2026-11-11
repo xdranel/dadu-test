@@ -76,7 +76,7 @@
                     <tr>
                         <th>Mata Kuliah</th>
                         <th class="!text-center">Kelas & Prodi</th>
-                        <th class="!text-center">Periode / Semester Studi / SKS</th>
+                        <th class="!text-center">Periode / SKS</th>
                         <th class="!text-center">Dosen</th>
                         <th class="!text-center">JUMLAH MHS</th>
                         <th class="!text-center">Aksi</th>
@@ -94,8 +94,7 @@
                                 <div class="text-xs text-slate-500 mt-0.5">{{ $item->study_program_display }}</div>
                             </td>
                             <td class="text-center align-middle">
-                                <div class="text-slate-700">{{ $item->academicPeriod?->label ?? $item->academic_year }}</div>
-                                <div class="text-xs text-slate-500">Semester studi {{ $item->semester_display }}</div>
+                                <div class="text-slate-700">{{ $item->academic_year ?: '-' }}</div>
                                 <div class="text-xs font-semibold text-gray-500 mt-0.5">{{ $item->credits ?: '-' }} SKS</div>
                             </td>
                             <td class="text-center align-middle">
