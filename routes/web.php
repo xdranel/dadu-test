@@ -363,7 +363,7 @@ Route::middleware(['auth', 'password.changed'])->group(function () {
         Route::get('sidang-ta-registrations/{sidang_ta_registration}', [SidangTaRegistrationController::class, 'show'])
             ->middleware('permission:sidang_ta_registration_read')->name('sidang-ta-registrations.show');
         Route::get('sidang-ta-registration-documents/{document}/download', [SidangTaRegistrationController::class, 'downloadDocument'])
-            ->middleware('permission:sidang_ta_registration_read|sidang_ta_registration_review')->name('sidang-ta-registration-documents.download');
+            ->middleware('permission:sidang_ta_registration_read|sidang_ta_registration_review|sidang_ta_registration_view_program')->name('sidang-ta-registration-documents.download');
 
         Route::post('sidang-ta-drafts', [SidangTaDraftController::class, 'store'])
             ->middleware('permission:sidang_ta_registration_create')->name('sidang-ta-drafts.store');
@@ -378,7 +378,7 @@ Route::middleware(['auth', 'password.changed'])->group(function () {
             ->name('sidang-ta-draft-documents.preview');
         Route::get('sidang-ta-registration-documents/{document}/preview',
             [SidangTaRegistrationController::class, 'previewDocument'])
-            ->middleware('permission:sidang_ta_registration_read|sidang_ta_registration_review')
+            ->middleware('permission:sidang_ta_registration_read|sidang_ta_registration_review|sidang_ta_registration_view_program')
             ->name('sidang-ta-registration-documents.preview');
         Route::get('sidang-ta-draft-documents/{document}/download',
             [SidangTaDraftController::class, 'downloadDocument'])
@@ -401,13 +401,13 @@ Route::middleware(['auth', 'password.changed'])->group(function () {
 
         Route::prefix('admin')->name('admin.')->group(function () {
             Route::get('sidang-ta-registrations', [SidangTaRegistrationController::class, 'adminIndex'])
-                ->middleware('permission:sidang_ta_registration_review|sidang_ta_period_read')
+                ->middleware('permission:sidang_ta_registration_review|sidang_ta_period_read|sidang_ta_registration_view_program')
                 ->name('sidang-ta-registrations.index');
             Route::get('sidang-ta-registrations/export', [SidangTaRegistrationController::class, 'exportExcel'])
                 ->middleware('permission:sidang_ta_registration_review')
                 ->name('sidang-ta-registrations.export');
             Route::get('sidang-ta-registrations/{sidang_ta_registration}', [SidangTaRegistrationController::class, 'adminShow'])
-                ->middleware('permission:sidang_ta_registration_review')
+                ->middleware('permission:sidang_ta_registration_review|sidang_ta_registration_view_program')
                 ->name('sidang-ta-registrations.show');
             Route::post('sidang-ta-registrations/{sidang_ta_registration}/review', [SidangTaRegistrationController::class, 'review'])
                 ->middleware('permission:sidang_ta_registration_review')

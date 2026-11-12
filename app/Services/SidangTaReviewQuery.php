@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\SidangTaRegistration;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 
 class SidangTaReviewQuery
@@ -31,9 +32,14 @@ class SidangTaReviewQuery
         return array_filter($values, fn ($value) => $value !== null && $value !== '');
     }
 
-    public function query(array $filters): Builder
+    public function query(array $filters, ?array $programScope = null): Builder
     {
         $query = SidangTaRegistration::query();
+        if ($programScope !== null) {
+            $column = $query->getConnection()->getDriverName() === 'mysql'
+                ? DB::raw('CAST(study_program AS BINARY)') : 'study_program';
+            $query->whereIn($column, $programScope);
+        }
         if (isset($filters['search'])) {
             $term = $filters['search'];
             $query->where(fn (Builder $q) => $q->where('student_name', 'like', "%{$term}%")
@@ -45,9 +51,9 @@ class SidangTaReviewQuery
         return $query;
     }
 
-    public function counts(array $filters): array
+    public function counts(array $filters, ?array $programScope = null): array
     {
-        $rows = $this->query($filters)->selectRaw('status, COUNT(*) as aggregate')
+        $rows = $this->query($filters, $programScope)->selectRaw('status, COUNT(*) as aggregate')
             ->groupBy('status')->pluck('aggregate', 'status');
         $counts = ['total' => 0] + array_fill_keys(array_keys(self::STATUSES), 0);
         foreach ($rows as $status => $count) {

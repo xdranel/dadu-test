@@ -10,6 +10,7 @@ use App\Models\SidangTaRegistrationDraft;
 use App\Services\SidangTaAcademicSnapshot;
 use App\Services\SidangTaReviewExport;
 use App\Services\SidangTaReviewQuery;
+use App\Services\SidangTaProgramAccess;
 use App\Services\SidangTaStudentContext;
 use App\Services\SidangTaDraftFinalizer;
 use Illuminate\Http\Request;
@@ -129,35 +130,47 @@ class SidangTaRegistrationController extends Controller
     public function adminIndex(Request $request)
     {
         $canReview = $request->user()->can('sidang_ta_registration_review');
+        $canViewRegistrations = $canReview || $request->user()->can(SidangTaProgramAccess::PERMISSION);
+        $scopedProgram = null;
+        $programScope = null;
+        if (!$canReview && $canViewRegistrations) {
+            $access = app(SidangTaProgramAccess::class);
+            $scopedProgram = $access->programFor($request->user());
+            $programScope = $access->matchingPrograms($scopedProgram);
+        }
         $periods = SidangTaPeriod::orderByDesc('open_at')->orderByDesc('id')->get();
         $registrations = null;
         $filters = [];
         $counts = null;
         $studyPrograms = collect();
         $periodCards = collect();
-        if ($canReview) {
+        if ($canViewRegistrations) {
             $reviewQuery = app(SidangTaReviewQuery::class);
             $filters = $reviewQuery->filters($request);
-            $counts = $reviewQuery->counts($filters);
-            $studyPrograms = SidangTaRegistration::query()->whereNotNull('study_program')
-                ->where('study_program', '!=', '')->distinct()->orderBy('study_program')->pluck('study_program');
-            $registrations = $reviewQuery->query($filters)->with(['period', 'documents'])
+            if ($scopedProgram !== null) unset($filters['study_program']);
+            $counts = $reviewQuery->counts($filters, $programScope);
+            if ($canReview) {
+                $studyPrograms = SidangTaRegistration::query()->whereNotNull('study_program')
+                    ->where('study_program', '!=', '')->distinct()->orderBy('study_program')->pluck('study_program');
+            }
+            $registrations = $reviewQuery->query($filters, $programScope)->with(['period', 'documents'])
                 ->orderByDesc('submitted_at')->orderByDesc('id')->paginate(15)->appends($filters);
             $periodCards = isset($filters['period'])
                 ? $periods->where('id', $filters['period'])->values()
                 : $periods->where('is_active', true)->values();
         }
         return view('sidang_ta_registrations.admin.index', compact(
-            'canReview', 'registrations', 'periods', 'filters', 'counts', 'studyPrograms', 'periodCards'
+            'canReview', 'canViewRegistrations', 'scopedProgram', 'registrations', 'periods', 'filters', 'counts', 'studyPrograms', 'periodCards'
         ));
     }
 
     public function adminShow(SidangTaRegistration $sidang_ta_registration)
     {
+        app(SidangTaProgramAccess::class)->authorize(auth()->user(), $sidang_ta_registration);
         $registration = $sidang_ta_registration->load(['period', 'documents', 'logs.actor']);
         $needsReview = $registration->status === 'needs_review';
         $readonlyNeedsReview = $needsReview;
-        $reviewable = $registration->status === 'submitted';
+        $reviewable = auth()->user()->can('sidang_ta_registration_review') && $registration->status === 'submitted';
         $requiredTypes = \App\Support\SidangTaReviewEligibility::requiredTypes($registration);
         $approvalBlockers = \App\Support\SidangTaReviewEligibility::blockers($registration);
         $documentGroups = \App\Support\SidangTaReviewEligibility::groups($registration);
@@ -319,6 +332,11 @@ class SidangTaRegistrationController extends Controller
     {
         $user = auth()->user();
         if ($user->can('sidang_ta_registration_review')) {
+            \App\Support\SidangTaReviewEligibility::requiredTypes($registration);
+            return;
+        }
+        if ($user->can(SidangTaProgramAccess::PERMISSION)) {
+            app(SidangTaProgramAccess::class)->authorize($user, $registration);
             \App\Support\SidangTaReviewEligibility::requiredTypes($registration);
             return;
         }

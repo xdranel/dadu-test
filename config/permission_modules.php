@@ -46,7 +46,10 @@ return [
         // ── Layanan & Form ──────────────────────────────────────────────
         'queue_ticket'            => ['label' => 'Antrian Layanan',      'group' => 'Layanan & Form', 'actions' => ['read' => [], 'update' => []]],
         'graduation_registration' => ['label' => 'Pendaftaran Yudisium', 'group' => 'Layanan & Form', 'actions' => ['create' => [], 'read' => [], 'update' => [], 'delete' => [], 'review' => []]],
-        'sidang_ta_registration'  => ['label' => 'Pendaftaran Sidang TA', 'group' => 'Layanan & Form', 'actions' => ['create' => [], 'read' => [], 'update' => [], 'review' => []]],
+        'sidang_ta_registration'  => ['label' => 'Pendaftaran Sidang TA', 'group' => 'Layanan & Form', 'actions' => [
+            'create' => [], 'read' => [], 'update' => [], 'review' => [],
+            'view_program' => ['label' => 'Lihat Pengajuan (Prodi Dosen)'],
+        ]],
         'sidang_ta_period'        => ['label' => 'Periode Sidang TA', 'group' => 'Layanan & Form', 'actions' => ['create' => [], 'read' => [], 'update' => [], 'delete' => []]],
         'grade_appeal'            => ['label' => 'Form Banding Nilai',   'group' => 'Layanan & Form', 'actions' => ['create' => [], 'read' => [], 'update' => [], 'review' => []]],
 

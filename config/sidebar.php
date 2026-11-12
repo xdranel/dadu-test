@@ -117,7 +117,7 @@ return [
             'icon'  => 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01',
             'items' => [
                 ['label' => 'Review Yudisium',      'route' => 'admin.graduation-registrations.index', 'active' => 'admin.graduation-registrations.*', 'permission' => 'graduation_registration_review'],
-                ['label' => 'Review Sidang TA',     'route' => 'admin.sidang-ta-registrations.index', 'active' => ['admin.sidang-ta-registrations.*', 'admin.sidang-ta-periods.*'], 'permissions_any' => ['sidang_ta_registration_review', 'sidang_ta_period_read']],
+                ['label' => 'Review Sidang TA',     'route' => 'admin.sidang-ta-registrations.index', 'active' => ['admin.sidang-ta-registrations.*', 'admin.sidang-ta-periods.*'], 'permissions_any' => ['sidang_ta_registration_review', 'sidang_ta_period_read', 'sidang_ta_registration_view_program']],
                 ['label' => 'Review Banding Nilai', 'route' => 'admin.grade-appeals.index',            'active' => 'admin.grade-appeals.*',            'permission' => 'grade_appeal_review'],
                 ['label' => 'Layanan Mahasiswa',    'route' => 'admin.queue.index',                    'active' => 'admin.queue.*',                    'permission' => 'queue_ticket_read', 'badge_key' => 'queue_pending'],
             ],

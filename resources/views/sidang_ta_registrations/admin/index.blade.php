@@ -28,7 +28,7 @@
                 {{ $errors->first() }}
             </div>
         @endif
-        @if($canReview)
+        @if($canViewRegistrations)
             <div data-ta-review-data class="space-y-5">
                 <section data-ta-period-card class="campus-card space-y-3 p-4">
                     <h3 class="text-sm font-bold text-slate-800">{{ isset($filters['period']) ? 'Periode terpilih' : 'Periode aktif' }}</h3>
@@ -92,20 +92,26 @@
                             @endforeach
                         </select>
                     </label>
-                    <label class="text-xs font-semibold text-slate-600">Program studi
-                        <select class="campus-select mt-1" name="study_program">
-                            <option value="">Semua prodi</option>
-                            @if(isset($filters['study_program']) && !$studyPrograms->contains($filters['study_program']))
-                                <option value="{{ $filters['study_program'] }}" selected>{{ $filters['study_program'] }}
-                                </option>
-                            @endif
-                            @foreach($studyPrograms as $program)
-                                <option value="{{ $program }}" @selected(($filters['study_program'] ?? '') === $program)>
-                                    {{ $program }}
-                                </option>
-                            @endforeach
-                        </select>
-                    </label>
+                    @if($scopedProgram !== null)
+                        <p data-ta-program-scope class="text-xs font-semibold text-slate-600">Program studi
+                            <span class="mt-2 block text-sm text-slate-800">{{ $scopedProgram }}</span>
+                        </p>
+                    @else
+                        <label class="text-xs font-semibold text-slate-600">Program studi
+                            <select class="campus-select mt-1" name="study_program">
+                                <option value="">Semua prodi</option>
+                                @if(isset($filters['study_program']) && !$studyPrograms->contains($filters['study_program']))
+                                    <option value="{{ $filters['study_program'] }}" selected>{{ $filters['study_program'] }}
+                                    </option>
+                                @endif
+                                @foreach($studyPrograms as $program)
+                                    <option value="{{ $program }}" @selected(($filters['study_program'] ?? '') === $program)>
+                                        {{ $program }}
+                                    </option>
+                                @endforeach
+                            </select>
+                        </label>
+                    @endif
                     <div class="flex flex-wrap items-end gap-2">
                         <button type="submit" class="btn btn-primary">
                             Terapkan
@@ -114,16 +120,18 @@
                             Reset
                         </a>
                     </div>
-                    <div class="flex flex-wrap items-center gap-2 md:col-span-2 xl:col-span-5">
-                        @if($counts['total'] > 0)
-                            <a data-ta-export href="{{ route('admin.sidang-ta-registrations.export', $filters) }}" class="btn btn-success">
-                                <svg aria-hidden="true" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-width="1.7" stroke-linejoin="round" d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6zm0 0v6h6M8 12l5 6m0-6l-5 6"/></svg>
-                                Ekspor Excel
-                            </a>
-                        @else
-                            <button data-ta-export-empty type="button" disabled class="btn btn-success cursor-not-allowed opacity-50" title="Tidak ada pengajuan untuk diekspor">Ekspor Excel</button>
-                        @endif
-                    </div>
+                    @if($canReview)
+                        <div class="flex flex-wrap items-center gap-2 md:col-span-2 xl:col-span-5">
+                            @if($counts['total'] > 0)
+                                <a data-ta-export href="{{ route('admin.sidang-ta-registrations.export', $filters) }}" class="btn btn-success">
+                                    <svg aria-hidden="true" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-width="1.7" stroke-linejoin="round" d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6zm0 0v6h6M8 12l5 6m0-6l-5 6"/></svg>
+                                    Ekspor Excel
+                                </a>
+                            @else
+                                <button data-ta-export-empty type="button" disabled class="btn btn-success cursor-not-allowed opacity-50" title="Tidak ada pengajuan untuk diekspor">Ekspor Excel</button>
+                            @endif
+                        </div>
+                    @endif
                 </form>
                 <p class="text-xs leading-relaxed text-slate-500">
                     Ikon berkas: kuning menunggu verifikasi, hijau terverifikasi, merah perlu perbaikan, tanda ! belum ada/tidak ditemukan, tanda – tidak berlaku.
@@ -224,7 +232,7 @@
             </section>
         @endif
     </div>
-    @if($canReview)
+    @if($canViewRegistrations)
         @include('sidang_ta_registrations.partials.document-preview-modal')
     @endif
 </x-app-layout>

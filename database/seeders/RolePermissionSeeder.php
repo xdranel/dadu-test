@@ -25,7 +25,7 @@ class RolePermissionSeeder extends Seeder
             'jadwal'            => ['create', 'read', 'update', 'delete'],
             'queue_ticket'      => ['read', 'update'],
             'graduation_registration' => ['create', 'read', 'update', 'delete', 'review'],
-            'sidang_ta_registration' => ['create', 'read', 'update', 'review'],
+            'sidang_ta_registration' => ['create', 'read', 'update', 'review', 'view_program'],
             'sidang_ta_period' => ['create', 'read', 'update', 'delete'],
             'grade_appeal'      => ['create', 'read', 'update', 'delete', 'review'],
         ];
@@ -49,14 +49,20 @@ class RolePermissionSeeder extends Seeder
 
         // ─── admin (Administrator Operasional) ─────────────────────────────────
         $adminPermissions = array_values(array_filter($allPermissions, function ($p) {
-            return !str_ends_with($p, '_review');
+            return !str_ends_with($p, '_review') && $p !== 'sidang_ta_registration_view_program';
         }));
         $admin = Role::findByName('admin');
         $admin->syncPermissions($adminPermissions);
 
         // ─── Pelaksana (Staf unit teknis — Role ID 103) ────────────────────────
         $pelaksana = Role::findByName('Pelaksana');
-        $pelaksana->syncPermissions($allPermissions);
+        // Fresh-install defaults only. Do not run this seeder to update deployed roles.
+        $pelaksanaPermissions = array_filter($allPermissions, fn ($permission) =>
+            (!str_starts_with($permission, 'sidang_ta_registration_')
+                && !str_starts_with($permission, 'sidang_ta_period_'))
+            || in_array($permission, ['sidang_ta_registration_read', 'sidang_ta_registration_view_program'], true)
+        );
+        $pelaksana->syncPermissions(array_values($pelaksanaPermissions));
 
         // ─── Pemimpin (Kepala unit — Role ID 104) ──────────────────────────────
         $pemimpinPermissions = array_filter($allPermissions, function ($p) {
@@ -122,7 +128,7 @@ class RolePermissionSeeder extends Seeder
         $this->command->info('RolePermissionSeeder: Permissions berhasil di-assign ke semua role SSC!');
         $this->command->info('  101 mahasiswa → ' . count($mahasiswaPermissions) . ' permissions');
         $this->command->info('  102 Petugas   → ' . count($petugasPermissions) . ' permissions');
-        $this->command->info('  103 Pelaksana → Full CRUD + review');
+        $this->command->info('  103 Pelaksana → Sidang TA: baca prodi dosen; modul lain mengikuti default');
         $this->command->info('  104 Pemimpin  → Read + review');
         $this->command->info('  105 Pengamat  → Read-only');
         $this->command->info('  106 Akademik  → Full access (bypass)');

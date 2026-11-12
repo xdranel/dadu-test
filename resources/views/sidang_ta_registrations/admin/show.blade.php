@@ -69,6 +69,11 @@
                 @endunless
             </dl>
         </section>
+        @cannot('sidang_ta_registration_review')
+            <p data-ta-read-only role="status" class="rounded-xl bg-slate-50 p-4 text-sm text-slate-600">
+                Akses baca prodi dosen. Berkas, catatan petugas, dan riwayat dapat dilihat.
+            </p>
+        @endcannot
         @if($readonlyNeedsReview)
             <p data-meet-review-locked role="status" class="rounded-xl bg-amber-50 p-4 text-sm text-amber-900">
                 Pengajuan sedang menunggu revisi mahasiswa. Berkas dapat dilihat; perubahan peninjauan dikunci.

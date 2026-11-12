@@ -1,0 +1,112 @@
+diff --git a/config/permission_modules.php b/config/permission_modules.php
+index 510ece0..1cfa2ec 100644
+--- a/config/permission_modules.php
++++ b/config/permission_modules.php
+@@ -46,7 +46,10 @@
+         // ── Layanan & Form ──────────────────────────────────────────────
+         'queue_ticket'            => ['label' => 'Antrian Layanan',      'group' => 'Layanan & Form', 'actions' => ['read' => [], 'update' => []]],
+         'graduation_registration' => ['label' => 'Pendaftaran Yudisium', 'group' => 'Layanan & Form', 'actions' => ['create' => [], 'read' => [], 'update' => [], 'delete' => [], 'review' => []]],
+-        'sidang_ta_registration'  => ['label' => 'Pendaftaran Sidang TA', 'group' => 'Layanan & Form', 'actions' => ['create' => [], 'read' => [], 'update' => [], 'review' => []]],
++        'sidang_ta_registration'  => ['label' => 'Pendaftaran Sidang TA', 'group' => 'Layanan & Form', 'actions' => [
++            'create' => [], 'read' => [], 'update' => [], 'review' => [],
++            'view_program' => ['label' => 'Lihat Pengajuan (Prodi Dosen)'],
++        ]],
+         'sidang_ta_period'        => ['label' => 'Periode Sidang TA', 'group' => 'Layanan & Form', 'actions' => ['create' => [], 'read' => [], 'update' => [], 'delete' => []]],
+         'grade_appeal'            => ['label' => 'Form Banding Nilai',   'group' => 'Layanan & Form', 'actions' => ['create' => [], 'read' => [], 'update' => [], 'review' => []]],
+ 
+diff --git a/config/sidebar.php b/config/sidebar.php
+index 55d8066..0fd2415 100644
+--- a/config/sidebar.php
++++ b/config/sidebar.php
+@@ -117,7 +117,7 @@
+             'icon'  => 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01',
+             'items' => [
+                 ['label' => 'Review Yudisium',      'route' => 'admin.graduation-registrations.index', 'active' => 'admin.graduation-registrations.*', 'permission' => 'graduation_registration_review'],
+-                ['label' => 'Review Sidang TA',     'route' => 'admin.sidang-ta-registrations.index', 'active' => ['admin.sidang-ta-registrations.*', 'admin.sidang-ta-periods.*'], 'permissions_any' => ['sidang_ta_registration_review', 'sidang_ta_period_read']],
++                ['label' => 'Review Sidang TA',     'route' => 'admin.sidang-ta-registrations.index', 'active' => ['admin.sidang-ta-registrations.*', 'admin.sidang-ta-periods.*'], 'permissions_any' => ['sidang_ta_registration_review', 'sidang_ta_period_read', 'sidang_ta_registration_view_program']],
+                 ['label' => 'Review Banding Nilai', 'route' => 'admin.grade-appeals.index',            'active' => 'admin.grade-appeals.*',            'permission' => 'grade_appeal_review'],
+                 ['label' => 'Layanan Mahasiswa',    'route' => 'admin.queue.index',                    'active' => 'admin.queue.*',                    'permission' => 'queue_ticket_read', 'badge_key' => 'queue_pending'],
+             ],
+diff --git a/database/seeders/RolePermissionSeeder.php b/database/seeders/RolePermissionSeeder.php
+index fb4f565..1e67eab 100644
+--- a/database/seeders/RolePermissionSeeder.php
++++ b/database/seeders/RolePermissionSeeder.php
+@@ -25,7 +25,7 @@ public function run(): void
+             'jadwal'            => ['create', 'read', 'update', 'delete'],
+             'queue_ticket'      => ['read', 'update'],
+             'graduation_registration' => ['create', 'read', 'update', 'delete', 'review'],
+-            'sidang_ta_registration' => ['create', 'read', 'update', 'review'],
++            'sidang_ta_registration' => ['create', 'read', 'update', 'review', 'view_program'],
+             'sidang_ta_period' => ['create', 'read', 'update', 'delete'],
+             'grade_appeal'      => ['create', 'read', 'update', 'delete', 'review'],
+         ];
+@@ -49,14 +49,20 @@ public function run(): void
+ 
+         // ─── admin (Administrator Operasional) ─────────────────────────────────
+         $adminPermissions = array_values(array_filter($allPermissions, function ($p) {
+-            return !str_ends_with($p, '_review');
++            return !str_ends_with($p, '_review') && $p !== 'sidang_ta_registration_view_program';
+         }));
+         $admin = Role::findByName('admin');
+         $admin->syncPermissions($adminPermissions);
+ 
+         // ─── Pelaksana (Staf unit teknis — Role ID 103) ────────────────────────
+         $pelaksana = Role::findByName('Pelaksana');
+-        $pelaksana->syncPermissions($allPermissions);
++        // Fresh-install defaults only. Do not run this seeder to update deployed roles.
++        $pelaksanaPermissions = array_filter($allPermissions, fn ($permission) =>
++            (!str_starts_with($permission, 'sidang_ta_registration_')
++                && !str_starts_with($permission, 'sidang_ta_period_'))
++            || in_array($permission, ['sidang_ta_registration_read', 'sidang_ta_registration_view_program'], true)
++        );
++        $pelaksana->syncPermissions(array_values($pelaksanaPermissions));
+ 
+         // ─── Pemimpin (Kepala unit — Role ID 104) ──────────────────────────────
+         $pemimpinPermissions = array_filter($allPermissions, function ($p) {
+@@ -122,7 +128,7 @@ public function run(): void
+         $this->command->info('RolePermissionSeeder: Permissions berhasil di-assign ke semua role SSC!');
+         $this->command->info('  101 mahasiswa → ' . count($mahasiswaPermissions) . ' permissions');
+         $this->command->info('  102 Petugas   → ' . count($petugasPermissions) . ' permissions');
+-        $this->command->info('  103 Pelaksana → Full CRUD + review');
++        $this->command->info('  103 Pelaksana → Sidang TA: baca prodi dosen; modul lain mengikuti default');
+         $this->command->info('  104 Pemimpin  → Read + review');
+         $this->command->info('  105 Pengamat  → Read-only');
+         $this->command->info('  106 Akademik  → Full access (bypass)');
+diff --git a/routes/web.php b/routes/web.php
+index f5a4656..06e2ab9 100644
+--- a/routes/web.php
++++ b/routes/web.php
+@@ -363,7 +363,7 @@ function registerResourceWithPermissions(string $name, string $controller, strin
+         Route::get('sidang-ta-registrations/{sidang_ta_registration}', [SidangTaRegistrationController::class, 'show'])
+             ->middleware('permission:sidang_ta_registration_read')->name('sidang-ta-registrations.show');
+         Route::get('sidang-ta-registration-documents/{document}/download', [SidangTaRegistrationController::class, 'downloadDocument'])
+-            ->middleware('permission:sidang_ta_registration_read|sidang_ta_registration_review')->name('sidang-ta-registration-documents.download');
++            ->middleware('permission:sidang_ta_registration_read|sidang_ta_registration_review|sidang_ta_registration_view_program')->name('sidang-ta-registration-documents.download');
+ 
+         Route::post('sidang-ta-drafts', [SidangTaDraftController::class, 'store'])
+             ->middleware('permission:sidang_ta_registration_create')->name('sidang-ta-drafts.store');
+@@ -378,7 +378,7 @@ function registerResourceWithPermissions(string $name, string $controller, strin
+             ->name('sidang-ta-draft-documents.preview');
+         Route::get('sidang-ta-registration-documents/{document}/preview',
+             [SidangTaRegistrationController::class, 'previewDocument'])
+-            ->middleware('permission:sidang_ta_registration_read|sidang_ta_registration_review')
++            ->middleware('permission:sidang_ta_registration_read|sidang_ta_registration_review|sidang_ta_registration_view_program')
+             ->name('sidang-ta-registration-documents.preview');
+         Route::get('sidang-ta-draft-documents/{document}/download',
+             [SidangTaDraftController::class, 'downloadDocument'])
+@@ -401,13 +401,13 @@ function registerResourceWithPermissions(string $name, string $controller, strin
+ 
+         Route::prefix('admin')->name('admin.')->group(function () {
+             Route::get('sidang-ta-registrations', [SidangTaRegistrationController::class, 'adminIndex'])
+-                ->middleware('permission:sidang_ta_registration_review|sidang_ta_period_read')
++                ->middleware('permission:sidang_ta_registration_review|sidang_ta_period_read|sidang_ta_registration_view_program')
+                 ->name('sidang-ta-registrations.index');
+             Route::get('sidang-ta-registrations/export', [SidangTaRegistrationController::class, 'exportExcel'])
+                 ->middleware('permission:sidang_ta_registration_review')
+                 ->name('sidang-ta-registrations.export');
+             Route::get('sidang-ta-registrations/{sidang_ta_registration}', [SidangTaRegistrationController::class, 'adminShow'])
+-                ->middleware('permission:sidang_ta_registration_review')
++                ->middleware('permission:sidang_ta_registration_review|sidang_ta_registration_view_program')
+                 ->name('sidang-ta-registrations.show');
+             Route::post('sidang-ta-registrations/{sidang_ta_registration}/review', [SidangTaRegistrationController::class, 'review'])
+                 ->middleware('permission:sidang_ta_registration_review')
