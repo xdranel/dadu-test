@@ -1,0 +1,95 @@
+--- a/config/permission_modules.php
++++ b/config/permission_modules.php
+@@ -51,6 +51,10 @@
+         'grade_appeal'            => ['label' => 'Form Banding Nilai',   'group' => 'Layanan & Form', 'actions' => ['create' => [], 'read' => [], 'update' => [], 'review' => []]],
+ 
+         // ── IT PANEL (hanya Akademik yang boleh mendelegasikan) ──────────
++        'graduation_form_guide' => [
++            'label' => 'Panduan Form Yudisium', 'group' => 'IT Panel', 'sensitive' => true,
++            'actions' => ['create' => [], 'read' => [], 'update' => [], 'delete' => []],
++        ],
+         'sidang_ta_form_guide' => [
+             'label' => 'Panduan Form Sidang TA', 'group' => 'IT Panel', 'sensitive' => true,
+             'actions' => ['create' => [], 'read' => [], 'update' => [], 'delete' => []],
+--- a/config/sidebar.php
++++ b/config/sidebar.php
+@@ -130,6 +130,7 @@
+                 'M15 12a3 3 0 11-6 0 3 3 0 016 0z',
+             ],
+             'items' => [
++                ['label' => 'Panduan Form Yudisium', 'route' => 'admin.graduation-form-guides.index', 'active' => 'admin.graduation-form-guides.*', 'permission' => 'graduation_form_guide_read'],
+                 ['label' => 'Panduan Form Sidang TA', 'route' => 'admin.sidang-ta-guides.index', 'active' => 'admin.sidang-ta-guides.*', 'permission' => 'sidang_ta_form_guide_read'],
+                 ['label' => 'Sinkronisasi',        'route' => 'sync.index',          'active' => 'sync.*',          'permission' => 'sync_read'],
+                 ['label' => 'Pengaturan Role',    'route' => 'role.index',          'active' => 'role.*',          'permission' => 'role_read'],
+--- a/routes/console.php
++++ b/routes/console.php
+@@ -61,3 +61,5 @@
+ Schedule::command('sidang-ta:expire-revisions')->everyMinute()->withoutOverlapping(10);
+ 
+ Schedule::command('sidang-ta:purge-expired-drafts')->everyMinute()->withoutOverlapping(10);
++
++Schedule::command('graduation:cleanup-expired-drafts')->everyMinute()->withoutOverlapping(10);
+--- a/routes/web.php
++++ b/routes/web.php
+@@ -101,6 +101,14 @@
+ 
+     // All dashboard routes
+     Route::prefix('dashboard')->group(function () {
++        Route::get('graduation-form-guides/{guide}/preview', [\App\Http\Controllers\Admin\GraduationFormGuideController::class, 'preview'])->name('graduation-form-guides.preview');
++        Route::get('graduation-form-guides/{guide}/download', [\App\Http\Controllers\Admin\GraduationFormGuideController::class, 'download'])->name('graduation-form-guides.download');
++        Route::prefix('admin')->name('admin.')->group(function () {
++            Route::get('graduation-form-guides', [\App\Http\Controllers\Admin\GraduationFormGuideController::class, 'index'])->middleware('permission:graduation_form_guide_read')->name('graduation-form-guides.index');
++            Route::post('graduation-form-guides', [\App\Http\Controllers\Admin\GraduationFormGuideController::class, 'store'])->middleware('permission:graduation_form_guide_create')->name('graduation-form-guides.store');
++            Route::match(['put','patch'], 'graduation-form-guides/{guide}', [\App\Http\Controllers\Admin\GraduationFormGuideController::class, 'update'])->middleware('permission:graduation_form_guide_update')->name('graduation-form-guides.update');
++            Route::delete('graduation-form-guides/{guide}', [\App\Http\Controllers\Admin\GraduationFormGuideController::class, 'destroy'])->middleware('permission:graduation_form_guide_delete')->name('graduation-form-guides.destroy');
++        });
+         Route::get('sidang-ta-guides/{guide}/media', [SidangTaFormGuideController::class, 'media'])
+             ->name('sidang-ta-guides.media');
+         Route::prefix('admin')->name('admin.')->group(function () {
+@@ -324,6 +332,19 @@
+         Route::get('api/search/courses', [SearchController::class, 'courses'])->name('api.search.courses');
+ 
+         // Graduation Registration
++        Route::controller(\App\Http\Controllers\GraduationDraftController::class)->group(function () {
++            Route::post('graduation-drafts', 'store')->middleware('permission:graduation_registration_create')->name('graduation-drafts.store');
++            Route::get('graduation-drafts/{draft}/edit', 'edit')->middleware('permission:graduation_registration_create|graduation_registration_update')->name('graduation-drafts.edit');
++            Route::put('graduation-drafts/{draft}/steps/{step}', 'saveStep')->middleware('permission:graduation_registration_create|graduation_registration_update')->name('graduation-drafts.save-step');
++            Route::post('graduation-drafts/{draft}/review', 'prepareReview')->middleware('permission:graduation_registration_create|graduation_registration_update')->name('graduation-drafts.review.prepare');
++            Route::get('graduation-drafts/{draft}/review', 'reviewPage')->middleware('permission:graduation_registration_read')->name('graduation-drafts.review');
++            Route::post('graduation-drafts/{draft}/submit', 'submit')->middleware('permission:graduation_registration_create|graduation_registration_update')->name('graduation-drafts.submit');
++            Route::delete('graduation-drafts/{draft}', 'destroy')->middleware('permission:graduation_registration_create|graduation_registration_update')->name('graduation-drafts.destroy');
++            Route::post('graduation-registrations/{registration}/revision-draft', 'startRevision')->middleware('permission:graduation_registration_update')->name('graduation-drafts.revision');
++            Route::get('graduation-draft-documents/{document}/preview', 'preview')->middleware('permission:graduation_registration_read')->name('graduation-draft-documents.preview');
++            Route::get('graduation-draft-documents/{document}/download', 'download')->middleware('permission:graduation_registration_read')->name('graduation-draft-documents.download');
++        });
++
+         Route::get('graduation-registrations', [GraduationRegistrationController::class, 'index'])
+             ->middleware('permission:graduation_registration_read')
+             ->name('graduation-registrations.index');
+@@ -441,11 +462,13 @@
+                 ->name('graduation-registrations.show');
+             Route::post('graduation-registrations/{graduation_registration}/review', [GraduationRegistrationController::class, 'review'])
+                 ->name('graduation-registrations.review');
++            Route::post('graduation-registrations/{graduationRegistration}/plagiarism', [\App\Http\Controllers\Admin\GraduationReviewController::class, 'updatePlagiarism'])->name('graduation-registrations.plagiarism');
+             Route::delete('graduation-registrations/{graduation_registration}', [GraduationRegistrationController::class, 'adminDestroy'])
+                 ->middleware('permission:graduation_registration_delete')
+                 ->name('graduation-registrations.destroy');
+ 
+             // Graduation Period Settings
++            Route::get('graduation-periods', [\App\Http\Controllers\Admin\GraduationPeriodController::class, 'index'])->name('graduation-periods.index');
+             Route::post('graduation-periods', [\App\Http\Controllers\Admin\GraduationPeriodController::class, 'store'])
+                 ->name('graduation-periods.store');
+             Route::put('graduation-periods/{period}', [\App\Http\Controllers\Admin\GraduationPeriodController::class, 'update'])
+@@ -469,10 +492,10 @@
+ 
+         // Graduation Registration Document download, preview & delete
+         Route::get('graduation-registration-documents/{document}/preview', [GraduationRegistrationDocumentController::class, 'preview'])
+-            ->middleware('permission:graduation_registration_read')
++            ->middleware('permission:graduation_registration_read|graduation_registration_review')
+             ->name('graduation-registration-documents.preview');
+         Route::get('graduation-registration-documents/{document}/download', [GraduationRegistrationDocumentController::class, 'download'])
+-            ->middleware('permission:graduation_registration_read')
++            ->middleware('permission:graduation_registration_read|graduation_registration_review')
+             ->name('graduation-registration-documents.download');
+         Route::delete('graduation-registration-documents/{document}', [GraduationRegistrationDocumentController::class, 'destroy'])
+             ->middleware('permission:graduation_registration_update')

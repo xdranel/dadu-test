@@ -74,7 +74,7 @@
                 Pengajuan sedang menunggu revisi mahasiswa. Berkas dapat dilihat; perubahan peninjauan dikunci.
             </p>
         @endif
-        @include('sidang_ta_registrations.partials.detail-academic')
+        @include('sidang_ta_registrations.partials.detail-academic', ['showStaffAcademicDetails' => true])
         @include('sidang_ta_registrations.admin.partials.meet-document-groups')
         @if($reviewable)
             @include('sidang_ta_registrations.admin.partials.registration-decision')

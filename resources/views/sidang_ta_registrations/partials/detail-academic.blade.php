@@ -18,6 +18,10 @@
     $statuses = ['Sidang tingkat 2' => 'sidang_tingkat_2', 'Status SKPI' => 'skpi_status',
         'KRS Sidang TA 2' => 'ta2_krs_label'];
     $titles = ['Bahasa Indonesia' => 'ta_title', 'Bahasa Inggris' => 'ta_title_en'];
+    if ($showStaffAcademicDetails ?? false) {
+        $statuses += ['Status BPP' => 'bpp_status', 'Persetujuan sidang iGracias' => 'sidang_approval_status'];
+        $titles += ['Pembimbing 1' => 'advisor_1', 'Pembimbing 2' => 'advisor_2'];
+    }
     // Fields outside the academic summary remain stored without appearing in the detail panel.
     $omitted = ['level_3_status', 'bpp_status', 'ibasila_status', 'skpi_tak',
         'advisor_1', 'advisor_2', 'examiner_1', 'examiner_2', 'examiner_3',
@@ -33,7 +37,7 @@
     $statusTone = static fn ($value) => match (strtolower(trim(is_scalar($value) ? (string) $value : ''))) {
         'approved', 'disetujui', 'paid', 'lunas', 'lulus' => 'bg-emerald-50 text-emerald-800',
         'pending', 'menunggu', 'needs_review', 'perlu revisi' => 'bg-amber-50 text-amber-800',
-        'rejected', 'ditolak', 'tidak lulus' => 'bg-rose-50 text-rose-800',
+        'rejected', 'ditolak', 'tidak lulus', 'unpaid', 'belum lunas', 'kredit', 'perlu verifikasi' => 'bg-rose-50 text-rose-800',
         default => 'bg-slate-100 text-slate-700',
     };
 @endphp

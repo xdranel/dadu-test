@@ -188,7 +188,7 @@ test('detail_hides_history_keeps_private_preview_and_preserves_audit', function 
     expect($registration->logs()->where('action', 'resubmitted')->exists())->toBeTrue();
 });
 
-test('meet_detail_uses_saved_krs_label_and_hides_retired_snapshot_fields_for_student_and_staff', function () {
+test('meet_detail_uses_saved_krs_label_and_only_staff_sees_bpp_and_advisors', function () {
     $snapshot = array_replace($this->snapshot, [
         'ta2_krs_status' => 'eligible', 'ta2_krs_label' => 'Terdaftar saat pengajuan',
         'level_3_status' => 'HIDDEN-LEVEL3', 'bpp_status' => 'HIDDEN-BPP',
@@ -203,13 +203,22 @@ test('meet_detail_uses_saved_krs_label_and_hides_retired_snapshot_fields_for_stu
         'must_change_password' => false]);
     $reviewer->givePermissionTo('sidang_ta_registration_review');
     $staff = $this->actingAs($reviewer)->get(route('admin.sidang-ta-registrations.show', $registration))->assertOk();
-    foreach ([$response, $staff] as $page) {
+    foreach ([$response, $staff] as $index => $page) {
         $academic = (new Crawler($page->getContent()))->filter('[data-academic-detail]');
         expect($academic->filter('[data-snapshot-field="ta2_krs_label"]')->text(null, true))->toBe('Terdaftar saat pengajuan');
-        expect($academic->text(null, true))->not->toContain('HIDDEN-')->not->toContain('Live student changed');
+        expect($academic->text(null, true))->not->toContain('Live student changed');
+        foreach (['HIDDEN-LEVEL3','HIDDEN-BASILA','HIDDEN-AVAILABILITY','HIDDEN-EXAMINER','HIDDEN-DATE','HIDDEN-TIME','HIDDEN-LOCATION'] as $hidden) {
+            expect($academic->text(null, true))->not->toContain($hidden);
+        }
         expect($academic->filter('[data-academic-group="lecturers"], [data-academic-group="schedule"]')->count())->toBe(0);
         expect($academic->filter('[data-snapshot-field="ta2_krs_status"]')->count())->toBe(0);
-        expect($academic->text(null, true))->not->toContain('Status BPP')->not->toContain('Sidang tingkat 3');
+        expect($academic->text(null, true))->not->toContain('Sidang tingkat 3');
+        if ($index === 0) {
+            expect($academic->text(null, true))->not->toContain('Status BPP')->not->toContain('HIDDEN-ADVISOR')->not->toContain('HIDDEN-BPP');
+        } else {
+            expect($academic->filter('[data-snapshot-field="bpp_status"]')->text(null, true))->toBe('HIDDEN-BPP');
+            expect($academic->filter('[data-snapshot-field="advisor_1"]')->text(null, true))->toBe('HIDDEN-ADVISOR');
+        }
     }
     expect($registration->fresh()->academic_snapshot)->toEqual($snapshot);
 });
@@ -223,4 +232,40 @@ test('current_snapshot_without_krs_label_does_not_derive_one_from_live_data_or_r
     expect($academic->filter('[data-snapshot-field="ta2_krs_label"]')->text(null, true))->toBe('Belum tersedia');
     expect($academic->text(null, true))->not->toContain('eligible');
     expect($registration->fresh()->academic_snapshot)->not->toHaveKey('ta2_krs_label');
+});
+
+
+test('staff_review_uses_saved_bpp_igracias_and_advisors_without_mutating_the_registration', function () {
+    $snapshot=array_replace($this->snapshot, [
+        'bpp_status'=>'LUNAS','sidang_approval_status'=>'APPROVED',
+        'advisor_1'=>'Pembimbing Satu Historis','advisor_2'=>'<b>Pembimbing Dua Historis</b>',
+    ]);
+    $registration=($this->makeRegistration)(['status'=>'approved','academic_snapshot'=>$snapshot]);
+    $this->student->finalProject()->create(['thesis_title_id'=>'Judul Terbaru','advisor_1'=>'Pembimbing Terbaru']);
+    $reviewer=User::factory()->create(['status'=>'active','auth_source'=>'manual','must_change_password'=>false]);
+    $reviewer->givePermissionTo('sidang_ta_registration_review');
+    $before=$registration->getAttributes();
+    $academic=(new Crawler($this->actingAs($reviewer)->get(route('admin.sidang-ta-registrations.show',$registration))->assertOk()->getContent()))->filter('[data-academic-detail]');
+    expect($academic->filter('[data-academic-group="statuses"] [data-snapshot-field="bpp_status"]')->text(null,true))->toBe('LUNAS');
+    expect($academic->filter('[data-academic-group="statuses"] [data-snapshot-field="sidang_approval_status"]')->text(null,true))->toBe('Disetujui');
+    expect($academic->filter('[data-snapshot-field="sidang_approval_status"]')->attr('class'))->toContain('bg-emerald-50');
+    $titles=$academic->filter('[data-academic-group="titles"]');
+    expect($titles->filter('[data-snapshot-field]')->each(fn(Crawler $node)=>$node->attr('data-snapshot-field')))
+        ->toBe(['ta_title','ta_title_en','advisor_1','advisor_2']);
+    expect($titles->text(null,true))->toContain('Pembimbing Satu Historis')->toContain('<b>Pembimbing Dua Historis</b>')->not->toContain('Pembimbing Terbaru');
+    expect($titles->filter('b')->count())->toBe(0);
+    expect($registration->fresh()->getAttributes())->toBe($before);
+});
+
+test('staff_review_tolerates_older_snapshots_missing_new_fields', function () {
+    $snapshot=$this->snapshot;unset($snapshot['bpp_status'],$snapshot['sidang_approval_status'],$snapshot['advisor_1'],$snapshot['advisor_2']);
+    $registration=($this->makeRegistration)(['academic_snapshot'=>$snapshot]);
+    $reviewer=User::factory()->create(['status'=>'active','auth_source'=>'manual','must_change_password'=>false]);
+    $reviewer->givePermissionTo('sidang_ta_registration_review');
+    $academic=(new Crawler($this->actingAs($reviewer)->get(route('admin.sidang-ta-registrations.show',$registration))->assertOk()->getContent()))->filter('[data-academic-detail]');
+    foreach(['bpp_status','sidang_approval_status','advisor_1','advisor_2'] as $field) {
+        expect($academic->filter('[data-snapshot-field="'.$field.'"]')->text(null,true))->toBe('Belum tersedia');
+    }
+    expect($academic->filter('[data-snapshot-field="sidang_approval_status"]')->attr('class'))->toContain('bg-slate-100');
+    expect($registration->fresh()->academic_snapshot)->toEqual($snapshot);
 });
