@@ -17,10 +17,32 @@
         'TAK' => ['tak_score', 0], 'EPrT' => ['eprt_score', 0]];
     $statuses = ['Sidang tingkat 2' => 'sidang_tingkat_2', 'Status SKPI' => 'skpi_status',
         'KRS Sidang TA 2' => 'ta2_krs_label'];
-    $titles = ['Bahasa Indonesia' => 'ta_title', 'Bahasa Inggris' => 'ta_title_en'];
+    $titles = ['Bahasa Indonesia' => 'ta_title', 'Bahasa Inggris' => 'ta_title_en',
+        'Pembimbing 1' => 'advisor_1', 'Pembimbing 2' => 'advisor_2'];
     if ($showStaffAcademicDetails ?? false) {
         $statuses += ['Status BPP' => 'bpp_status', 'Persetujuan sidang iGracias' => 'sidang_approval_status'];
-        $titles += ['Pembimbing 1' => 'advisor_1', 'Pembimbing 2' => 'advisor_2'];
+    }
+    $thesisColumns = ['ta_title' => 'thesis_title_id', 'ta_title_en' => 'thesis_title_en',
+        'advisor_1' => 'advisor_1', 'advisor_2' => 'advisor_2'];
+    $missingThesisValue = static fn ($value) => $value === null || (is_string($value)
+        && in_array(strtolower(trim($value)), ['', '-', 'belum tersedia'], true));
+    $titleValues = [];
+    $titleFallbacks = [];
+    $missingTitles = [];
+    foreach ($thesisColumns as $key => $column) {
+        $titleValues[$key] = $snapshot[$key] ?? null;
+        if ($missingThesisValue($titleValues[$key])) $missingTitles[$key] = $column;
+    }
+    if ($missingTitles !== []) {
+        $currentProject = \App\Models\StudentFinalProject::where('student_number', $registration->student_number)
+            ->first(array_values($thesisColumns));
+        foreach ($missingTitles as $key => $column) {
+            $currentValue = $currentProject?->getAttribute($column);
+            if (!$missingThesisValue($currentValue)) {
+                $titleValues[$key] = $currentValue;
+                $titleFallbacks[$key] = true;
+            }
+        }
     }
     // Fields outside the academic summary remain stored without appearing in the detail panel.
     $omitted = ['level_3_status', 'bpp_status', 'ibasila_status', 'skpi_tak',
@@ -47,7 +69,7 @@
             Data akademik saat pengajuan
         </h2>
         <p class="text-sm leading-relaxed text-slate-500">
-            Data direkam saat pengajuan dikirim. Perubahan data akademik setelahnya tidak mengubah ringkasan tersimpan ini.
+            Data yang tercatat saat pengajuan tetap dipakai. Judul dan pembimbing yang belum tercatat dapat ditampilkan dari Data Akademik terbaru dengan penanda sumber.
         </p>
     </header>
     <div class="space-y-6 p-5 sm:p-6">
@@ -105,8 +127,13 @@
                         <dt class="text-xs font-semibold text-slate-500">{{ $label }}</dt>
                         <dd data-snapshot-field="{{ $key }}"
                             class="mt-1.5 break-words rounded-xl bg-slate-50 p-4 text-sm leading-relaxed text-slate-800">
-                            {{ $display($snapshot[$key] ?? null) }}
+                            {{ $display($titleValues[$key] ?? null) }}
                         </dd>
+                        @if(isset($titleFallbacks[$key]))
+                            <p data-title-source="{{ $key }}" class="mt-1 text-xs text-slate-500">
+                                Data Akademik terbaru; belum tercatat saat pengajuan.
+                            </p>
+                        @endif
                     </div>
                 @endforeach
             </dl>
@@ -129,7 +156,7 @@
             </section>
         @endif
         <p class="border-t border-slate-100 pt-4 text-xs leading-relaxed text-slate-500">
-            Waktu sumber akademik:
+            Waktu sumber akademik saat pengajuan:
             <span data-snapshot-field="academic_source_updated_at">{{ $display($snapshot['academic_source_updated_at'] ?? null) }}</span>.
             Waktu ini menunjukkan pembaruan sumber data, bukan waktu kirim pendaftaran.
         </p>

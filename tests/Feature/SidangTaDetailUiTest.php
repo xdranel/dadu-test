@@ -58,7 +58,7 @@ test('detail_uses_saved_academic_snapshot_after_student_data_changes', function 
     $academic = $crawler->filter('[data-academic-detail]');
     expect($academic->count())->toBe(1);
     expect($academic->text(null, true))->toContain('Nama Saat Diajukan')->toContain('Judul TA Historis')
-        ->toContain('Historical Thesis Title')->not->toContain('Dosen Historis')
+        ->toContain('Historical Thesis Title')->toContain('Dosen Historis')
         ->not->toContain('Nama Terbaru Berbeda')->not->toContain('Judul TA Terbaru Berbeda');
     expect($academic->filter('[data-snapshot-field="gpa"]')->text(null, true))->toBe('3,25');
     expect($academic->filter('[data-academic-group]')->count())->toBe(4);
@@ -188,7 +188,7 @@ test('detail_hides_history_keeps_private_preview_and_preserves_audit', function 
     expect($registration->logs()->where('action', 'resubmitted')->exists())->toBeTrue();
 });
 
-test('meet_detail_uses_saved_krs_label_and_only_staff_sees_bpp_and_advisors', function () {
+test('meet_detail_uses_saved_krs_label_and_advisors_for_both_views_with_bpp_for_staff', function () {
     $snapshot = array_replace($this->snapshot, [
         'ta2_krs_status' => 'eligible', 'ta2_krs_label' => 'Terdaftar saat pengajuan',
         'level_3_status' => 'HIDDEN-LEVEL3', 'bpp_status' => 'HIDDEN-BPP',
@@ -214,7 +214,8 @@ test('meet_detail_uses_saved_krs_label_and_only_staff_sees_bpp_and_advisors', fu
         expect($academic->filter('[data-snapshot-field="ta2_krs_status"]')->count())->toBe(0);
         expect($academic->text(null, true))->not->toContain('Sidang tingkat 3');
         if ($index === 0) {
-            expect($academic->text(null, true))->not->toContain('Status BPP')->not->toContain('HIDDEN-ADVISOR')->not->toContain('HIDDEN-BPP');
+            expect($academic->text(null, true))->not->toContain('Status BPP')->not->toContain('HIDDEN-BPP');
+            expect($academic->filter('[data-snapshot-field="advisor_1"]')->text(null, true))->toBe('HIDDEN-ADVISOR');
         } else {
             expect($academic->filter('[data-snapshot-field="bpp_status"]')->text(null, true))->toBe('HIDDEN-BPP');
             expect($academic->filter('[data-snapshot-field="advisor_1"]')->text(null, true))->toBe('HIDDEN-ADVISOR');
@@ -268,4 +269,70 @@ test('staff_review_tolerates_older_snapshots_missing_new_fields', function () {
     }
     expect($academic->filter('[data-snapshot-field="sidang_approval_status"]')->attr('class'))->toContain('bg-slate-100');
     expect($registration->fresh()->academic_snapshot)->toEqual($snapshot);
+});
+
+
+test('thesis_display_fallback_shows_current_fields_for_owner_and_staff_without_changing_the_submission', function () {
+    $snapshot=array_replace($this->snapshot,['ta_title'=>'-', 'ta_title_en'=>null, 'advisor_1'=>'', 'advisor_2'=>'Belum tersedia']);
+    $registration=($this->makeRegistration)(['academic_snapshot'=>$snapshot]);$before=$registration->getAttributes();
+    $this->student->update(['gpa'=>3.99,'name'=>'Nama terbaru berbeda']);
+    $this->student->finalProject()->create(['thesis_title_id'=>'Judul baru setelah impor','thesis_title_en'=>'New imported thesis',
+        'advisor_1'=>'Pembimbing pertama terbaru','advisor_2'=>'<script>Nama pembimbing kedua</script>']);
+    $owner=$this->get(route('sidang-ta-registrations.show',$registration))->assertOk();
+    $reviewer=User::factory()->create(['status'=>'active','auth_source'=>'manual','must_change_password'=>false]);
+    $reviewer->givePermissionTo('sidang_ta_registration_review');
+    $staff=$this->actingAs($reviewer)->get(route('admin.sidang-ta-registrations.show',$registration))->assertOk();
+    foreach([$owner,$staff] as $response) {
+        $academic=(new Crawler($response->getContent()))->filter('[data-academic-detail]');
+        $titles=$academic->filter('[data-academic-group="titles"]');
+        foreach(['ta_title'=>'Judul baru setelah impor','ta_title_en'=>'New imported thesis','advisor_1'=>'Pembimbing pertama terbaru','advisor_2'=>'<script>Nama pembimbing kedua</script>'] as $field=>$value) {
+            expect($titles->filter('[data-snapshot-field="'.$field.'"]')->text(null,true))->toBe($value);
+            expect($titles->filter('[data-title-source="'.$field.'"]')->text(null,true))->toBe('Data Akademik terbaru; belum tercatat saat pengajuan.');
+        }
+        expect($titles->filter('script')->count())->toBe(0);
+        expect($academic->filter('[data-snapshot-field="gpa"]')->text(null,true))->toBe('3,25');
+        expect($academic->text(null,true))->not->toContain('Nama terbaru berbeda');
+    }
+    expect($registration->fresh()->getAttributes())->toBe($before);
+});
+
+test('thesis_display_fallback_fills_each_missing_field_without_replacing_recorded_values', function () {
+    $snapshot=array_replace($this->snapshot,['ta_title_en'=>'  ', 'advisor_1'=>'Pembimbing saat pengajuan','advisor_2'=>null]);
+    $registration=($this->makeRegistration)(['academic_snapshot'=>$snapshot]);
+    $this->student->finalProject()->create(['thesis_title_id'=>'Judul terbaru tidak dipakai','thesis_title_en'=>'Latest English title',
+        'advisor_1'=>'Pembimbing terbaru tidak dipakai','advisor_2'=>'Pembimbing kedua terbaru']);
+    $academic=(new Crawler($this->get(route('sidang-ta-registrations.show',$registration))->assertOk()->getContent()))->filter('[data-academic-detail]');
+    $titles=$academic->filter('[data-academic-group="titles"]');
+    expect($titles->filter('[data-snapshot-field="ta_title"]')->text(null,true))->toBe('Judul TA Historis');
+    expect($titles->filter('[data-snapshot-field="advisor_1"]')->text(null,true))->toBe('Pembimbing saat pengajuan');
+    expect($titles->filter('[data-snapshot-field="ta_title_en"]')->text(null,true))->toBe('Latest English title');
+    expect($titles->filter('[data-snapshot-field="advisor_2"]')->text(null,true))->toBe('Pembimbing kedua terbaru');
+    expect($titles->filter('[data-title-source]')->count())->toBe(2);
+    expect($titles->text(null,true))->not->toContain('tidak dipakai');
+    expect($registration->fresh()->academic_snapshot)->toEqual($snapshot);
+});
+
+test('thesis_display_fallback_reads_an_import_after_submission_without_writing_back_to_snapshot', function () {
+    $snapshot=array_replace($this->snapshot,['ta_title'=>'-', 'ta_title_en'=>null, 'advisor_1'=>null,'advisor_2'=>null]);
+    $registration=($this->makeRegistration)(['academic_snapshot'=>$snapshot]);$before=$registration->getAttributes();
+    $first=new Crawler($this->get(route('sidang-ta-registrations.show',$registration))->assertOk()->getContent());
+    expect($first->filter('[data-snapshot-field="ta_title"]')->text(null,true))->toBe('Belum tersedia');
+    expect($first->filter('[data-title-source]')->count())->toBe(0);
+    $project=$this->student->finalProject()->create(['thesis_title_id'=>'Diimpor belakangan','advisor_1'=>'Pembimbing setelah impor']);
+    $second=new Crawler($this->get(route('sidang-ta-registrations.show',$registration))->assertOk()->getContent());
+    expect($second->filter('[data-snapshot-field="ta_title"]')->text(null,true))->toBe('Diimpor belakangan');
+    expect($second->filter('[data-snapshot-field="advisor_1"]')->text(null,true))->toBe('Pembimbing setelah impor');
+    $project->update(['thesis_title_id'=>'Pembaruan berikutnya']);
+    $third=new Crawler($this->get(route('sidang-ta-registrations.show',$registration))->assertOk()->getContent());
+    expect($third->filter('[data-snapshot-field="ta_title"]')->text(null,true))->toBe('Pembaruan berikutnya');
+    expect($registration->fresh()->getAttributes())->toBe($before);
+});
+
+test('thesis_display_fallback_has_no_source_label_when_current_values_are_also_missing', function () {
+    $snapshot=array_replace($this->snapshot,['ta_title'=>'-', 'ta_title_en'=>null, 'advisor_1'=>null,'advisor_2'=>null]);
+    $registration=($this->makeRegistration)(['academic_snapshot'=>$snapshot]);
+    $this->student->finalProject()->create(['thesis_title_id'=>'-', 'advisor_1'=>' ']);
+    $titles=(new Crawler($this->get(route('sidang-ta-registrations.show',$registration))->assertOk()->getContent()))->filter('[data-academic-group="titles"]');
+    foreach(['ta_title','ta_title_en','advisor_1','advisor_2'] as $field) expect($titles->filter('[data-snapshot-field="'.$field.'"]')->text(null,true))->toBe('Belum tersedia');
+    expect($titles->filter('[data-title-source]')->count())->toBe(0);
 });
