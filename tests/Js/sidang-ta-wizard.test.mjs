@@ -142,7 +142,7 @@ test('PDF upload rejects image and oversize selections and drops', () => {
     input.files=[{name:'capture.png',type:'image/png',size:100}]; state.picked();
     assert.match(state.localError,/PDF/); assert.equal(input.files.length,0);
     state.drop({dataTransfer:{files:[{name:'large.pdf',type:'application/pdf',size:11*1024*1024}]}});
-    assert.match(state.localError,/10 MB/); assert.equal(input.files.length,0);
+    assert.match(state.localError,/5 MB/); assert.equal(input.files.length,0);
 });
 
 test('WA validation preserves digit strings and rejects punctuation letters and invalid lengths', () => {
@@ -221,4 +221,21 @@ test('changing selected period updates registration and verification schedules t
     assert.equal(state.selectedPeriodId, '2');
     state.updatePeriodHint({selectedOptions: []});
     assert.equal(state.selectedPeriodId, '');
+});
+
+
+test('upload limit accepts five MB and rejects one byte above it', () => {
+    const { state, input }=uploadState();
+    input.files=[{name:'batas.pdf',type:'application/pdf',size:5*1024*1024}];state.picked();
+    assert.equal(state.localError,'');assert.equal(state.fileName,'batas.pdf');
+    input.files=[{name:'kelebihan.pdf',type:'application/pdf',size:5*1024*1024+1}];state.picked();
+    assert.match(state.localError,/5 MB/);assert.equal(input.files.length,0);
+});
+
+test('upload picker uses the size supplied by the server', () => {
+    const state=sidangTaUpload({maxSizeMb:3});
+    const input={files:[{name:'besar.pdf',type:'application/pdf',size:3*1024*1024+1}],disabled:false,
+        set value(value) {if(value==='') this.files=[];}};
+    state.$refs={file:input};state.$dispatch=()=>{};state.picked();
+    assert.match(state.localError,/3 MB/);assert.equal(input.files.length,0);
 });

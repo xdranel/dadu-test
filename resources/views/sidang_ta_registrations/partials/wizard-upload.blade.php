@@ -9,7 +9,8 @@
     $label = \App\Support\SidangTaMeetRequirements::LABELS[$type] ?? $type;
     $conditional = $conditional ?? null;
     $errorKey = "documents.{$type}";
-    $uploadInitial = ['serverError' => $errors->has($errorKey)];
+    $uploadMaxMb = \App\Support\SidangTaMeetRequirements::MAX_UPLOAD_MB;
+    $uploadInitial = ['serverError' => $errors->has($errorKey), 'maxSizeMb' => $uploadMaxMb];
 @endphp
 <div data-upload-type="{{ $type }}" data-upload-locked="{{ $lockedUpload ? 'true' : 'false' }}"
      class="min-w-0 rounded-xl border border-slate-200 p-4 {{ $lockedUpload ? 'bg-slate-100 text-slate-500' : 'bg-white' }}"
@@ -30,6 +31,11 @@
                 {{ number_format(($existing->file_size ?? 0) / 1024) }} KB · {{ $lockedUpload ? 'Berkas ini tetap digunakan.' : 'Pilih berkas baru hanya untuk mengganti.' }}
             </p>
         </div>
+        @if($existing->file_size > \App\Support\SidangTaMeetRequirements::MAX_UPLOAD_KB * 1024)
+            <p class="mt-2 text-xs text-slate-600">
+                Berkas lama tetap tersimpan. Batas {{ $uploadMaxMb }} MB hanya berlaku untuk unggahan baru atau pengganti.
+            </p>
+        @endif
     @elseif($existing)
         <p class="mt-3 text-sm text-rose-700">
             {{ $revisionExpired ? 'Berkas tersimpan tidak ditemukan. Batas waktu unggah pengganti telah berakhir.'
@@ -76,7 +82,7 @@
                     Klik untuk memilih atau seret file ke sini
                 </p>
                 <p class="mt-1 text-xs text-slate-500">
-                    PDF · Maksimal 10 MB · Satu berkas
+                    PDF · Maksimal {{ $uploadMaxMb }} MB · Satu berkas
                 </p>
             </div>
         </div>

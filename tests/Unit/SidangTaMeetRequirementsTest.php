@@ -26,7 +26,7 @@ test('meet_requirements_stage_three_has_one_base_pdf_and_no_certificate_for_auto
 test('meet_requirements_eprt_waiver_adds_exactly_one_required_pdf', function () {
     $types = Requirements::typesForStep(3, null, Policy::eprt(449, 3)['mode']);
     expect($types)->toBe(['graduation_payment_proof', 'eprt_waiver_letter']);
-    expect(Requirements::fileRules('eprt_waiver_letter'))->toBe(['nullable', 'file', 'max:10240', 'mimes:pdf']);
+    expect(Requirements::fileRules('eprt_waiver_letter'))->toBe(['nullable', 'file', 'max:5120', 'mimes:pdf']);
 });
 
 test('meet_requirements_unknown_or_retest_does_not_invent_a_waiver_upload', function () {
@@ -65,7 +65,7 @@ test('meet_requirements_every_upload_has_a_label_and_expected_format', function 
         expect(Requirements::LABELS)->toHaveKey($type);
         expect(Requirements::LABELS[$type])->not->toBe('');
         $rules = Requirements::fileRules($type);
-        expect($rules)->toContain('nullable')->toContain('file')->toContain('max:10240');
+        expect($rules)->toContain('nullable')->toContain('file')->toContain('max:5120');
         expect(end($rules))->toBe('mimes:pdf');
     }
 });

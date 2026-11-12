@@ -95,7 +95,7 @@ class SaveSidangTaDraftStepRequest extends FormRequest
             'documents.array' => 'Jenis dokumen tidak sesuai tahap atau cabang yang dipilih.',
             'documents.*.file' => 'Pilih berkas yang valid.',
             'documents.*.uploaded' => 'Berkas gagal diunggah. Periksa ukuran berkas dan coba lagi.',
-            'documents.*.max' => 'Ukuran setiap file maksimal 10 MB.',
+            'documents.*.max' => 'Ukuran setiap file maksimal '.SidangTaMeetRequirements::MAX_UPLOAD_MB.' MB.',
             'documents.*.mimes' => 'Format dokumen tidak sesuai persyaratan tahap ini.',
             'prohibited' => 'Isian :attribute tidak diperbolehkan pada tahap ini.',
         ];

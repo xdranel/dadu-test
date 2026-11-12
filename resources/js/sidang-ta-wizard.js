@@ -86,6 +86,7 @@ export default (initial = {}) => ({
 });
 
 export const sidangTaUpload = (initial = {}) => ({
+    maxSizeMb: initial.maxSizeMb ?? 5,
     fileName: '',
     fileSize: '',
     dragDepth: 0,
@@ -104,11 +105,11 @@ export const sidangTaUpload = (initial = {}) => ({
     picked() {
         if (this.$refs.file.disabled) return;
         const file = this.$refs.file.files[0];
-        if (file && (!/\.pdf$/i.test(file.name) || (file.type && file.type !== 'application/pdf') || file.size > 10 * 1024 * 1024)) {
+        if (file && (!/\.pdf$/i.test(file.name) || (file.type && file.type !== 'application/pdf') || file.size > this.maxSizeMb * 1024 * 1024)) {
             this.$refs.file.value = '';
             this.fileName = '';
             this.fileSize = '';
-            this.localError = 'Gunakan file PDF maksimal 10 MB.';
+            this.localError = `Gunakan file PDF maksimal ${this.maxSizeMb} MB.`;
             this.selectionChanged = true;
             this.$dispatch('sidang-ta-file-changed');
             return;

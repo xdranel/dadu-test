@@ -381,3 +381,23 @@ test('meet_final_revalidates_required_scalar_values_even_if_review_metadata_exis
     ($this->submitMeet)($draft)->assertUnprocessable()->assertJsonValidationErrors('draft');
     ($this->assertPreserved)($draft, $paths);
 })->with(['student_phone', 'graduation_payment_date', 'diploma_biodata_accurate']);
+
+
+test('upload_limit_existing_eight_mb_draft_can_resume_review_and_submit_without_reupload', function () {
+    $draft=($this->meetDraft)('automatic');
+    $document=$draft->documents()->where('document_type','thesis_draft')->firstOrFail();
+    $bytes=8*1024*1024;
+    Storage::disk('local')->put($document->file_path,'%PDF-1.4'.str_repeat('x',$bytes-8));
+    $document->update(['file_size'=>$bytes]);
+    $originalPath=$document->file_path;
+    $this->get(route('sidang-ta-drafts.edit',[$draft,'step'=>2]))->assertOk()
+        ->assertSee('Maksimal 5 MB')->assertSee('Batas 5 MB hanya berlaku untuk unggahan baru atau pengganti.');
+    $this->postJson(route('sidang-ta-drafts.steps.store',['draft'=>$draft,'step'=>2]),[
+        'version'=>$draft->fresh()->version,'documents'=>[]])->assertOk();
+    $draft=($this->markReviewed)($draft);
+    $id=($this->submitMeet)($draft)->assertOk()->json('data.id');
+    $final=SidangTaRegistration::findOrFail($id)->documents()->where('document_type','thesis_draft')->firstOrFail();
+    expect($final->file_path)->toBe($originalPath)->and($final->file_size)->toBe($bytes);
+    expect(Storage::disk('local')->size($originalPath))->toBe($bytes);
+    $this->get(route('sidang-ta-registration-documents.download',$final))->assertDownload($final->file_name);
+});

@@ -415,3 +415,51 @@ test('targeted_revision_can_save_one_of_two_requested_files_without_unlocking_re
     expect($source->documents()->where('status', 'pending')->count())->toBe(2);
     expect($source->documents()->where('status', 'verified')->count())->toBe(6);
 });
+
+
+test('upload_limit_revisions_keep_verified_eight_mb_files_and_enforce_five_mb_replacements', function () {
+    $source=($this->submittedSource)('automatic');$bytes=8*1024*1024;
+    foreach(['ta_data_capture','thesis_draft'] as $type) {
+        $doc=$source->documents()->where('document_type',$type)->firstOrFail();
+        Storage::disk('local')->put($doc->file_path,'%PDF-1.4'.str_repeat('x',$bytes-8));
+        $doc->update(['file_size'=>$bytes]);
+    }
+    $draft=($this->prepareRevision)($source,['ta_data_capture']);
+    $verified=$source->documents()->where('document_type','thesis_draft')->firstOrFail();$before=$verified->getAttributes();
+    $rejected=$source->documents()->where('document_type','ta_data_capture')->firstOrFail();
+    $paths=Storage::disk('local')->allFiles();$version=$draft->fresh()->version;
+    $response=($this->replaceDocument)($draft,'ta_data_capture',2,['documents'=>[
+        'ta_data_capture'=>UploadedFile::fake()->create('besar.pdf',5121,'application/pdf')]])
+        ->assertUnprocessable()->assertJsonValidationErrors('documents.ta_data_capture');
+    expect($response->json('errors')['documents.ta_data_capture'][0])->toBe('Ukuran setiap file maksimal 5 MB.');
+    expect($draft->fresh()->version)->toBe($version);
+    expect(Storage::disk('local')->allFiles())->toBe($paths);
+    Storage::disk('local')->assertExists($rejected->file_path);
+    ($this->replaceDocument)($draft,'ta_data_capture',2,['documents'=>[
+        'ta_data_capture'=>UploadedFile::fake()->create('baru.pdf',5120,'application/pdf')]])->assertOk();
+    $draft=($this->markReviewed)($draft);
+    ($this->submitRevision)($source,$draft)->assertOk();
+    expect($verified->fresh()->getAttributes())->toBe($before);
+    expect(Storage::disk('local')->size($verified->file_path))->toBe($bytes);
+    expect($source->documents()->where('document_type','ta_data_capture')->firstOrFail()->file_size)->toBe(5120*1024);
+});
+
+test('upload_limit_saved_eight_mb_revision_replacement_can_still_be_reviewed_and_submitted', function () {
+    $source=($this->submittedSource)('automatic');
+    $draft=($this->prepareRevision)($source,['ta_data_capture']);
+    ($this->replaceDocument)($draft)->assertOk();
+    // Represent a replacement that was already persisted before the size limit changed.
+    $replacement=$draft->documents()->where('document_type','ta_data_capture')->firstOrFail();
+    $bytes=8*1024*1024;
+    Storage::disk('local')->put($replacement->file_path,'%PDF-1.4'.str_repeat('x',$bytes-8));
+    $replacement->update(['file_size'=>$bytes]);
+    $path=$replacement->file_path;
+    $this->postJson(route('sidang-ta-drafts.steps.store',['draft'=>$draft,'step'=>2]),[
+        'version'=>$draft->fresh()->version,'documents'=>[]])->assertOk();
+    $draft=($this->markReviewed)($draft);
+    ($this->submitRevision)($source,$draft)->assertOk();
+    $final=$source->documents()->where('document_type','ta_data_capture')->firstOrFail();
+    expect($final->file_path)->toBe($path)->and($final->file_size)->toBe($bytes);
+    expect(Storage::disk('local')->size($path))->toBe($bytes);
+    $this->get(route('sidang-ta-registration-documents.download',$final))->assertDownload($final->file_name);
+});

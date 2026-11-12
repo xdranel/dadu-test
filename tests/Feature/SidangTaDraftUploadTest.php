@@ -99,7 +99,7 @@ test('rejects_unknown_keys_and_oversized_files', function () {
         'unknown_type' => UploadedFile::fake()->create('unknown.pdf', 100, 'application/pdf'),
     ]])->assertUnprocessable()->assertJsonValidationErrors('documents');
     ($this->saveUploadStep)(2, ['documents' => [
-        'ta_data_capture' => UploadedFile::fake()->create('large.pdf', 10241, 'application/pdf'),
+        'ta_data_capture' => UploadedFile::fake()->create('large.pdf', 5121, 'application/pdf'),
     ]])->assertUnprocessable()->assertJsonValidationErrors('documents.ta_data_capture');
     expect($this->draft->documents()->count())->toBe(0);
     expect(Storage::disk('local')->allFiles())->toBe([]);
@@ -107,7 +107,7 @@ test('rejects_unknown_keys_and_oversized_files', function () {
 
 test('accepts_size_boundary_and_requires_pdf_in_payment_stage', function () {
     $files = ($this->filesFor)(2);
-    $files['ta_data_capture'] = UploadedFile::fake()->create('limit.pdf', 10240, 'application/pdf');
+    $files['ta_data_capture'] = UploadedFile::fake()->create('limit.pdf', 5120, 'application/pdf');
     ($this->saveUploadStep)(2, ['documents' => $files])->assertOk();
     ($this->saveUploadStep)(3, ['documents' => [
         'graduation_payment_proof' => UploadedFile::fake()->create('image.jpg', 100, 'image/jpeg'),
