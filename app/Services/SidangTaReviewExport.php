@@ -7,6 +7,8 @@ use App\Support\SidangTaReviewEligibility as Eligibility;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
+use OpenSpout\Common\Entity\Cell\FormulaCell;
+use OpenSpout\Common\Entity\Style\Style;
 use Rap2hpoutre\FastExcel\FastExcel;
 use RuntimeException;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
@@ -76,12 +78,27 @@ class SidangTaReviewExport
         return $row;
     }
 
+    private function spreadsheetRow(SidangTaRegistration $registration): array
+    {
+        $row = $this->row($registration);
+        $style = (new Style)->setFontColor('0563C1')->setFontUnderline();
+        foreach (SidangTaRegistration::DOCUMENT_TYPES as $type => $label) {
+            $column = $label.' — Ketersediaan';
+            if ($row[$column] !== 'Tersedia') continue;
+            $document = $registration->documents->firstWhere('document_type', $type);
+            $url = str_replace('"', '""', route('sidang-ta-registration-documents.preview', $document));
+            // Only application-generated URLs become formulas; user input stays escaped text.
+            $row[$column] = new FormulaCell('=HYPERLINK("'.$url.'","Lihat PDF")', $style);
+        }
+        return $row;
+    }
+
     public function download(Collection $registrations): BinaryFileResponse
     {
         if ($registrations->isEmpty()) {
             throw ValidationException::withMessages(['export' => 'Tidak ada pengajuan yang cocok untuk diekspor.']);
         }
-        $rows = $registrations->map(fn (SidangTaRegistration $registration) => $this->row($registration));
+        $rows = $registrations->map(fn (SidangTaRegistration $registration) => $this->spreadsheetRow($registration));
         $temporary = tempnam(sys_get_temp_dir(), 'dadu-ta-xlsx-');
         if ($temporary === false) throw new RuntimeException('File sementara ekspor tidak dapat dibuat.');
         $path = $temporary.'.xlsx';

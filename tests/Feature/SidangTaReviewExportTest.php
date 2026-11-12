@@ -106,7 +106,7 @@ test('p2b_xlsx_preserves_text_ids_phones_and_literal_formula_like_content', func
         'student_phone' => '001234567890', 'parent_phone' => '000987654321',
         'review_notes' => '=HYPERLINK("https://example.invalid","x")',
         'academic_snapshot' => ['gpa' => '=1+1', 'ta_title' => '=SUM(1,2)']]);
-    ($this->attach)($registration, 'thesis_draft', 'rejected', true, '=SUM(2,3)');
+    $uploaded = ($this->attach)($registration, 'thesis_draft', 'rejected', true, '=SUM(2,3)');
     [, $rows, $path] = ($this->exportRows)();
     $row = $rows->first();
     expect($row)->toHaveCount(57);
@@ -119,7 +119,10 @@ test('p2b_xlsx_preserves_text_ids_phones_and_literal_formula_like_content', func
     $document = new DOMDocument;
     expect($document->loadXML($xml, LIBXML_NONET))->toBeTrue();
     $xpath = new DOMXPath($document);
-    expect($xpath->query('//*[local-name()="f"]')->length)->toBe(0);
+    // Only the application-generated document link may be a formula.
+    $formulas = $xpath->query('//*[local-name()="f"]');
+    expect($formulas->length)->toBe(1);
+    expect($formulas->item(0)->textContent)->toBe('HYPERLINK("'.route('sidang-ta-registration-documents.preview', $uploaded).'","Lihat PDF")');
     // Reader OpenSpout dapat menafsirkan teks berawalan '=' sebagai FormulaCell.
     // Periksa literal langsung dari inlineStr pada XLSX, bukan computed value reader.
     $textCell = function (string $column) use ($xpath): string {
@@ -236,4 +239,82 @@ test('p2b_private_attachment_is_deleted_after_send_without_mutating_registration
     expect($registration->fresh()->status)->toBe('submitted');
     expect($registration->fresh()->lock_version)->toBe(1);
     expect($registration->logs()->count())->toBe(0);
+});
+
+
+function export106Sheet(string $path): DOMXPath
+{
+    $zip = new ZipArchive;
+    expect($zip->open($path))->toBeTrue();
+    try { $xml = $zip->getFromName('xl/worksheets/sheet1.xml'); } finally { $zip->close(); }
+    $document = new DOMDocument;
+    expect($document->loadXML($xml, LIBXML_NONET))->toBeTrue();
+    return new DOMXPath($document);
+}
+
+test('p2b_uploaded_documents_are_clickable_in_existing_columns_for_both_branches', function (bool $accurate, string $mode, array $required) {
+    $registration = ($this->makeRegistration)(['diploma_biodata_accurate' => $accurate,
+        'academic_snapshot' => ['admission' => ['eprt' => ['mode' => $mode]]]]);
+    $documents = [];
+    foreach (SidangTaRegistration::DOCUMENT_TYPES as $type => $label) {
+        $documents[$type] = ($this->attach)($registration, $type, 'pending', true, 'Catatan berkas');
+    }
+    [, $rows, $path] = ($this->exportRows)();
+    expect($rows->first())->toHaveCount(57);
+    $xpath = export106Sheet($path);
+    expect($xpath->query('//*[local-name()="f"]')->length)->toBe(7);
+    $addresses = [];
+    foreach ($xpath->query('//*[local-name()="row" and @r="1"]/*[local-name()="c"]') as $cell) {
+        $header = $xpath->evaluate('string(.//*[local-name()="t"])', $cell);
+        $addresses[$header] = preg_replace('/1$/', '2', $cell->getAttribute('r'));
+    }
+    foreach (SidangTaRegistration::DOCUMENT_TYPES as $type => $label) {
+        $cell = '//*[local-name()="c" and @r="'.$addresses[$label.' — Ketersediaan'].'"]';
+        $formula = $xpath->evaluate('string('.$cell.'/*[local-name()="f"])');
+        if (in_array($type, $required, true)) {
+            expect($formula)->toBe('HYPERLINK("'.route('sidang-ta-registration-documents.preview', $documents[$type]).'","Lihat PDF")');
+        } else {
+            expect($formula)->toBe('');
+            expect($rows->first()[$label.' — Ketersediaan'])->toBe('N/A');
+        }
+        expect($rows->first()[$label.' — Status'])->toBe(in_array($type, $required, true) ? 'Menunggu verifikasi' : 'N/A');
+    }
+})->with([
+    'biodata sesuai dan EPRT memenuhi' => [true, 'automatic', ['ta_data_capture', 'online_supervision_capture',
+        'ta_supervisor_sk', 'thesis_draft', 'graduation_payment_proof', 'diploma_statement', 'diploma_biodata_form']],
+    'bukti PDM dan surat permakluman' => [false, 'waiver', ['ta_data_capture', 'online_supervision_capture',
+        'ta_supervisor_sk', 'thesis_draft', 'graduation_payment_proof', 'eprt_waiver_letter', 'pdm_submission_proof']],
+]);
+
+test('p2b_missing_or_inapplicable_uploads_do_not_create_broken_links', function () {
+    $registration = ($this->makeRegistration)();
+    ($this->attach)($registration, 'thesis_draft', 'verified', false);
+    ($this->attach)($registration, 'pdm_submission_proof', 'verified', true);
+    [, $rows, $path] = ($this->exportRows)();
+    expect(export106Sheet($path)->query('//*[local-name()="f"]')->length)->toBe(0);
+    $row = $rows->first();
+    expect($row[SidangTaRegistration::DOCUMENT_TYPES['thesis_draft'].' — Ketersediaan'])->toBe('Tidak ditemukan');
+    expect($row[SidangTaRegistration::DOCUMENT_TYPES['ta_data_capture'].' — Ketersediaan'])->toBe('Tidak ada metadata');
+    expect($row[SidangTaRegistration::DOCUMENT_TYPES['pdm_submission_proof'].' — Ketersediaan'])->toBe('N/A');
+});
+
+test('p2b_export_pdf_links_open_the_protected_preview_without_mutating_data', function () {
+    $registration = ($this->makeRegistration)();
+    $uploaded = ($this->attach)($registration, 'thesis_draft', 'rejected', true, 'Perbaiki naskah');
+    Storage::disk('local')->put($uploaded->file_path, '%PDF-1.4 preview');
+    $before = $registration->getRawOriginal();
+    [, , $path] = ($this->exportRows)();
+    $xpath = export106Sheet($path);
+    $formula = $xpath->query('//*[local-name()="f"]')->item(0)?->textContent;
+    expect($formula)->not->toBeNull();
+    expect(preg_match('/^HYPERLINK\("([^"]+)","Lihat PDF"\)$/', $formula, $match))->toBe(1);
+    $url = $match[1];
+    expect($url)->toBe(route('sidang-ta-registration-documents.preview', $uploaded));
+    $this->get($url)->assertOk()->assertHeader('Content-Type', 'application/pdf');
+    $stranger = User::factory()->create(['status' => 'active', 'auth_source' => 'manual', 'must_change_password' => false]);
+    $stranger->givePermissionTo('sidang_ta_registration_read');
+    $this->actingAs($stranger)->get($url)->assertForbidden();
+    auth()->logout();
+    $this->get($url)->assertRedirect(route('login'));
+    expect($registration->fresh()->getRawOriginal())->toBe($before);
 });
