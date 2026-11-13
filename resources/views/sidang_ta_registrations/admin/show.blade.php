@@ -12,7 +12,9 @@
             'resubmitted' => 'Revisi dikirim',
             'needs_review' => 'Diminta revisi',
             'approved' => 'Pengajuan disetujui',
+            'approval_cancelled' => 'Persetujuan dibatalkan',
             'rejected' => 'Pengajuan ditolak',
+            'reopened' => 'Pengajuan dibuka kembali',
             'document_verified' => 'Dokumen diverifikasi',
             'document_rejected' => 'Dokumen diminta perbaikan',
             ];
@@ -83,6 +85,13 @@
         @include('sidang_ta_registrations.admin.partials.meet-document-groups')
         @if($reviewable)
             @include('sidang_ta_registrations.admin.partials.registration-decision')
+        @elseif($showApprovalCancellation)
+            @include('sidang_ta_registrations.admin.partials.approval-cancellation')
+        @elseif($showRegistrationReopening)
+            @include('sidang_ta_registrations.admin.partials.registration-reopening')
+        @endif
+        @if($verificationWindowWarning !== null)
+            @include('sidang_ta_registrations.admin.partials.verification-window-warning')
         @endif
         @if($registration->review_notes)
             <section class="rounded-xl border border-amber-200 bg-amber-50 p-4">

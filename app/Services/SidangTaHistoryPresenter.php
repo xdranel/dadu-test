@@ -10,7 +10,9 @@ class SidangTaHistoryPresenter
         'submitted' => 'Pengajuan pendaftaran sidang dikirim',
         'needs_review' => 'Pengajuan diminta revisi oleh admin',
         'approved' => 'Pengajuan disetujui admin',
+        'approval_cancelled' => 'Persetujuan dibatalkan admin; menunggu peninjauan ulang',
         'rejected' => 'Pengajuan ditolak',
+        'reopened' => 'Pengajuan dibuka kembali oleh admin',
         'resubmitted' => 'Pengajuan revisi dikirim',
     ];
 

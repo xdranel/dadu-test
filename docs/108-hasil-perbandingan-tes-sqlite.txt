@@ -1,0 +1,92 @@
+108 - Hasil perbandingan suite SQLite in-memory
+Baseline: 757 lulus, 267 gagal. Fitur akhir: 773 lulus, 265 gagal.
+Tidak ada nama kegagalan tambahan. Dua kasus baseline lulus pada pengulangan; bukan klaim perbaikan modul lain.
+MySQL localhost:3307 tidak tersedia. MariaDB privat tidak kompatibel dengan migrasi FK lama dan telah dimatikan.
+Pengujian final memakai SQLite. Data aplikasi tidak dipakai.
+Daftar di bawah: baseline_count | final_count | file | nama tes
+
+1 | 1 | tests/Feature/AcademicPeriodManagementTest.php | period93_referenced_period_identity_cannot_be_rewritten_as_another_term
+1 | 1 | tests/Feature/AcademicProfileJsonImportTest.php | json66_profile_is_removed_when_its_student_is_deleted
+1 | 1 | tests/Feature/AcademicProfileJsonImportTest.php | json73_finance_status_does_not_change_existing_academic_or_language_eligibility
+1 | 1 | tests/Feature/Auth/PasswordResetTest.php | password can be reset with valid token
+1 | 1 | tests/Feature/Auth/PasswordResetTest.php | reset password link can be requested
+1 | 1 | tests/Feature/Auth/PasswordResetTest.php | reset password screen can be rendered
+1 | 1 | tests/Feature/Auth/PasswordUpdateTest.php | password can be updated
+2 | 2 | tests/Feature/CourseIndexMissingMasterTest.php | 18
+1 | 1 | tests/Feature/ExamScheduleTest.php | authenticated user gets empty json if autocomplete query is empty or less than 2 characters
+1 | 1 | tests/Feature/ExamScheduleTest.php | autocomplete search returns matching distinct courses
+1 | 1 | tests/Feature/ExamScheduleTest.php | autocomplete search returns matching lecturers with name validation
+1 | 1 | tests/Feature/ExamScheduleTest.php | check availability endpoint returns false when student courses overlap
+1 | 1 | tests/Feature/ExamScheduleTest.php | course info endpoint resolves study program dynamically for general courses
+1 | 1 | tests/Feature/ExamScheduleTest.php | exam schedule creation gets Draft - Conflict when room capacity is exceeded
+1 | 1 | tests/Feature/ExamScheduleTest.php | exam schedule creation gets Draft - Conflict when student courses overlap at same time
+1 | 1 | tests/Feature/ExamScheduleTest.php | guest cannot access autocomplete search endpoints
+1 | 1 | tests/Feature/ExamScheduleTest.php | mahasiswa only sees their enrolled exam schedules
+1 | 1 | tests/Feature/FlatTermKrsImportTest.php | flat93_additive_import_preserves_other_periods_and_absent_courses
+1 | 1 | tests/Feature/FlatTermKrsImportTest.php | flat93_ambiguous_unlinked_or_conflicting_period_does_not_change_history
+1 | 1 | tests/Feature/FlatTermKrsImportTest.php | flat93_collation_equivalent_codes_are_conflicts_instead_of_overwrites
+1 | 1 | tests/Feature/FlatTermKrsImportTest.php | flat93_retakes_with_same_legacy_unique_key_preserve_other_period
+1 | 1 | tests/Feature/FlatTermKrsImportTest.php | flat93_rosters_and_group_counts_separate_academic_period_identity
+1 | 1 | tests/Feature/FlatTermKrsImportTest.php | flat93_same_batch_cross_term_legacy_key_conflicts_skip_both_instead_of_rolling_back_valid_rows
+1 | 1 | tests/Feature/FlatTermKrsImportTest.php | flat93_term_upload_previews_without_writing_and_apply_uses_student_study_semester
+1 | 1 | tests/Feature/FlatTermKrsImportTest.php | flat93_unique_unlinked_wrong_term_is_repaired_in_place_only_after_review
+1 | 1 | tests/Feature/FlatTermKrsImportTest.php | id
+1 | 1 | tests/Feature/GraduationRegistrationTest.php | admin can change review status of graduation registration
+1 | 1 | tests/Feature/GraduationRegistrationTest.php | admin can delete graduation registration submission
+1 | 1 | tests/Feature/GraduationRegistrationTest.php | admin can see active period countdown banner on graduation registration index
+1 | 1 | tests/Feature/GraduationRegistrationTest.php | backend blocks submission if student is ineligible due to failed courses or tak score
+1 | 1 | tests/Feature/GraduationRegistrationTest.php | countdown banner is not visible if there is no active period
+1 | 1 | tests/Feature/GraduationRegistrationTest.php | countdown banner shows expired status when active period is closed
+1 | 1 | tests/Feature/GraduationRegistrationTest.php | student can submit graduation registration with honors predicate cumlaude and criteria hki
+1 | 1 | tests/Feature/GraduationRegistrationTest.php | student can submit graduation registration with student email and conditional title change
+11 | 11 | tests/Feature/OfficialKrsJsonImportTest.php | 47
+1 | 1 | tests/Feature/OfficialKrsJsonImportTest.php | id
+1 | 1 | tests/Feature/OfficialKrsJsonImportTest.php | official_krs70_a_failed_student_does_not_prevent_another_valid_student_from_importing
+1 | 1 | tests/Feature/OfficialKrsJsonImportTest.php | official_krs70_accepts_name_case_and_surrounding_whitespace
+1 | 1 | tests/Feature/OfficialKrsJsonImportTest.php | official_krs70_accepts_whole_ta_names_and_keeps_proposals_and_ta_one_ineligible
+1 | 1 | tests/Feature/OfficialKrsJsonImportTest.php | official_krs70_migration_rollback_refuses_to_truncate_long_class_names
+1 | 1 | tests/Feature/OfficialKrsJsonImportTest.php | official_krs70_missing_period_skips_the_student_without_guessing_or_creating_a_period
+1 | 1 | tests/Feature/OfficialKrsJsonImportTest.php | official_krs70_preserves_study_semester_and_long_class_without_inventing_master_data
+1 | 1 | tests/Feature/OfficialKrsJsonImportTest.php | official_krs70_replacement_preserves_other_students_and_historical_periods
+1 | 1 | tests/Feature/OfficialKrsJsonImportTest.php | official_krs70_replaces_the_same_period_and_a_withdrawn_ta_course_stops_qualifying
+1 | 1 | tests/Feature/OfficialKrsJsonImportTest.php | official_krs70_two_active_periods_do_not_change_the_explicit_import_period
+1 | 1 | tests/Feature/OfficialKrsJsonImportTest.php | official_krs70_uses_the_explicit_term_even_when_another_term_is_active
+1 | 1 | tests/Feature/OfficialKrsJsonImportTest.php | official_krs98_historical_linked_krs_can_still_be_updated_without_the_retired_importer
+1 | 1 | tests/Feature/PublicDocumentTest.php | displays documents of a specific category folder when filtered
+1 | 1 | tests/Feature/PublicDocumentTest.php | displays search results across categories and allows searching within a folder
+1 | 1 | tests/Feature/QueueHistoryAndLogTest.php | event called and finished are logged during next call cycle
+1 | 1 | tests/Feature/QueueHistoryAndLogTest.php | event skipped is logged when officer skips ticket
+1 | 1 | tests/Feature/QueueHistoryAndLogTest.php | event undo_call is logged when officer cancels call
+1 | 1 | tests/Feature/QueueTicketTest.php | ambil tiket saat tutup ditolak dan menampilkan view closed
+1 | 1 | tests/Feature/QueueTicketTest.php | ambil tiket sukses via POST /queue/take saves details and sets device_token cookie
+1 | 1 | tests/Feature/QueueTicketTest.php | dua request berurutan/bersamaan tidak menghasilkan kode kembar
+1 | 1 | tests/Feature/QueueTicketTest.php | visitor get take page displays form when queue is open
+15 | 15 | tests/Feature/SidangTaActivationTest.php | 40
+1 | 1 | tests/Feature/SidangTaAdmissionFactsTest.php | meet_facts_ta2_uses_linked_active_period_and_can_complete_all_six_gates
+1 | 1 | tests/Feature/SidangTaApprovalCancellationTest.php | historical approved registration can be reopened without a current Student master record
+1 | 1 | tests/Feature/SidangTaDraftSchemaTest.php | draft_documents_have_unique_types_per_draft
+2 | 2 | tests/Feature/SidangTaDummyImportTest.php | 42
+1 | 1 | tests/Feature/SidangTaDummyImportTest.php | meet_dummy_krs_waits_for_registered_period_and_can_be_imported_after_initialization
+17 | 17 | tests/Feature/SidangTaFollowup79Test.php | 21
+28 | 28 | tests/Feature/SidangTaMeetFinalizationTest.php | 44
+16 | 16 | tests/Feature/SidangTaMeetUiTest.php | 41
+4 | 4 | tests/Feature/SidangTaMeetingContractTest.php | 49
+8 | 8 | tests/Feature/SidangTaMeetingLanguageTest.php | 44
+32 | 32 | tests/Feature/SidangTaOfficialAdmissionTest.php | 55
+6 | 6 | tests/Feature/SidangTaReviewUiTest.php | 46
+32 | 32 | tests/Feature/SidangTaRevisionDeadlineTest.php | 43
+21 | 21 | tests/Feature/SidangTaTargetedRevisionTest.php | 44
+1 | 1 | tests/Feature/SidangTaWizardUiTest.php | meet_krs_requires_one_active_period_and_accepted_ta_names
+1 | 1 | tests/Feature/StudentAcademicDetailTest.php | detail88 active courses all courses and all grades stay separate
+1 | 1 | tests/Feature/SyncKrsFormatsTest.php | krs98 displayed flat example defaults to preview and only confirmation writes internal study semester
+1 | 1 | tests/Feature/SyncKrsFormatsTest.php | krs98 displayed official example is auto detected and replaces the complete included period list
+1 | 1 | tests/Feature/SyncTest.php | admin can import associative Course JSON
+1 | 1 | tests/Feature/SyncTest.php | admin can import flat array Course JSON
+1 | 1 | tests/Feature/SyncTest.php | admin can import flat array KRS JSON and automatically create or update student profile
+1 | 1 | tests/Feature/SyncTest.php | admin can import graduation JSON payload
+1 | 1 | tests/Feature/SyncTest.php | admin can import valid Attendance JSON when student exists
+1 | 1 | tests/Feature/SyncTest.php | admin can import valid KRS JSON when student exists
+1 | 1 | tests/Feature/SyncTest.php | admin can import valid student JSON
+1 | 1 | tests/Feature/SyncTest.php | student update cascades student_number to child tables
+1 | 1 | tests/Feature/SyncTest.php | sync import skips rows if student does not exist for KRS and Attendance
+2 | 0 | tests/Unit/DemoImportPreparation79Test.php | 60

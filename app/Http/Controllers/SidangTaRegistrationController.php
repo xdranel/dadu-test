@@ -171,19 +171,28 @@ class SidangTaRegistrationController extends Controller
         $needsReview = $registration->status === 'needs_review';
         $readonlyNeedsReview = $needsReview;
         $reviewable = auth()->user()->can('sidang_ta_registration_review') && $registration->status === 'submitted';
+        $showApprovalCancellation = auth()->user()->can('sidang_ta_registration_review') && $registration->status === 'approved';
+        $approvalCancellationBlocker = $showApprovalCancellation
+            ? app(\App\Services\SidangTaRegistrationReview::class)->approvalCancellationBlocker($registration) : null;
         $requiredTypes = \App\Support\SidangTaReviewEligibility::requiredTypes($registration);
         $approvalBlockers = \App\Support\SidangTaReviewEligibility::blockers($registration);
         $documentGroups = \App\Support\SidangTaReviewEligibility::groups($registration);
+        $showRegistrationReopening = auth()->user()->can('sidang_ta_registration_review') && $registration->status === 'rejected';
+        $verificationWindowWarning = $showRegistrationReopening
+            ? app(\App\Services\SidangTaRegistrationReview::class)->reopeningBlocker($registration) : null;
         $revisionBlockers = [];
         if ($reviewable) {
             try {
                 if (\App\Support\SidangTaRevisionDeadline::hasBeenDisabled($registration)) {
+                    $verificationWindowWarning = app(\App\Services\SidangTaRegistrationReview::class)->reopeningBlocker($registration);
                     throw ValidationException::withMessages(['action' => \App\Support\SidangTaRevisionDeadline::DISABLED_MESSAGE]);
                 }
                 if (\App\Support\SidangTaRevisionDeadline::hasNotStarted($registration)) {
+                    $verificationWindowWarning = app(\App\Services\SidangTaRegistrationReview::class)->reopeningBlocker($registration);
                     throw ValidationException::withMessages(['action' => \App\Support\SidangTaRevisionDeadline::NOT_STARTED_MESSAGE]);
                 }
                 if (\App\Support\SidangTaRevisionDeadline::hasExpired($registration)) {
+                    $verificationWindowWarning = app(\App\Services\SidangTaRegistrationReview::class)->reopeningBlocker($registration);
                     throw ValidationException::withMessages(['action' => \App\Support\SidangTaRevisionDeadline::MESSAGE]);
                 }
                 \App\Support\SidangTaRevisionContract::assertCanRequest($registration);
@@ -192,26 +201,35 @@ class SidangTaRegistrationController extends Controller
             }
         }
         return view('sidang_ta_registrations.admin.show', compact(
-            'registration', 'reviewable', 'needsReview', 'readonlyNeedsReview', 'requiredTypes', 'approvalBlockers', 'documentGroups', 'revisionBlockers'
+            'registration', 'reviewable', 'needsReview', 'readonlyNeedsReview', 'requiredTypes', 'approvalBlockers', 'documentGroups', 'revisionBlockers', 'showApprovalCancellation', 'approvalCancellationBlocker', 'showRegistrationReopening', 'verificationWindowWarning'
         ));
     }
 
     public function review(Request $request, SidangTaRegistration $sidang_ta_registration)
     {
         $validated = $request->validate([
-            'action' => ['required', 'in:approved,rejected,needs_review'],
+            'action' => ['required', 'in:approved,rejected,needs_review,cancel_approval,reopen_registration'],
             'review_notes' => ['required_if:action,rejected,needs_review', 'nullable', 'string', 'max:2000'],
             'registration_version' => ['required', 'integer', 'min:1'],
         ]);
         try {
-            app(\App\Services\SidangTaRegistrationReview::class)->decide($request->user(), $sidang_ta_registration,
-                (int) $validated['registration_version'], $validated['action'], $validated['review_notes'] ?? null);
+            $review = app(\App\Services\SidangTaRegistrationReview::class);
+            if ($validated['action'] === 'cancel_approval') {
+                $review->cancelApproval($request->user(), $sidang_ta_registration, (int) $validated['registration_version']);
+            } elseif ($validated['action'] === 'reopen_registration') {
+                $review->reopenRejected($request->user(), $sidang_ta_registration, (int) $validated['registration_version']);
+            } else {
+                $review->decide($request->user(), $sidang_ta_registration,
+                    (int) $validated['registration_version'], $validated['action'], $validated['review_notes'] ?? null);
+            }
         } catch (HttpExceptionInterface $exception) {
             if ($request->expectsJson() || $exception->getStatusCode() !== 409) throw $exception;
             return redirect()->route('admin.sidang-ta-registrations.show', $sidang_ta_registration)
                 ->withErrors(['registration_version' => $exception->getMessage()])->withInput();
         }
-        return redirect()->back()->with('success', 'Status pendaftaran Sidang TA berhasil diperbarui.');
+        return redirect()->back()->with('success', $validated['action'] === 'cancel_approval'
+            ? 'Persetujuan dibatalkan. Pengajuan kembali menunggu peninjauan; status verifikasi berkas tetap dipertahankan.'
+            : 'Status pendaftaran Sidang TA berhasil diperbarui.');
     }
 
     public function reviewDocument(Request $request, SidangTaRegistration $sidang_ta_registration,

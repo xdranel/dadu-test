@@ -1,4 +1,5 @@
 @php
+    $verificationWindowWarning = $verificationWindowWarning ?? null;
     $revisionBlockers = $revisionBlockers ?? ['Data kelengkapan revisi belum tersedia. Muat ulang halaman.'];
     $oldForm = old('_review_form') === 'decision';
     $rawVersion = $oldForm ? old('registration_version') : $registration->lock_version;
@@ -16,7 +17,7 @@
     </h3>
     @if($revisionBlockers !== [])
         <div data-ta-revision-blockers role="status" class="rounded-xl bg-amber-50 p-3 text-xs text-amber-900">
-            <p class="font-semibold">Selesaikan pemeriksaan dokumen sebelum meminta revisi.</p>
+            <p class="font-semibold">{{ $verificationWindowWarning !== null ? 'Perbarui jadwal Verifikasi Berkas sebelum meminta revisi.' : 'Selesaikan pemeriksaan dokumen sebelum meminta revisi.' }}</p>
             <ul class="mt-2 list-inside list-disc space-y-1">
                 @foreach($revisionBlockers as $message)<li>{{ $message }}</li>@endforeach
             </ul>
@@ -49,6 +50,9 @@
         </p>
     @endif
     <div class="flex flex-wrap justify-end gap-2">
+        @if($verificationWindowWarning !== null)
+            <button data-ta-window-warning-trigger type="button" class="btn btn-secondary" x-on:click="$dispatch('open-modal', 'ta-verification-window-warning')">Perbarui Jadwal Verifikasi</button>
+        @endif
         <button data-ta-request-revision type="submit"
                 class="btn btn-secondary disabled:cursor-not-allowed disabled:opacity-50"
                 name="action" value="needs_review" @disabled($revisionBlockers !== [])>

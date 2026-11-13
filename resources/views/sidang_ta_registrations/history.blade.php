@@ -5,7 +5,7 @@
         <ol data-student-timeline class="ml-3 border-l border-slate-200">
             @forelse($events as $event)
                 <li class="relative pb-7 pl-7">
-                    <span aria-hidden="true" class="absolute -left-3 flex h-6 w-6 items-center justify-center rounded-full {{ $event['action']==='rejected' ? 'bg-rose-100 text-rose-800' : ($event['action']==='needs_review' ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800') }}">{{ $event['action']==='rejected' ? '×' : '✓' }}</span>
+                    <span aria-hidden="true" class="absolute -left-3 flex h-6 w-6 items-center justify-center rounded-full {{ $event['action']==='rejected' ? 'bg-rose-100 text-rose-800' : (in_array($event['action'], ['needs_review', 'approval_cancelled', 'reopened'], true) ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800') }}">{{ $event['action']==='rejected' ? '×' : (in_array($event['action'], ['approval_cancelled', 'reopened'], true) ? '↺' : '✓') }}</span>
                     <p class="text-sm font-semibold text-slate-800">{{ $event['label'] }} <span class="font-normal text-slate-500">— {{ $event['time'] }}</span></p>
                     @if(filled($event['notes']))<p class="mt-2 whitespace-pre-line break-words text-sm text-slate-700">{{ $event['notes'] }}</p>@endif
                 </li>
