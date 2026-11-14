@@ -16,11 +16,57 @@ use Throwable;
 
 class SidangTaReviewExport
 {
+    private const COLUMN_ORDER = [
+        'ID Pengajuan',
+        'Periode Sidang TA',
+        'NIM',
+        'Nama Mahasiswa',
+        'Program Studi',
+        'HP Mahasiswa',
+        'HP Orang Tua/Wali',
+        'Status Pengajuan',
+        'Semester',
+        'IPK',
+        'SKS Lulus',
+        'Sidang Tingkat 2',
+        'KRS Sidang TA 2',
+        'Judul TA Indonesia',
+        'Judul TA Inggris',
+        'TAK',
+        'EPrT',
+        'Surat Permakluman EPRT — Status',
+        'Surat Permakluman EPRT — File',
+        'Surat Permakluman EPRT — Catatan',
+        'Status BPP',
+        'Status SKPI',
+        'Data TA di iGracias — Status',
+        'Data TA di iGracias — Catatan',
+        'Bimbingan Online yang Disetujui — Status',
+        'Bimbingan Online yang Disetujui — Catatan',
+        'Bukti Pembayaran Wisuda — Status',
+        'Bukti Pembayaran Wisuda — Catatan',
+        'Tanggal Bayar Wisuda',
+        'SK Pembimbing TA Aktif — Status',
+        'SK Pembimbing TA Aktif — Catatan',
+        'Draft Buku TA (PDF) — Status',
+        'Draft Buku TA (PDF) — File',
+        'Draft Buku TA (PDF) — Catatan',
+        'Biodata Ijazah',
+        'Surat Pernyataan Biodata Ijazah — Status',
+        'Surat Pernyataan Biodata Ijazah — File',
+        'Surat Pernyataan Biodata Ijazah — Catatan',
+        'Formulir Biodata Ijazah — Status',
+        'Formulir Biodata Ijazah — File',
+        'Formulir Biodata Ijazah — Catatan',
+        'Bukti Pengajuan PDM — Status',
+        'Bukti Pengajuan PDM — Catatan',
+    ];
+
     public const SNAPSHOT_COLUMNS = [
-        'Snapshot NIM' => 'student_number',
-        'Snapshot Nama' => 'student_name',
-        'Snapshot Prodi' => 'study_program',
-        'Email Kampus' => 'student_email',
+//        'Snapshot NIM' => 'student_number',
+//        'Snapshot Nama' => 'student_name',
+//        'Snapshot Prodi' => 'study_program',
+//        'Email Kampus' => 'student_email',
         'Semester' => 'semester',
         'IPK' => 'gpa',
         'SKS Lulus' => 'passed_credits',
@@ -55,9 +101,9 @@ class SidangTaReviewExport
             'Program Studi' => $this->text($registration->study_program),
             'HP Mahasiswa' => $this->text($registration->student_phone),
             'HP Orang Tua/Wali' => $this->text($registration->parent_phone),
+            'Status Pengajuan' => SidangTaReviewQuery::STATUSES[$registration->status] ?? $this->text($registration->status),
             'Tanggal Bayar Wisuda' => $this->text($registration->graduation_payment_date?->format('Y-m-d')),
             'Biodata Ijazah' => $registration->diploma_biodata_accurate ? 'Sudah sesuai' : 'Belum sesuai (PDM)',
-            'Status Pengajuan' => SidangTaReviewQuery::STATUSES[$registration->status] ?? $this->text($registration->status),
             'Dikirim' => $this->text($registration->submitted_at?->format('Y-m-d H:i:s')),
             'Ditinjau' => $this->text($registration->reviewed_at?->format('Y-m-d H:i:s')),
             'Catatan Petugas' => $this->text($registration->review_notes),
@@ -71,11 +117,15 @@ class SidangTaReviewExport
             $document = $registration->documents->firstWhere('document_type', $type);
             $row[$label.' — Status'] = !$applicable ? 'N/A' : (!$document ? 'Belum ada dokumen'
                 : ($labels[$document->status] ?? $this->text($document->status)));
-            $row[$label.' — Ketersediaan'] = !$applicable ? 'N/A' : (!$document ? 'Tidak ada metadata'
+            $row[$label.' — File'] = !$applicable ? 'N/A' : (!$document ? 'Tidak ada metadata'
                 : (Storage::disk('local')->exists($document->file_path) ? 'Tersedia' : 'Tidak ditemukan'));
             $row[$label.' — Catatan'] = !$applicable ? 'N/A' : $this->text($document?->notes);
         }
-        return $row;
+        return collect(self::COLUMN_ORDER)
+            ->mapWithKeys(fn ($column) => [
+                $column => $row[$column] ?? 'Belum tersedia',
+            ])
+            ->all();
     }
 
     private function spreadsheetRow(SidangTaRegistration $registration): array
@@ -83,8 +133,10 @@ class SidangTaReviewExport
         $row = $this->row($registration);
         $style = (new Style)->setFontColor('0563C1')->setFontUnderline();
         foreach (SidangTaRegistration::DOCUMENT_TYPES as $type => $label) {
-            $column = $label.' — Ketersediaan';
-            if ($row[$column] !== 'Tersedia') continue;
+            $column = $label.' — File';
+            if (!isset($row[$column]) || $row[$column] !== 'Tersedia') {
+                continue;
+            }
             $document = $registration->documents->firstWhere('document_type', $type);
             $url = str_replace('"', '""', route('sidang-ta-registration-documents.preview', $document));
             // Only application-generated URLs become formulas; user input stays escaped text.
