@@ -30,6 +30,12 @@
         @endif
         @if($canViewRegistrations)
             <div data-ta-review-data class="space-y-5">
+                @can('sidang_ta_period_read')
+                <div class="grid gap-4 md:grid-cols-2">
+                    <section class="campus-card space-y-3 p-4"><h3 class="font-bold">Pendaftaran dan Verifikasi Berkas</h3><a href="{{ route('admin.sidang-ta-periods.index') }}" class="btn btn-secondary">Kelola Periode</a></section>
+                    <section class="campus-card space-y-3 p-4"><h3 class="font-bold">Pelaksanaan Sidang TA</h3><p class="text-sm text-slate-500">Atur tanggal, hari, jam dan durasi untuk pencarian ruang kelas.</p><a data-manage-ta-execution href="{{ route('admin.sidang-ta-execution.index') }}" class="btn btn-secondary">Kelola Pelaksanaan</a></section>
+                </div>
+                @endcan
                 <section data-ta-period-card class="campus-card space-y-3 p-4">
                     <h3 class="text-sm font-bold text-slate-800">{{ isset($filters['period']) ? 'Periode terpilih' : 'Periode aktif' }}</h3>
                     @can('sidang_ta_period_read')

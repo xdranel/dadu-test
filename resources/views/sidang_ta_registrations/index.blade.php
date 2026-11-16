@@ -74,7 +74,8 @@
                      x-show="status !== 'Ditutup'">@include('sidang_ta_registrations.partials.period-schedule')</div>
             @endforeach
         </div>
-        <section data-testid="drafts-panel" class="campus-card w-full max-w-xl space-y-4 p-5">
+        <div class="grid items-start gap-4 xl:grid-cols-2">
+        <section data-testid="drafts-panel" class="campus-card w-full space-y-4 p-5">
             <div>
                 <h3 class="text-base font-bold text-slate-800">Draft tersimpan</h3>
                 <p class="mt-1 text-xs leading-relaxed text-slate-500">Lanjutkan progres yang sudah disimpan sebelum
@@ -143,6 +144,9 @@
                 <p class="text-sm text-slate-500">Belum ada draft tersimpan.</p>
             @endforelse
         </section>
+        <div class="space-y-4">@foreach($bookingRegistrations as $bookingRegistration)@include('sidang_ta_registrations.partials.booking-card')@endforeach</div>
+        </div>
+
 
 
         <section class="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">

@@ -2,10 +2,12 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Room;
 use App\Http\Requests\StoreRoomRequest;
 use App\Http\Requests\UpdateRoomRequest;
+use App\Models\Room;
+use App\Services\RoomAliasService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Rap2hpoutre\FastExcel\FastExcel;
 
 class RoomController extends Controller
@@ -35,15 +37,15 @@ class RoomController extends Controller
             ->latest()
             ->get();
 
-        $filename = 'room-' . now()->format('Y-m-d') . '.xlsx';
+        $filename = 'room-'.now()->format('Y-m-d').'.xlsx';
 
         return (new FastExcel($data))->download($filename, function ($r) {
             return [
                 'Room Code' => $r->room_code,
-                'Name'      => $r->name,
-                'Building'  => $r->building,
-                'Capacity'  => $r->capacity,
-                'Status'    => $r->status,
+                'Name' => $r->name,
+                'Building' => $r->building,
+                'Capacity' => $r->capacity,
+                'Status' => $r->status,
             ];
         });
     }
@@ -51,11 +53,11 @@ class RoomController extends Controller
     public function import(Request $request)
     {
         $request->validate([
-            'file' => ['required', 'file', 'mimes:xlsx,xls,csv', 'max:2048'],
+            'file' => ['required', 'file', 'mimes:xlsx,xls,csv', 'max:20480'],
         ]);
 
         $imported = 0;
-        $skipped  = 0;
+        $skipped = 0;
 
         try {
             (new FastExcel)->import($request->file('file'), function ($row) use (&$imported, &$skipped) {
@@ -65,12 +67,14 @@ class RoomController extends Controller
                     $normalizedRow[$normalizedKey] = $value;
                 }
 
-                $code     = $normalizedRow['room_code'] ?? $normalizedRow['kode_ruang'] ?? null;
-                $name     = $normalizedRow['name'] ?? $normalizedRow['nama_ruang'] ?? null;
+                $code = $normalizedRow['room_code'] ?? $normalizedRow['kode_ruang'] ?? null;
+                $name = $normalizedRow['name'] ?? $normalizedRow['nama_ruang'] ?? null;
                 $building = $normalizedRow['building'] ?? $normalizedRow['lokasi_gedung'] ?? '-';
                 $capacity = $normalizedRow['capacity'] ?? $normalizedRow['kapasitas'] ?? 0;
 
-                if (empty($code) || empty($name)) return null;
+                if (empty($code) || empty($name)) {
+                    return null;
+                }
 
                 $statusInput = strtolower(trim($normalizedRow['status'] ?? ''));
                 $statusDb = 'Dapat Dipakai';
@@ -81,17 +85,17 @@ class RoomController extends Controller
                 Room::updateOrCreate(
                     ['room_code' => strtoupper($code)],
                     [
-                        'name'      => $name,
-                        'building'  => $building,
-                        'capacity'  => is_numeric($capacity) ? $capacity : 0,
-                        'status'    => $statusDb,
+                        'name' => $name,
+                        'building' => $building,
+                        'capacity' => is_numeric($capacity) ? $capacity : 0,
+                        'status' => $statusDb,
                     ]
                 );
 
                 $imported++;
             });
         } catch (\Exception $e) {
-            return back()->with('error', 'Error: ' . $e->getMessage());
+            return back()->with('error', 'Error: '.$e->getMessage());
         }
 
         $message = "Import selesai: {$imported} ruangan berhasil ditambahkan/diperbarui.";
@@ -106,7 +110,7 @@ class RoomController extends Controller
 
     public function store(StoreRoomRequest $request)
     {
-        Room::create($request->validated());
+        app(RoomAliasService::class)->save(null, $request->validated());
 
         return redirect()->route('rooms.index')
             ->with('success', 'Ruangan berhasil ditambahkan.');
@@ -114,12 +118,14 @@ class RoomController extends Controller
 
     public function edit(Room $room)
     {
-        return view('rooms.edit', compact('room'));
+        $aliases = DB::table('room_schedule_aliases')->where('room_id', $room->id)->pluck('label')->all();
+
+        return view('rooms.edit', compact('room', 'aliases'));
     }
 
     public function update(UpdateRoomRequest $request, Room $room)
     {
-        $room->update($request->validated());
+        app(RoomAliasService::class)->save($room, $request->validated());
 
         return redirect()->route('rooms.index')
             ->with('success', "Data {$room->name} berhasil diperbarui.");

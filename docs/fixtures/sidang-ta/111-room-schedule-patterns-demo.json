@@ -1,0 +1,27 @@
+{
+  "generated_at": "2026-11-15T09:00:00+07:00",
+  "source": "iGracias",
+  "total": 1,
+  "selected_menus": [
+    "jadwal_perkuliahan"
+  ],
+  "filter_jadwal_perkuliahan": {
+    "schoolYear": "2627/1",
+    "studyProgramId": "",
+    "roomId": "",
+    "isConflict": ""
+  },
+  "data": [
+    {
+      "periode": "2627/1",
+      "hari": "SENIN",
+      "tanggal": "09-11-2026",
+      "ruangan": "DEMO-A",
+      "jam_mulai": "08:30:00",
+      "jam_selesai": "10:30:00",
+      "jenis_jadwal": "TETAP",
+      "kode_dosen": "DUM",
+      "nama_mk": "Mata Kuliah Dummy"
+    }
+  ]
+}

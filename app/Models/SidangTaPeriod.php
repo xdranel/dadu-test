@@ -21,6 +21,11 @@ class SidangTaPeriod extends Model
         'show_to_students' => 'boolean',
     ];
 
+    public function executionSetting()
+    {
+        return $this->hasOne(SidangTaExecutionSetting::class, 'sidang_ta_period_id');
+    }
+
     public function isOpen(): bool
     {
         return $this->is_active && now()->between($this->open_at, $this->close_at);
@@ -33,7 +38,7 @@ class SidangTaPeriod extends Model
 
     public function revisionIsOpen(): bool
     {
-        return $this->is_revision_active && (!$this->revisionIsConfigured() || now()->between($this->revision_open_at, $this->revision_close_at));
+        return $this->is_revision_active && (! $this->revisionIsConfigured() || now()->between($this->revision_open_at, $this->revision_close_at));
     }
 
     public function revisionHasExpired(): bool
@@ -44,6 +49,7 @@ class SidangTaPeriod extends Model
     public function scopeVisibleToStudents(Builder $query): Builder
     {
         $at = now();
+
         // Incomplete legacy verification dates cannot keep a closed card on screen forever.
         return $query->where('show_to_students', true)->where(function (Builder $query) use ($at) {
             $query->where('close_at', '>=', $at)->orWhere(function (Builder $query) use ($at) {

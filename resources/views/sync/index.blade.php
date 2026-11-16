@@ -5,13 +5,32 @@
     <div class="grid grid-cols-1 lg:grid-cols-3 items-start gap-5 mb-5" x-data="{ importType: 'student' }">
         <!-- Panel Import JSON -->
         <div class="lg:col-span-2 space-y-5" data-sync-import-column>
+            @if(session('success'))
+                <div class="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800" role="status">{{ session('success') }}</div>
+            @endif
+            @if($errors->any())
+                <div class="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800" role="alert">
+                    <p class="font-semibold">Import belum berhasil.</p>
+                    <ul class="mt-1 list-disc space-y-1 pl-5">
+                        @foreach($errors->all() as $error)<li>{{ $error }}</li>@endforeach
+                    </ul>
+                    @if(session('import_errors'))
+                        <details class="mt-2">
+                            <summary class="cursor-pointer font-medium">Tampilkan rincian baris ({{ count(session('import_errors')) }})</summary>
+                            <ul class="mt-1 max-h-48 list-disc space-y-1 overflow-y-auto pl-5">
+                                @foreach(session('import_errors') as $importError)<li>{{ $importError }}</li>@endforeach
+                            </ul>
+                        </details>
+                    @endif
+                </div>
+            @endif
             <div class="campus-card p-6" data-import-json-card>
                 <div class="flex items-center justify-between mb-5">
                     <div>
                         <h3 class="text-base font-bold text-slate-800">
                             Import Data via JSON
                         </h3>
-                        <p class="text-xs text-slate-400 mt-0.5">Unggah file JSON untuk memasukkan data mahasiswa, KRS, mata kuliah, atau profil akademik (iGracias + BASILA)</p>
+                        <p class="text-xs text-slate-400 mt-0.5">Unggah file JSON untuk memasukkan data mahasiswa, KRS, mata kuliah, profil akademik (iGracias + BASILA), atau jadwal ruangan iGracias</p>
                     </div>
                 </div>
 
@@ -28,13 +47,21 @@
                                 <option value="attendance">Jadwal/Kehadiran Mahasiswa (attendance)</option>
                                 <option value="course">Mata Kuliah (course)</option>
                                 <option value="academic_profile">Profil Akademik (iGracias + BASILA)</option>
+                                <option value="room_schedule">Jadwal Ruangan iGracias (room_schedule)</option>
                             </select>
                         </div>
 
-                        <!-- Pilih File JSON -->
+                        <!-- Pilih File JSON / TXT -->
                         <div>
-                            <label class="campus-label" for="json_file">Pilih File JSON (.json) <span class="text-rose-400">*</span></label>
-                            <input type="file" id="json_file" name="json_file" accept=".json" class="campus-input w-full py-1.5" required>
+                            <label class="campus-label" for="json_file">
+                                Pilih File
+                                <span x-show="importType === 'room_schedule'" x-cloak>(.json atau .txt)</span>
+                                <span x-show="importType !== 'room_schedule'">(.json)</span>
+                                <span class="text-rose-400">*</span>
+                            </label>
+                            <input type="file" id="json_file" name="json_file"
+                                   :accept="importType === 'room_schedule' ? '.json,.txt,application/json,text/plain' : '.json'"
+                                   class="campus-input w-full py-1.5" required>
                         </div>
                     </div>
 
@@ -47,6 +74,13 @@
                     <!-- Catatan Khusus Profil Akademik -->
                     <div x-show="importType === 'academic_profile'" x-cloak class="bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs text-amber-700">
                         <span class="font-semibold">Catatan Profil Akademik:</span> File JSON harus berformat <code class="bg-amber-100 px-1 rounded">{"data": [...]}</code> dari sumber iGracias + BASILA (sidang tingkat, tugas akhir, TAK, nilai TA, MK mengulang/belum lulus, approval BASILA, dan status BPP). Matching dilakukan berdasarkan NIM + nama.
+                    </div>
+
+                    <div x-show="importType === 'room_schedule'" x-cloak class="rounded-lg border border-sky-200 bg-sky-50 p-3 text-xs text-sky-800 space-y-2">
+                        <p class="font-semibold">Jadwal Ruangan iGracias — pola mingguan</p>
+                        <p>Unggah snapshot lengkap semester dengan <code>jenis_jadwal: TETAP</code>, periode seperti <code>2627/1</code>, serta metadata/filter ekspor. Pola diperbarui untuk semester yang sama dan digunakan setiap minggu dalam batas semester tersebut.</p>
+                        <p>Daftarkan periode akademik dan cocokkan nama/kode atau alias ruangan terlebih dahulu di Data Akademik. Ruang kelas untuk Sidang TA perlu ditandai oleh petugas.</p>
+                        <p>Format lama <code>aaData</code> tetap dibaca sebagai jadwal tanggal tertentu; tidak otomatis menjadi sumber pola semester. Lihat rincian kesalahan apabila impor belum berhasil.</p>
                     </div>
 
                     <!-- Submit -->
@@ -201,6 +235,37 @@
   ]
 }</pre>
                     </div>
+
+                    <div x-show="importType === 'room_schedule'">
+                        <p class="font-semibold text-slate-600">Contoh struktur pola mingguan ruangan</p>
+                        <p class="my-2 text-xs text-slate-500">Ilustrasi satu baris. Saat impor gunakan seluruh snapshot semester hasil ekspor asli; jangan memangkas data atau mengubah metadata kelengkapannya.</p>
+                        <pre class="overflow-x-auto rounded-lg border bg-slate-50 p-3 text-xs">{
+  "source": "iGracias",
+  "total": 1,
+  "selected_menus": [
+    "jadwal_perkuliahan"
+  ],
+  "filter_jadwal_perkuliahan": {
+    "schoolYear": "2627/1",
+    "studyProgramId": "",
+    "roomId": "",
+    "isConflict": ""
+  },
+  "data": [
+    {
+      "periode": "2627/1",
+      "hari": "SENIN",
+      "tanggal": "09-11-2026",
+      "ruangan": "A",
+      "jam_mulai": "08:30:00",
+      "jam_selesai": "10:30:00",
+      "jenis_jadwal": "TETAP",
+      "kode_dosen": "DUM",
+      "nama_mk": "Mata Kuliah Dummy"
+    }
+  ]
+}</pre>
+                    </div>
                 </div>
             </div>
         </div>
@@ -294,7 +359,11 @@
                                 </td>
                                 <td>
                                     <span class="text-xs font-semibold text-slate-700">
-                                        {{ $settings->firstWhere('module', $log->module)?->label ?? $log->module }}
+                                        @if($log->module === 'room_schedule')
+                                            Jadwal Ruangan iGracias
+                                        @else
+                                            {{ $settings->firstWhere('module', $log->module)?->label ?? $log->module }}
+                                        @endif
                                     </span>
                                 </td>
                                 <td class="text-xs text-slate-500">{{ $log->triggered_by }}</td>
@@ -312,9 +381,13 @@
                                 <td class="text-xs text-slate-400">{{ $log->durasi }}</td>
                                 <td class="text-xs">
                                     @if($log->has_issues)
-                                        <button type="button" class="text-amber-700 hover:underline font-semibold"
-                                            data-sync-issues-url="{{ route('sync.logs.details', $log->id) }}"
-                                            onclick="openSyncIssues(this)">Lihat catatan</button>
+                                        @if(is_numeric($log->id))
+                                            <button type="button" class="text-amber-700 hover:underline font-semibold"
+                                                data-sync-issues-url="{{ route('sync.logs.details', $log->id) }}"
+                                                onclick="openSyncIssues(this)">Lihat catatan</button>
+                                        @else
+                                            <span class="text-amber-700 font-semibold">Ada kesalahan</span>
+                                        @endif
                                     @elseif($log->status === 'completed')
                                         <span class="text-emerald-600">Selesai</span>
                                     @elseif($log->status === 'processing')

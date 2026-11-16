@@ -12,10 +12,10 @@ use App\Support\SidangTaReviewEligibility as Eligibility;
 use App\Support\SidangTaRevisionContract;
 use App\Support\SidangTaRevisionDeadline;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Log;
-use Throwable;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
+use Throwable;
 
 class SidangTaRegistrationReview
 {
@@ -27,11 +27,12 @@ class SidangTaRegistrationReview
             'Persyaratan pengajuan tidak sesuai. Muat ulang atau hubungi petugas.');
         abort_unless($locked->status === 'submitted', 422,
             'Peninjauan terkunci. Pengajuan sedang direvisi atau sudah diputuskan.');
+
         return $locked;
     }
 
     public function document(User $user, SidangTaRegistration $registration, SidangTaRegistrationDocument $document,
-                             int $version, string $status, ?string $notes): SidangTaRegistration
+        int $version, string $status, ?string $notes): SidangTaRegistration
     {
         abort_unless($user->can('sidang_ta_registration_review'), 403);
         abort_unless(in_array($status, ['verified', 'rejected'], true), 422);
@@ -40,18 +41,23 @@ class SidangTaRegistrationReview
         if ($status === 'rejected' && $notes === null) {
             throw ValidationException::withMessages(['notes' => 'Isi catatan perbaikan dokumen.']);
         }
+
         return DB::transaction(function () use ($user, $registration, $document, $version, $status, $notes) {
             $locked = $this->locked($registration, $version);
             $doc = $locked->documents()->whereKey($document->id)->lockForUpdate()->firstOrFail();
             abort_unless(in_array($doc->document_type, Eligibility::requiredTypes($locked), true), 422,
                 'Dokumen ini tidak berlaku untuk cabang biodata pengajuan.');
-            if ($status === 'verified' && !Storage::disk('local')->exists($doc->file_path)) {
+            if ($status === 'verified' && ! Storage::disk('local')->exists($doc->file_path)) {
                 throw ValidationException::withMessages(['document' => 'Berkas tidak ditemukan. Minta mahasiswa mengunggah ulang.']);
             }
             $oldRegistrationStatus = $locked->status;
-            if ($status === 'verified') $notes = null;
+            if ($status === 'verified') {
+                $notes = null;
+            }
             $nextStatus = $locked->status;
-            if ($doc->status === $status && $doc->notes === $notes && $locked->status === $nextStatus) return $locked;
+            if ($doc->status === $status && $doc->notes === $notes && $locked->status === $nextStatus) {
+                return $locked;
+            }
             $labels = ['pending' => 'Menunggu verifikasi', 'verified' => 'Terverifikasi', 'rejected' => 'Perlu perbaikan'];
             $oldDocumentStatus = $labels[$doc->status] ?? $doc->status;
             $doc->status = $status;
@@ -63,9 +69,12 @@ class SidangTaRegistrationReview
             $locked->lock_version++;
             $locked->save();
             $logNotes = SidangTaRegistration::DOCUMENT_TYPES[$doc->document_type].': '.$oldDocumentStatus.' → '.$labels[$status];
-            if ($notes !== null) $logNotes .= '. Catatan: '.$notes;
+            if ($notes !== null) {
+                $logNotes .= '. Catatan: '.$notes;
+            }
             $locked->logAction($status === 'verified' ? 'document_verified' : 'document_rejected',
                 $oldRegistrationStatus, $nextStatus, $logNotes, $user->id);
+
             return $locked;
         }, 3);
     }
@@ -73,10 +82,10 @@ class SidangTaRegistrationReview
     public function approvalCancellationBlocker(SidangTaRegistration $registration): ?string
     {
         $period = $registration->period;
-        if (!$period || !$period->revisionIsConfigured()) {
+        if (! $period || ! $period->revisionIsConfigured()) {
             return 'Lengkapi tanggal mulai dan selesai Verifikasi Berkas sebelum membatalkan persetujuan.';
         }
-        if (!$period->is_revision_active) {
+        if (! $period->is_revision_active) {
             return 'Verifikasi Berkas sedang dinonaktifkan. Persetujuan tidak dapat dibatalkan.';
         }
         if (now()->lessThan($period->revision_open_at)) {
@@ -85,12 +94,14 @@ class SidangTaRegistrationReview
         if (now()->greaterThan($period->revision_close_at)) {
             return 'Jadwal Verifikasi Berkas telah berakhir. Persetujuan tidak dapat dibatalkan.';
         }
-        return null;
+
+        return app(SidangTaBookingLifecycle::class)->approvalWithdrawalBlocker($registration);
     }
 
     public function cancelApproval(User $user, SidangTaRegistration $registration, int $version): SidangTaRegistration
     {
         abort_unless($user->can('sidang_ta_registration_review'), 403);
+
         return DB::transaction(function () use ($user, $registration, $version) {
             // Same student-first order as draft finalization. Historical data may lack its Student row.
             Student::where('student_number', $registration->student_number)->lockForUpdate()->first();
@@ -110,6 +121,7 @@ class SidangTaRegistrationReview
             abort_if($sameStudent->contains(fn ($other) => $other->id !== $locked->id
                 && in_array($other->status, ['submitted', 'needs_review'], true)), 409,
                 'Persetujuan tidak dapat dibatalkan karena mahasiswa sudah memiliki pengajuan aktif lain.');
+            app(SidangTaBookingLifecycle::class)->cancelOnApprovalWithdrawal($locked, $user);
             $locked->status = 'submitted';
             $locked->reviewed_by = null;
             $locked->reviewed_at = null;
@@ -117,6 +129,7 @@ class SidangTaRegistrationReview
             $locked->save();
             $locked->logAction('approval_cancelled', 'approved', 'submitted',
                 'Persetujuan dibatalkan untuk peninjauan ulang. Status verifikasi berkas tetap dipertahankan.', $user->id);
+
             return $locked;
         }, 3);
     }
@@ -124,16 +137,26 @@ class SidangTaRegistrationReview
     public function reopeningBlocker(SidangTaRegistration $registration): ?string
     {
         $period = $registration->period;
-        if (!$period || !$period->revisionIsConfigured()) return 'Lengkapi tanggal mulai dan selesai Verifikasi Berkas terlebih dahulu.';
-        if (!$period->is_revision_active) return 'Aktifkan Verifikasi Berkas terlebih dahulu pada Kelola Periode.';
-        if (now()->lessThan($period->revision_open_at)) return 'Verifikasi Berkas belum dimulai. Tunggu jadwal dibuka atau sesuaikan tanggalnya.';
-        if (now()->greaterThan($period->revision_close_at)) return 'Verifikasi Berkas telah berakhir. Perpanjang tanggal verifikasi terlebih dahulu pada Kelola Periode.';
+        if (! $period || ! $period->revisionIsConfigured()) {
+            return 'Lengkapi tanggal mulai dan selesai Verifikasi Berkas terlebih dahulu.';
+        }
+        if (! $period->is_revision_active) {
+            return 'Aktifkan Verifikasi Berkas terlebih dahulu pada Kelola Periode.';
+        }
+        if (now()->lessThan($period->revision_open_at)) {
+            return 'Verifikasi Berkas belum dimulai. Tunggu jadwal dibuka atau sesuaikan tanggalnya.';
+        }
+        if (now()->greaterThan($period->revision_close_at)) {
+            return 'Verifikasi Berkas telah berakhir. Perpanjang tanggal verifikasi terlebih dahulu pada Kelola Periode.';
+        }
+
         return null;
     }
 
     public function reopenRejected(User $user, SidangTaRegistration $registration, int $version): SidangTaRegistration
     {
         abort_unless($user->can('sidang_ta_registration_review'), 403);
+
         return DB::transaction(function () use ($user, $registration, $version) {
             Student::where('student_number', $registration->student_number)->lockForUpdate()->first();
             $drafts = SidangTaRegistrationDraft::where('source_registration_id', $registration->id)
@@ -168,19 +191,24 @@ class SidangTaRegistrationReview
                 foreach (array_unique($retired) as $path) {
                     try {
                         if (SidangTaRegistrationDocument::where('file_path', $path)->exists()
-                            || SidangTaRegistrationDraftDocument::where('file_path', $path)->exists()) continue;
-                        if (!Storage::disk('local')->delete($path)) Log::warning('Cleanup draft lama saat buka kembali perlu diulang.', ['path' => $path]);
+                            || SidangTaRegistrationDraftDocument::where('file_path', $path)->exists()) {
+                            continue;
+                        }
+                        if (! Storage::disk('local')->delete($path)) {
+                            Log::warning('Cleanup draft lama saat buka kembali perlu diulang.', ['path' => $path]);
+                        }
                     } catch (Throwable $exception) {
                         Log::warning('Cleanup draft lama saat buka kembali gagal.', ['path' => $path, 'error' => $exception->getMessage()]);
                     }
                 }
             });
+
             return $locked;
         }, 3);
     }
 
     public function decide(User $user, SidangTaRegistration $registration, int $version,
-                           string $action, ?string $notes): SidangTaRegistration
+        string $action, ?string $notes): SidangTaRegistration
     {
         abort_unless($user->can('sidang_ta_registration_review'), 403);
         abort_unless(in_array($action, ['approved', 'needs_review', 'rejected'], true), 422);
@@ -189,6 +217,7 @@ class SidangTaRegistrationReview
         if (in_array($action, ['needs_review', 'rejected'], true) && $notes === null) {
             throw ValidationException::withMessages(['review_notes' => 'Isi catatan revisi atau penolakan.']);
         }
+
         return DB::transaction(function () use ($user, $registration, $version, $action, $notes) {
             $locked = $this->locked($registration, $version);
             if ($action === 'needs_review') {
@@ -210,6 +239,7 @@ class SidangTaRegistrationReview
             $locked->lock_version++;
             $locked->save();
             $locked->logAction($action, $old, $action, $notes, $user->id);
+
             return $locked;
         }, 3);
     }

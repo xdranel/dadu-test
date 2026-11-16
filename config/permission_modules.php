@@ -23,7 +23,7 @@ return [
 
     'standard_actions' => [
         'create' => 'C',
-        'read'   => 'R',
+        'read' => 'R',
         'update' => 'U',
         'delete' => 'D',
         'review' => 'Review',
@@ -32,26 +32,28 @@ return [
     'modules' => [
 
         // ── Data Akademik ───────────────────────────────────────────────
-        'student'  => ['label' => 'Mahasiswa',    'group' => 'Data Akademik', 'actions' => ['create' => [], 'read' => [], 'update' => [], 'delete' => []]],
+        'student' => ['label' => 'Mahasiswa',    'group' => 'Data Akademik', 'actions' => ['create' => [], 'read' => [], 'update' => [], 'delete' => []]],
         'lecturer' => ['label' => 'Dosen',        'group' => 'Data Akademik', 'actions' => ['create' => [], 'read' => [], 'update' => [], 'delete' => []]],
-        'course'   => ['label' => 'Mata Kuliah',  'group' => 'Data Akademik', 'actions' => ['create' => [], 'read' => [], 'update' => [], 'delete' => []]],
-        'room'     => ['label' => 'Ruangan',      'group' => 'Data Akademik', 'actions' => ['create' => [], 'read' => [], 'update' => [], 'delete' => []]],
-        'jadwal'   => ['label' => 'Jadwal Ujian', 'group' => 'Data Akademik', 'actions' => ['create' => [], 'read' => [], 'update' => [], 'delete' => []]],
+        'course' => ['label' => 'Mata Kuliah',  'group' => 'Data Akademik', 'actions' => ['create' => [], 'read' => [], 'update' => [], 'delete' => []]],
+        'room' => ['label' => 'Ruangan',      'group' => 'Data Akademik', 'actions' => ['create' => [], 'read' => [], 'update' => [], 'delete' => []]],
+        'jadwal' => ['label' => 'Jadwal Ujian', 'group' => 'Data Akademik', 'actions' => ['create' => [], 'read' => [], 'update' => [], 'delete' => []]],
 
         // ── Dokumen ─────────────────────────────────────────────────────
         'document_category' => ['label' => 'Kategori Dokumen', 'group' => 'Dokumen', 'actions' => ['create' => [], 'read' => [], 'update' => [], 'delete' => []]],
-        'document'          => ['label' => 'Dokumen',          'group' => 'Dokumen', 'actions' => ['create' => [], 'read' => [], 'update' => [], 'delete' => []]],
-        'public_document'   => ['label' => 'Dokumen Publik',   'group' => 'Dokumen', 'actions' => ['read' => []]],
+        'document' => ['label' => 'Dokumen',          'group' => 'Dokumen', 'actions' => ['create' => [], 'read' => [], 'update' => [], 'delete' => []]],
+        'public_document' => ['label' => 'Dokumen Publik',   'group' => 'Dokumen', 'actions' => ['read' => []]],
 
         // ── Layanan & Form ──────────────────────────────────────────────
-        'queue_ticket'            => ['label' => 'Antrian Layanan',      'group' => 'Layanan & Form', 'actions' => ['read' => [], 'update' => []]],
+        'queue_ticket' => ['label' => 'Antrian Layanan',      'group' => 'Layanan & Form', 'actions' => ['read' => [], 'update' => []]],
         'graduation_registration' => ['label' => 'Pendaftaran Yudisium', 'group' => 'Layanan & Form', 'actions' => ['create' => [], 'read' => [], 'update' => [], 'delete' => [], 'review' => []]],
-        'sidang_ta_registration'  => ['label' => 'Pendaftaran Sidang TA', 'group' => 'Layanan & Form', 'actions' => [
+        'sidang_ta_registration' => ['label' => 'Pendaftaran Sidang TA', 'group' => 'Layanan & Form', 'actions' => [
             'create' => [], 'read' => [], 'update' => [], 'review' => [],
             'view_program' => ['label' => 'Lihat Pengajuan (Prodi Dosen)'],
         ]],
-        'sidang_ta_period'        => ['label' => 'Periode Sidang TA', 'group' => 'Layanan & Form', 'actions' => ['create' => [], 'read' => [], 'update' => [], 'delete' => []]],
-        'grade_appeal'            => ['label' => 'Form Banding Nilai',   'group' => 'Layanan & Form', 'actions' => ['create' => [], 'read' => [], 'update' => [], 'review' => []]],
+        'sidang_ta_period' => ['label' => 'Periode Sidang TA', 'group' => 'Layanan & Form', 'actions' => ['create' => [], 'read' => [], 'update' => [], 'delete' => []]],
+        'grade_appeal' => ['label' => 'Form Banding Nilai',   'group' => 'Layanan & Form', 'actions' => ['create' => [], 'read' => [], 'update' => [], 'review' => []]],
+
+        'room_booking' => ['label' => 'Peminjaman Ruangan', 'group' => 'Layanan & Form', 'actions' => ['create' => [], 'read' => [], 'update' => [], 'review' => []]],
 
         // ── IT PANEL (hanya Akademik yang boleh mendelegasikan) ──────────
         'sidang_ta_form_guide' => [
@@ -61,16 +63,16 @@ return [
         'sync' => [
             'label' => 'Sinkronisasi', 'group' => 'IT Panel', 'sensitive' => true,
             'actions' => [
-                'read'    => [], // melihat halaman, status, statistik & pengaturan sinkronisasi
-                'update'  => [], // mengubah pengaturan sinkronisasi
+                'read' => [], // melihat halaman, status, statistik & pengaturan sinkronisasi
+                'update' => [], // mengubah pengaturan sinkronisasi
                 'execute' => ['label' => 'Jalankan Sinkronisasi / Impor'], // scrape, dispatch, import JSON/profil
             ],
         ],
         'role' => [
             'label' => 'Pengaturan Role', 'group' => 'IT Panel', 'sensitive' => true,
             'actions' => [
-                'read'        => [], // melihat daftar role & permission
-                'update'      => [], // mengubah permission suatu role
+                'read' => [], // melihat daftar role & permission
+                'update' => [], // mengubah permission suatu role
                 'assign_user' => ['label' => 'Beri Role ke Pengguna'],
                 'revoke_user' => ['label' => 'Cabut Role dari Pengguna'],
             ],

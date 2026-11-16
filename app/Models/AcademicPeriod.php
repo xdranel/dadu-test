@@ -16,10 +16,10 @@ class AcademicPeriod extends Model
     ];
 
     protected $casts = [
-        'semester'   => 'integer',
+        'semester' => 'integer',
         'start_date' => 'date',
-        'end_date'   => 'date',
-        'is_active'  => 'boolean',
+        'end_date' => 'date',
+        'is_active' => 'boolean',
     ];
 
     // =========================================================================
@@ -75,6 +75,16 @@ class AcademicPeriod extends Model
     // =========================================================================
     // Relations
     // =========================================================================
+
+    public function roomPatterns()
+    {
+        return $this->hasMany(RoomWeeklyPattern::class);
+    }
+
+    public function roomSource()
+    {
+        return $this->hasOne(RoomScheduleSource::class);
+    }
 
     public function courses()
     {

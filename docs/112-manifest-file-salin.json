@@ -1,0 +1,638 @@
+{
+  "feature": "Sidang TA room scheduling111/112",
+  "base_docker": "57d06d7aa87fbb87b1dbb05a0a488ef2c2321dc8",
+  "base_source": "1c83b32d5f7fd9547666ecf300e0cba6f113e208",
+  "note": "Self hash intentionally excluded. Source-specific variants preserve unrelated source changes.",
+  "files": [
+    {
+      "path": "app/Http/Controllers/AcademicPeriodController.php",
+      "source_before": "1f972853834991666c502121ce948e01e918b246bf2e13b3d69043e74b755e96",
+      "docker_before": "1f972853834991666c502121ce948e01e918b246bf2e13b3d69043e74b755e96",
+      "worktree_hash": "42f4dad91a6989a899183548e69da37d0c97902625bfbceb22b991e4f39d689c",
+      "source_after": "42f4dad91a6989a899183548e69da37d0c97902625bfbceb22b991e4f39d689c"
+    },
+    {
+      "path": "app/Http/Controllers/Admin/SidangTaBookingController.php",
+      "source_before": null,
+      "docker_before": null,
+      "worktree_hash": "c10f796a9388b093ee96cf5308fd211340d48f871e02813951c73992cf78e4d3",
+      "source_after": "c10f796a9388b093ee96cf5308fd211340d48f871e02813951c73992cf78e4d3"
+    },
+    {
+      "path": "app/Http/Controllers/Admin/SidangTaExecutionController.php",
+      "source_before": null,
+      "docker_before": null,
+      "worktree_hash": "3d6606ad93d54978e07592a47c2227170bdbc6f987c52ec7cdd302d993af61a1",
+      "source_after": "3d6606ad93d54978e07592a47c2227170bdbc6f987c52ec7cdd302d993af61a1"
+    },
+    {
+      "path": "app/Http/Controllers/LecturerController.php",
+      "source_before": "e74c0edafc3ca4d5a09532cc76b349220cf4e3120b64e7646cac4660e67c2302",
+      "docker_before": "bf3f23dd7fbdc919578c03ea1fc00f64b39941ae7c1248016a7dfbec2a2f9fd2",
+      "worktree_hash": "7acf3456826f1f5fb143704ea0257588e11ad90540fb38d50a16ef0e96fa9781",
+      "source_after": "7acf3456826f1f5fb143704ea0257588e11ad90540fb38d50a16ef0e96fa9781"
+    },
+    {
+      "path": "app/Http/Controllers/RoomBookingController.php",
+      "source_before": "d5282698d6d316dbc7a6aa72c6af382d6b9c49adc1dbc3af40fd06f10b677bae",
+      "docker_before": null,
+      "worktree_hash": "35dda920a3eaed91a486f9a9e6ad0a207bd69c8265bd0007c04aa31e9158310b",
+      "source_after": "35dda920a3eaed91a486f9a9e6ad0a207bd69c8265bd0007c04aa31e9158310b"
+    },
+    {
+      "path": "app/Http/Controllers/RoomController.php",
+      "source_before": "381606aefb247e2c63759dcc9faf0fdffe15776e6f1733c78034f39396cc1b6f",
+      "docker_before": "b0195dfed5f32570878788ab56c3e4b3473e66d6ae67ba11d892b70737d979e6",
+      "worktree_hash": "893c22b2c618dcbb5bf9f8da50f45fe21642d176874c2626f8364659eb54fd89",
+      "source_after": "893c22b2c618dcbb5bf9f8da50f45fe21642d176874c2626f8364659eb54fd89"
+    },
+    {
+      "path": "app/Http/Controllers/SidangTaBookingController.php",
+      "source_before": null,
+      "docker_before": null,
+      "worktree_hash": "c4829e3b68ecd38165095a699a643a394c122ddc03a787d32de3efbec79438ab",
+      "source_after": "c4829e3b68ecd38165095a699a643a394c122ddc03a787d32de3efbec79438ab"
+    },
+    {
+      "path": "app/Http/Controllers/SidangTaRegistrationController.php",
+      "source_before": "ff65edde1a750c6e71d8313ea7d398e5a5ed85e4cf78114e59f0a536712c2ca6",
+      "docker_before": "ff65edde1a750c6e71d8313ea7d398e5a5ed85e4cf78114e59f0a536712c2ca6",
+      "worktree_hash": "54afc4eb2484fe3b6e07ffe5ca0cf01e1627403489223883a6142ed8bf44396b",
+      "source_after": "54afc4eb2484fe3b6e07ffe5ca0cf01e1627403489223883a6142ed8bf44396b"
+    },
+    {
+      "path": "app/Http/Controllers/SyncController.php",
+      "source_before": "5ddc84eb946601aaf6f4cb1a1fb58737272d1d50c17b1d8eb18dfbe8d37e4932",
+      "docker_before": "3dfa3be32e45c3a0c54e54e0a69e3c128839f79202b93dfae43e832380efcf10",
+      "worktree_hash": "726efa29be114dd364a6142765b41ac0af7f2b94f4ceccdb68b69c221c6d826f",
+      "source_after": "726efa29be114dd364a6142765b41ac0af7f2b94f4ceccdb68b69c221c6d826f"
+    },
+    {
+      "path": "app/Http/Requests/ConfirmSidangTaBookingRequest.php",
+      "source_before": null,
+      "docker_before": null,
+      "worktree_hash": "374a90f0a2e49fab53190d30bfd06343232389993bcc85e27f16dbf6558ff956",
+      "source_after": "374a90f0a2e49fab53190d30bfd06343232389993bcc85e27f16dbf6558ff956"
+    },
+    {
+      "path": "app/Http/Requests/SaveSidangTaExecutionRequest.php",
+      "source_before": null,
+      "docker_before": null,
+      "worktree_hash": "c59ba9885a3838480c66187b66f782aeabe56a781fdfa41601aff9822544d140",
+      "source_after": "c59ba9885a3838480c66187b66f782aeabe56a781fdfa41601aff9822544d140"
+    },
+    {
+      "path": "app/Http/Requests/StoreRoomRequest.php",
+      "source_before": "fffb9fb0f4e630b623cdca89e5b05c842722734089e1a2deae7a9bf1fc136e8a",
+      "docker_before": "fffb9fb0f4e630b623cdca89e5b05c842722734089e1a2deae7a9bf1fc136e8a",
+      "worktree_hash": "23a993b77cb5f06d4b2805ef700a035a7644197c47f85628d5fdeb8e437f2695",
+      "source_after": "23a993b77cb5f06d4b2805ef700a035a7644197c47f85628d5fdeb8e437f2695"
+    },
+    {
+      "path": "app/Http/Requests/UpdateRoomRequest.php",
+      "source_before": "5a2fe84423111ef4466a19a904cf03d6958a670d609a4806f439f4aee18d9622",
+      "docker_before": "5a2fe84423111ef4466a19a904cf03d6958a670d609a4806f439f4aee18d9622",
+      "worktree_hash": "c2bc80e235ab7de02023318ee43c06ca3692b2327658011f3e8ae378f3d9b2dd",
+      "source_after": "c2bc80e235ab7de02023318ee43c06ca3692b2327658011f3e8ae378f3d9b2dd"
+    },
+    {
+      "path": "app/Models/AcademicPeriod.php",
+      "source_before": "4b8b9f61185ce26c7d6a8966bf381ef1f7488866c38c409b630ce6762e120818",
+      "docker_before": "4b8b9f61185ce26c7d6a8966bf381ef1f7488866c38c409b630ce6762e120818",
+      "worktree_hash": "5f0d8adb8a64bf1fdbd511738671737a0d0294c2fa808aa4d3c6227d8efbe4ca",
+      "source_after": "5f0d8adb8a64bf1fdbd511738671737a0d0294c2fa808aa4d3c6227d8efbe4ca"
+    },
+    {
+      "path": "app/Models/Room.php",
+      "source_before": "9b7401cc2d5a69cf481f098dc3d140ae13eb0d095213b0d6cdd795e9cfca3254",
+      "docker_before": "9b7401cc2d5a69cf481f098dc3d140ae13eb0d095213b0d6cdd795e9cfca3254",
+      "worktree_hash": "2bfff5778685eec3035962cbb6743ee17e75982cb18c8f6e7b93871e7e62de8d",
+      "source_after": "2bfff5778685eec3035962cbb6743ee17e75982cb18c8f6e7b93871e7e62de8d"
+    },
+    {
+      "path": "app/Models/RoomBookingHistory.php",
+      "source_before": "c8f1361213b4beeef2cd713b1506b4b182c85d8f170fa283e1bf4f4d1e6408b4",
+      "docker_before": null,
+      "worktree_hash": "2549f8db64d4c80667ba12faa11c31438fdc79db76b735c8cd572548be75914c",
+      "source_after": "2549f8db64d4c80667ba12faa11c31438fdc79db76b735c8cd572548be75914c"
+    },
+    {
+      "path": "app/Models/RoomBookingOccurrence.php",
+      "source_before": "97947e30804a4019aa79792f5f83804f76c4175575211423b43a4f384e29c9c3",
+      "docker_before": null,
+      "worktree_hash": "d30183517c10632b3ac700083587ec9ac948d5e351971d7240c5732b6596abf2",
+      "source_after": "d30183517c10632b3ac700083587ec9ac948d5e351971d7240c5732b6596abf2"
+    },
+    {
+      "path": "app/Models/RoomBookingRequest.php",
+      "source_before": "b2396582c17f816e42859555335c9e2e8985540a5d4e019061844decea07a936",
+      "docker_before": null,
+      "worktree_hash": "849cd845ae5645c3a88b2c0d709c9708d8e75d0ce11a9bdb443265fb44cf698a",
+      "source_after": "849cd845ae5645c3a88b2c0d709c9708d8e75d0ce11a9bdb443265fb44cf698a"
+    },
+    {
+      "path": "app/Models/RoomScheduleSource.php",
+      "source_before": null,
+      "docker_before": null,
+      "worktree_hash": "fd8645d20442688f46246db16064ca0b87a6654a6c3f9b74b342b8b26123ebef",
+      "source_after": "fd8645d20442688f46246db16064ca0b87a6654a6c3f9b74b342b8b26123ebef"
+    },
+    {
+      "path": "app/Models/RoomWeeklyPattern.php",
+      "source_before": null,
+      "docker_before": null,
+      "worktree_hash": "8c5670faf7b4ebc1846285c1609569ae663b4459756d4aee30b449529e4b39e4",
+      "source_after": "8c5670faf7b4ebc1846285c1609569ae663b4459756d4aee30b449529e4b39e4"
+    },
+    {
+      "path": "app/Models/SidangTaExecutionSetting.php",
+      "source_before": null,
+      "docker_before": null,
+      "worktree_hash": "b6df76da6e1576b0418609f5f76c5330002723488d4c215ed732508464bbe50c",
+      "source_after": "b6df76da6e1576b0418609f5f76c5330002723488d4c215ed732508464bbe50c"
+    },
+    {
+      "path": "app/Models/SidangTaPeriod.php",
+      "source_before": "9af64e52d532e3113a02e167b2455d10345da0399dcf4051cdebf826e9657495",
+      "docker_before": "9af64e52d532e3113a02e167b2455d10345da0399dcf4051cdebf826e9657495",
+      "worktree_hash": "227719fc2c1ac97b9ac346b96f69c198418f885f0b1dabf4989e2256dc6fb29a",
+      "source_after": "227719fc2c1ac97b9ac346b96f69c198418f885f0b1dabf4989e2256dc6fb29a"
+    },
+    {
+      "path": "app/Models/SidangTaRegistration.php",
+      "source_before": "d2fab96fc43a4b186950ccdc699a405501fd597c9e6077471b06a05397b76dee",
+      "docker_before": "d2fab96fc43a4b186950ccdc699a405501fd597c9e6077471b06a05397b76dee",
+      "worktree_hash": "81f4c11d4204aa8c82005a7976a833110d70997cc203a107105badc1672f3e59",
+      "source_after": "81f4c11d4204aa8c82005a7976a833110d70997cc203a107105badc1672f3e59"
+    },
+    {
+      "path": "app/Models/SidangTaSchedule.php",
+      "source_before": null,
+      "docker_before": null,
+      "worktree_hash": "acac286575e98264623ab6c6c6e286fcbeffabefdbfbc2681558fdb6c3d34108",
+      "source_after": "acac286575e98264623ab6c6c6e286fcbeffabefdbfbc2681558fdb6c3d34108"
+    },
+    {
+      "path": "app/Services/RoomAliasService.php",
+      "source_before": null,
+      "docker_before": null,
+      "worktree_hash": "7025c724e405685a17ac9c16a55bf9d129936d2e2ef2a090c24babdb15b55d54",
+      "source_after": "7025c724e405685a17ac9c16a55bf9d129936d2e2ef2a090c24babdb15b55d54"
+    },
+    {
+      "path": "app/Services/RoomAvailabilityService.php",
+      "source_before": null,
+      "docker_before": null,
+      "worktree_hash": "658fe95324add1ee1a178e5b955cc44c25952e33243e09cd743d546cf6411e47",
+      "source_after": "658fe95324add1ee1a178e5b955cc44c25952e33243e09cd743d546cf6411e47"
+    },
+    {
+      "path": "app/Services/RoomBookingTransitionService.php",
+      "source_before": null,
+      "docker_before": null,
+      "worktree_hash": "2f63a8abc29e244dc7f304af158ac78ece08eb114f1f7910b427c0ce7ed67bf7",
+      "source_after": "2f63a8abc29e244dc7f304af158ac78ece08eb114f1f7910b427c0ce7ed67bf7"
+    },
+    {
+      "path": "app/Services/RoomScheduleImportService.php",
+      "source_before": "163499c0a1e3396b45320b97cf119b8ab7d7316313cc08365d89d66450d5fd50",
+      "docker_before": null,
+      "worktree_hash": "42c1d36fb3ce4713ec6c524ebd8b82447fba3e0c39e8221ceddc0961da407ee5",
+      "source_after": "42c1d36fb3ce4713ec6c524ebd8b82447fba3e0c39e8221ceddc0961da407ee5"
+    },
+    {
+      "path": "app/Services/SidangTaBookingAccess.php",
+      "source_before": null,
+      "docker_before": null,
+      "worktree_hash": "166286ece3e3897bdea1169f3d5d71a52194f3183712ec640b48b7395e316e3a",
+      "source_after": "166286ece3e3897bdea1169f3d5d71a52194f3183712ec640b48b7395e316e3a"
+    },
+    {
+      "path": "app/Services/SidangTaBookingAdministration.php",
+      "source_before": null,
+      "docker_before": null,
+      "worktree_hash": "8ff780a941bf2602fbed8336b5e19e9d3b3aa489441f1f44c9c73896dd5bee98",
+      "source_after": "8ff780a941bf2602fbed8336b5e19e9d3b3aa489441f1f44c9c73896dd5bee98"
+    },
+    {
+      "path": "app/Services/SidangTaBookingIdentity.php",
+      "source_before": null,
+      "docker_before": null,
+      "worktree_hash": "868f0b8056bd1dbd5da1037b72421353cdccd81d2808c4a8de9e14c5a48f483a",
+      "source_after": "868f0b8056bd1dbd5da1037b72421353cdccd81d2808c4a8de9e14c5a48f483a"
+    },
+    {
+      "path": "app/Services/SidangTaBookingLifecycle.php",
+      "source_before": null,
+      "docker_before": null,
+      "worktree_hash": "bebec976ee4a4393cf30fafd65cbcfae69f2b7cd23c83bdf2ea4afbcf5cb2532",
+      "source_after": "bebec976ee4a4393cf30fafd65cbcfae69f2b7cd23c83bdf2ea4afbcf5cb2532"
+    },
+    {
+      "path": "app/Services/SidangTaBookingLock.php",
+      "source_before": null,
+      "docker_before": null,
+      "worktree_hash": "05a5b459a3088cde1b81dbb937f351460547ec66bc80838137fc0e6ec4d54ec3",
+      "source_after": "05a5b459a3088cde1b81dbb937f351460547ec66bc80838137fc0e6ec4d54ec3"
+    },
+    {
+      "path": "app/Services/SidangTaBookingService.php",
+      "source_before": null,
+      "docker_before": null,
+      "worktree_hash": "6864c45828e1421340f512e90701793c4e609bf81e287d3a623d07583d24c00d",
+      "source_after": "6864c45828e1421340f512e90701793c4e609bf81e287d3a623d07583d24c00d"
+    },
+    {
+      "path": "app/Services/SidangTaExecutionWindowService.php",
+      "source_before": null,
+      "docker_before": null,
+      "worktree_hash": "6c390a7842c50903db05ddab393e5096667772b9572fbe8787606b02c261fe0b",
+      "source_after": "6c390a7842c50903db05ddab393e5096667772b9572fbe8787606b02c261fe0b"
+    },
+    {
+      "path": "app/Services/SidangTaHistoryPresenter.php",
+      "source_before": "4127f8ca362d500924d35b67dfc29f4e795c8e1a12a0cea341fd689a4a485d30",
+      "docker_before": "4127f8ca362d500924d35b67dfc29f4e795c8e1a12a0cea341fd689a4a485d30",
+      "worktree_hash": "4c3a9cbf967cc67d13ea6ff088a4313e2e8549b7460bb52ffa2e2733a9732a8f",
+      "source_after": "4c3a9cbf967cc67d13ea6ff088a4313e2e8549b7460bb52ffa2e2733a9732a8f"
+    },
+    {
+      "path": "app/Services/SidangTaRegistrationReview.php",
+      "source_before": "8fda44768f2e078fe19d99abd0558199937a300a6e5a5f23513dec766cac9869",
+      "docker_before": "8fda44768f2e078fe19d99abd0558199937a300a6e5a5f23513dec766cac9869",
+      "worktree_hash": "d0fc08abc1f687853687dda7b4c5a2eaa18536a4d2bde2412f36e140bd48ca60",
+      "source_after": "d0fc08abc1f687853687dda7b4c5a2eaa18536a4d2bde2412f36e140bd48ca60"
+    },
+    {
+      "path": "app/Support/RoomTimeWindows.php",
+      "source_before": null,
+      "docker_before": null,
+      "worktree_hash": "962f81967b87535ce762e20ec0b748215b074379f8680a89fdc3730215f3683f",
+      "source_after": "962f81967b87535ce762e20ec0b748215b074379f8680a89fdc3730215f3683f"
+    },
+    {
+      "path": "app/Support/WeeklyRoomScheduleNormalizer.php",
+      "source_before": null,
+      "docker_before": null,
+      "worktree_hash": "914d9b26ccf943263f6c5de7dc4a87b5572f41897942345b55c746c4cc7a174e",
+      "source_after": "914d9b26ccf943263f6c5de7dc4a87b5572f41897942345b55c746c4cc7a174e"
+    },
+    {
+      "path": "config/permission_modules.php",
+      "source_before": "492d20be0a1bce0e550c12abfc2b8bb96dd6d91c22629862d236874e5e2481b3",
+      "docker_before": "644e0397eefee7db5cf68c202c87fec1168bb01ead2374216d2b18df699d9fe7",
+      "worktree_hash": "a77782fe7b07cc31d2d4decc53c68856b893cb2d105ce2ea9b5cf1dae5b4ef59",
+      "source_after": "438d4cb6127d1a98598711d5c2586f12913cc43ffbcddc08415a82eff4601bc4"
+    },
+    {
+      "path": "config/sidebar.php",
+      "source_before": "cb7bbdd2ccfee94d95741af6fcfdcdc7e0efa2ef2b6d3e54f40e7c1966d5c99a",
+      "docker_before": "1d9dd43a4155ec97c4420c5f253bd1c3e53c769557e3cec79d22eb96aa71305a",
+      "worktree_hash": "65cacabcb889ee45d31c23c783bca2f8cd81d7d175b7d1c2d3372fb0b467957b",
+      "source_after": "14b8849ba6e0364a3453a47cb059a04c5805f7aa92af6274c435978b5dd252bc"
+    },
+    {
+      "path": "database/migrations/2026_11_11_000001_create_room_booking_tables.php",
+      "source_before": "8cff88f7ac051aa0d50a88771f4bf4d5d57e9865c76fdc1a6eddb750503f65df",
+      "docker_before": null,
+      "worktree_hash": "13f1cf90a0140b9c5e940928165d284ed6b191f4ad971b37222e14c46f522109",
+      "source_after": "13f1cf90a0140b9c5e940928165d284ed6b191f4ad971b37222e14c46f522109"
+    },
+    {
+      "path": "database/migrations/2026_11_14_064319_add_lecturer_code_to_room_schedules_table.php",
+      "source_before": "35953f99e0fb9b68670c53f88848e3ec6b216b363e86be21ffa0f4d01a07e4f1",
+      "docker_before": null,
+      "worktree_hash": "35953f99e0fb9b68670c53f88848e3ec6b216b363e86be21ffa0f4d01a07e4f1",
+      "source_after": "35953f99e0fb9b68670c53f88848e3ec6b216b363e86be21ffa0f4d01a07e4f1"
+    },
+    {
+      "path": "database/migrations/2026_11_15_110001_create_room_weekly_patterns.php",
+      "source_before": null,
+      "docker_before": null,
+      "worktree_hash": "513d6a47d632d1c6dd6b41fa1afb34f7b412a79a52ff6cdfb09f7f9c85e5fd69",
+      "source_after": "513d6a47d632d1c6dd6b41fa1afb34f7b412a79a52ff6cdfb09f7f9c85e5fd69"
+    },
+    {
+      "path": "database/migrations/2026_11_15_110002_create_sidang_ta_scheduling_tables.php",
+      "source_before": null,
+      "docker_before": null,
+      "worktree_hash": "2bc0b5f627ddf6b2f4d9ef8d25c376093d7c88534aa96bab39694c51f1f2a6de",
+      "source_after": "2bc0b5f627ddf6b2f4d9ef8d25c376093d7c88534aa96bab39694c51f1f2a6de"
+    },
+    {
+      "path": "database/migrations/2026_11_15_110003_extend_room_booking_for_sidang_ta.php",
+      "source_before": null,
+      "docker_before": null,
+      "worktree_hash": "437a4bafd77d8fa4b6269de644a7336e7845cc26ae04f8c32b66ed1159efd31c",
+      "source_after": "437a4bafd77d8fa4b6269de644a7336e7845cc26ae04f8c32b66ed1159efd31c"
+    },
+    {
+      "path": "database/migrations/2026_11_15_110004_create_room_schedule_aliases.php",
+      "source_before": null,
+      "docker_before": null,
+      "worktree_hash": "8e59ab5ab4dc5d9b98cc022e49b678725325d330e29ef293194e2c137b5955ac",
+      "source_after": "8e59ab5ab4dc5d9b98cc022e49b678725325d330e29ef293194e2c137b5955ac"
+    },
+    {
+      "path": "docker/scripts/copy-ta-room-feature.sh",
+      "source_before": null,
+      "docker_before": "4fd241097c912bacfbd239c6827f26ac8a48f68f4fd7c11d246301dc525709cc",
+      "worktree_hash": "4fd241097c912bacfbd239c6827f26ac8a48f68f4fd7c11d246301dc525709cc",
+      "source_after": "4fd241097c912bacfbd239c6827f26ac8a48f68f4fd7c11d246301dc525709cc"
+    },
+    {
+      "path": "docs/109-rescan-dan-catatan-awal-jadwal-pelaksanaan-sidang-ta.md",
+      "source_before": null,
+      "docker_before": "dc609b353712ba060711864a03261c2daa829e33cde317c57ea680eeb5e423ba",
+      "worktree_hash": "dc609b353712ba060711864a03261c2daa829e33cde317c57ea680eeb5e423ba",
+      "source_after": "dc609b353712ba060711864a03261c2daa829e33cde317c57ea680eeb5e423ba"
+    },
+    {
+      "path": "docs/110-rancangan-integrasi-jadwal-sidang-ta-dan-peminjaman-ruangan.md",
+      "source_before": null,
+      "docker_before": "8f5bab50270ddf9ca893a9558f10c3000cbf3bc647d242daa0364e324f62726e",
+      "worktree_hash": "8f5bab50270ddf9ca893a9558f10c3000cbf3bc647d242daa0364e324f62726e",
+      "source_after": "8f5bab50270ddf9ca893a9558f10c3000cbf3bc647d242daa0364e324f62726e"
+    },
+    {
+      "path": "docs/111-rencana-implementasi-jadwal-sidang-ta-dan-peminjaman-ruangan.md",
+      "source_before": null,
+      "docker_before": "90c58362dc99040af682215e959d670f07b063e36445c0df84d9781898c21ec4",
+      "worktree_hash": "ff089fb2f229d2dc17e6ea5983bdb779e060120604e404f7215164b8977bfe88",
+      "source_after": "ff089fb2f229d2dc17e6ea5983bdb779e060120604e404f7215164b8977bfe88"
+    },
+    {
+      "path": "docs/112-daftar-file-salin-sidang-ta-room.txt",
+      "source_before": null,
+      "docker_before": "95e8ba8bc27b46609a827b45aba905620247e7d285e45dd63a005135840e76d9",
+      "worktree_hash": "95e8ba8bc27b46609a827b45aba905620247e7d285e45dd63a005135840e76d9",
+      "source_after": "95e8ba8bc27b46609a827b45aba905620247e7d285e45dd63a005135840e76d9"
+    },
+    {
+      "path": "docs/112-hasil-implementasi-jadwal-sidang-ta-dan-peminjaman-ruangan.md",
+      "source_before": null,
+      "docker_before": "3934f592932b7eaf92400236248024803549c09d8f127f1308e6d09a420bdf19",
+      "worktree_hash": "9e5134cd29c1885adc14487489b55c1cb92a6e759986baf5cb1f0d0ec2a6f2d0",
+      "source_after": "9e5134cd29c1885adc14487489b55c1cb92a6e759986baf5cb1f0d0ec2a6f2d0"
+    },
+    {
+      "path": "docs/112-kegagalan-suite-baseline.md",
+      "source_before": null,
+      "docker_before": "34545b1812c49adb750b910fba4c71f2335eea63c750b7b64f3d3b99e6b33dd5",
+      "worktree_hash": "32e0c3fa6a6c5cbfbdde97cd1a112566581b7d93a3bc3f098d18a086c92db083",
+      "source_after": "32e0c3fa6a6c5cbfbdde97cd1a112566581b7d93a3bc3f098d18a086c92db083"
+    },
+    {
+      "path": "docs/fixtures/sidang-ta/111-room-schedule-patterns-demo.json",
+      "source_before": null,
+      "docker_before": null,
+      "worktree_hash": "383f33188a745f72ee062cfc0d120ff1087dc2b0828e8535c849f4eca4bf4d71",
+      "source_after": "383f33188a745f72ee062cfc0d120ff1087dc2b0828e8535c849f4eca4bf4d71"
+    },
+    {
+      "path": "resources/views/room-bookings/create.blade.php",
+      "source_before": "6df655b54cf3a672dab21ae5f5989e2161da22e889e8ee15eff31c17f55d1360",
+      "docker_before": null,
+      "worktree_hash": "9f02e2d91c37ea8d13de754c45a00ccc723131e6aa57a38bc826aea57054a399",
+      "source_after": "9f02e2d91c37ea8d13de754c45a00ccc723131e6aa57a38bc826aea57054a399"
+    },
+    {
+      "path": "resources/views/room-bookings/dashboard.blade.php",
+      "source_before": "c774aced69c9856231044f1b87998c105b9dded7a6b4cc8adc0ad1fd359042be",
+      "docker_before": null,
+      "worktree_hash": "88f288ead43a5eca0d37b961999bd464b7ebedc3020d59906537fb061ca51ac8",
+      "source_after": "88f288ead43a5eca0d37b961999bd464b7ebedc3020d59906537fb061ca51ac8"
+    },
+    {
+      "path": "resources/views/room-bookings/index.blade.php",
+      "source_before": "0ab73fa81611cbf35f47d0c9c809aa809b37fd44ff06cbe5c25f5c02377fc66a",
+      "docker_before": null,
+      "worktree_hash": "0ab73fa81611cbf35f47d0c9c809aa809b37fd44ff06cbe5c25f5c02377fc66a",
+      "source_after": "0ab73fa81611cbf35f47d0c9c809aa809b37fd44ff06cbe5c25f5c02377fc66a"
+    },
+    {
+      "path": "resources/views/room-bookings/review.blade.php",
+      "source_before": "7b547e987f08d6371aee87c00e8dd4f3d35827ac46d9736d893507fdca487b73",
+      "docker_before": null,
+      "worktree_hash": "3219afcdfc62b2fb0c2638a0523d0d4d48b6142f7c72cb62b436f860966bfc7d",
+      "source_after": "3219afcdfc62b2fb0c2638a0523d0d4d48b6142f7c72cb62b436f860966bfc7d"
+    },
+    {
+      "path": "resources/views/rooms/create.blade.php",
+      "source_before": "8a7c7c2ac8744511f68f9f8b3f1943f128fb1dece44c26e6f1df8396d1fd9866",
+      "docker_before": "8a7c7c2ac8744511f68f9f8b3f1943f128fb1dece44c26e6f1df8396d1fd9866",
+      "worktree_hash": "014d50500e6263c960ffa52fc0c681f6299d171e17625f47a4639f53b1226b9e",
+      "source_after": "014d50500e6263c960ffa52fc0c681f6299d171e17625f47a4639f53b1226b9e"
+    },
+    {
+      "path": "resources/views/rooms/edit.blade.php",
+      "source_before": "589e4cea59ccfba549051d90a24134f0f76a4d75078dee948258a871e272af6c",
+      "docker_before": "589e4cea59ccfba549051d90a24134f0f76a4d75078dee948258a871e272af6c",
+      "worktree_hash": "0cf34205993ee21611818bbffa1c30f7f6cf259c47adacbdb1f2a4152ec8c9c4",
+      "source_after": "0cf34205993ee21611818bbffa1c30f7f6cf259c47adacbdb1f2a4152ec8c9c4"
+    },
+    {
+      "path": "resources/views/rooms/index.blade.php",
+      "source_before": "3c7b537c804170c52e6fe19651f2b39aa69e16266cf4529b9eff11bab81a4324",
+      "docker_before": "3c7b537c804170c52e6fe19651f2b39aa69e16266cf4529b9eff11bab81a4324",
+      "worktree_hash": "ad5b5ab57b56e2bbc8f78fd7fff071e75308b7c8bfbde7af95a20c8c625d3426",
+      "source_after": "ad5b5ab57b56e2bbc8f78fd7fff071e75308b7c8bfbde7af95a20c8c625d3426"
+    },
+    {
+      "path": "resources/views/sidang_ta_registrations/admin/booking.blade.php",
+      "source_before": null,
+      "docker_before": null,
+      "worktree_hash": "8bf52b0cb626e6e73f3098e97d5272e90a0fd9e008ce1e51a0b9ce323f193524",
+      "source_after": "8bf52b0cb626e6e73f3098e97d5272e90a0fd9e008ce1e51a0b9ce323f193524"
+    },
+    {
+      "path": "resources/views/sidang_ta_registrations/admin/execution-settings.blade.php",
+      "source_before": null,
+      "docker_before": null,
+      "worktree_hash": "2dc5c6ee3f88f5fb953371e19533a4f84233511568444606ab84b5158d2375a8",
+      "source_after": "2dc5c6ee3f88f5fb953371e19533a4f84233511568444606ab84b5158d2375a8"
+    },
+    {
+      "path": "resources/views/sidang_ta_registrations/admin/index.blade.php",
+      "source_before": "8692f18f033d3ade88726b4253b6db60cfdbf1ed8596fcc8207bc665ab299dab",
+      "docker_before": "8692f18f033d3ade88726b4253b6db60cfdbf1ed8596fcc8207bc665ab299dab",
+      "worktree_hash": "5828867c887a3f653303510b4acca6834f0af0ee5aac5445a695d4ae94f2cc4f",
+      "source_after": "5828867c887a3f653303510b4acca6834f0af0ee5aac5445a695d4ae94f2cc4f"
+    },
+    {
+      "path": "resources/views/sidang_ta_registrations/admin/partials/approval-cancellation.blade.php",
+      "source_before": "ba7345daa332bec7519841ad8ade8ef347bb2215c612dc945a041061df91da16",
+      "docker_before": "ba7345daa332bec7519841ad8ade8ef347bb2215c612dc945a041061df91da16",
+      "worktree_hash": "79f2ee939268c936e287a0a65ddb4e65975de5a1183159a8dc891f9552916dd8",
+      "source_after": "79f2ee939268c936e287a0a65ddb4e65975de5a1183159a8dc891f9552916dd8"
+    },
+    {
+      "path": "resources/views/sidang_ta_registrations/admin/show.blade.php",
+      "source_before": "5f5c6a95c2f9e80a177d2ffd013472e680da84f64aa2eaf13f321f15682a89fe",
+      "docker_before": "5f5c6a95c2f9e80a177d2ffd013472e680da84f64aa2eaf13f321f15682a89fe",
+      "worktree_hash": "4369b2eaa08e8fe0b0bc9b9629286b73e2cef79df823ee828f3a797486a6e0d6",
+      "source_after": "4369b2eaa08e8fe0b0bc9b9629286b73e2cef79df823ee828f3a797486a6e0d6"
+    },
+    {
+      "path": "resources/views/sidang_ta_registrations/booking/index.blade.php",
+      "source_before": null,
+      "docker_before": null,
+      "worktree_hash": "da2c941fedec78020bc9fcb78bf67e48e0cfc33ead99aed051c3dc1ae5641445",
+      "source_after": "da2c941fedec78020bc9fcb78bf67e48e0cfc33ead99aed051c3dc1ae5641445"
+    },
+    {
+      "path": "resources/views/sidang_ta_registrations/index.blade.php",
+      "source_before": "29fc280acd4507ee6777a64062a382ccf7a0d4990d25f9779c47d75dc983324b",
+      "docker_before": "29fc280acd4507ee6777a64062a382ccf7a0d4990d25f9779c47d75dc983324b",
+      "worktree_hash": "fa64815434c7890404c11f15d416ead0ad725815bef7bf6cf51850fb0546d9d7",
+      "source_after": "fa64815434c7890404c11f15d416ead0ad725815bef7bf6cf51850fb0546d9d7"
+    },
+    {
+      "path": "resources/views/sidang_ta_registrations/partials/booking-card.blade.php",
+      "source_before": null,
+      "docker_before": null,
+      "worktree_hash": "143e934cdb6053594e2cbb33e2ca527bacd667994b17fcb59f7d171702ec6ecf",
+      "source_after": "143e934cdb6053594e2cbb33e2ca527bacd667994b17fcb59f7d171702ec6ecf"
+    },
+    {
+      "path": "resources/views/sidang_ta_registrations/partials/booking-identity.blade.php",
+      "source_before": null,
+      "docker_before": null,
+      "worktree_hash": "34996039dd08975b6aab371e87196953af08ba0df26d96a85fdc6f53a9f01945",
+      "source_after": "34996039dd08975b6aab371e87196953af08ba0df26d96a85fdc6f53a9f01945"
+    },
+    {
+      "path": "resources/views/sync/index.blade.php",
+      "source_before": "dbff075175d1f790c33de4fb2698224867422c14d4a5dce9988840d52b18fe57",
+      "docker_before": "889a327915e7e9fa41d0f9cebf501e64d8776a3abf8f77ad3368e9ae323c7d78",
+      "worktree_hash": "8e49bb334c6ba57712ded53b7b72f68bc7b85f3e775db73abe1635a9395c3594",
+      "source_after": "8e49bb334c6ba57712ded53b7b72f68bc7b85f3e775db73abe1635a9395c3594"
+    },
+    {
+      "path": "routes/web.php",
+      "source_before": "3c8aadec72dfa00ce5fdd09863be1edf32a56ae47ad84f1e718db540801bcef4",
+      "docker_before": "a72e74509dfe8ed9fcc76803e9ebed3ff42b8b3770873c19a61ce5867d02f12c",
+      "worktree_hash": "8357334e9f899b7abef9958857ec2bff30515e96a34e5864686973e0df12c123",
+      "source_after": "a992876a992da5cfa463b08d1ffa627463b5d7fb31b489968f474933ed721336"
+    },
+    {
+      "path": "tests/Feature/LecturerBookingIdentityImportTest.php",
+      "source_before": null,
+      "docker_before": null,
+      "worktree_hash": "fdc4385c81a9e46b13e98964524d79cc6be91b833e5e27b2292f942b0d0655c1",
+      "source_after": "fdc4385c81a9e46b13e98964524d79cc6be91b833e5e27b2292f942b0d0655c1"
+    },
+    {
+      "path": "tests/Feature/RoomAvailabilityServiceTest.php",
+      "source_before": null,
+      "docker_before": null,
+      "worktree_hash": "51296f4986c7e0f82432a43594990fcb1a516fd3311569cc934c7d9d25993a9c",
+      "source_after": "51296f4986c7e0f82432a43594990fcb1a516fd3311569cc934c7d9d25993a9c"
+    },
+    {
+      "path": "tests/Feature/RoomBookingSharedAvailabilityTest.php",
+      "source_before": null,
+      "docker_before": null,
+      "worktree_hash": "b6a4d83e37d720dc2542b4013f6c329b6924acc561536ceadfa17776759f5016",
+      "source_after": "b6a4d83e37d720dc2542b4013f6c329b6924acc561536ceadfa17776759f5016"
+    },
+    {
+      "path": "tests/Feature/SidangTaBookingConcurrencyTest.php",
+      "source_before": null,
+      "docker_before": null,
+      "worktree_hash": "8d44985f53754b497af49890c39dd1a2ba14b7c27e4036d33daf80c1774216d3",
+      "source_after": "8d44985f53754b497af49890c39dd1a2ba14b7c27e4036d33daf80c1774216d3"
+    },
+    {
+      "path": "tests/Feature/SidangTaBookingLifecycleTest.php",
+      "source_before": null,
+      "docker_before": null,
+      "worktree_hash": "50f5531aebec97f23bfc008bec8a72650a6e9a3ad539975e8bff451bbb581792",
+      "source_after": "50f5531aebec97f23bfc008bec8a72650a6e9a3ad539975e8bff451bbb581792"
+    },
+    {
+      "path": "tests/Feature/SidangTaBookingUiTest.php",
+      "source_before": null,
+      "docker_before": null,
+      "worktree_hash": "a393d77c852345d6baff408beaa2841e00a46d0d0d11b819d324d59dd68f02f8",
+      "source_after": "a393d77c852345d6baff408beaa2841e00a46d0d0d11b819d324d59dd68f02f8"
+    },
+    {
+      "path": "tests/Feature/SidangTaExecutionSettingsTest.php",
+      "source_before": null,
+      "docker_before": null,
+      "worktree_hash": "fd606de42f384b728cbc3340eee687534a8fc56b74da4647da87c624de5997c7",
+      "source_after": "fd606de42f384b728cbc3340eee687534a8fc56b74da4647da87c624de5997c7"
+    },
+    {
+      "path": "tests/Feature/SidangTaLecturerBookingLinkTest.php",
+      "source_before": null,
+      "docker_before": null,
+      "worktree_hash": "1c16fc7237d92e975ff100ddfdf2e68a412876a1366a214840790f315f7c6030",
+      "source_after": "1c16fc7237d92e975ff100ddfdf2e68a412876a1366a214840790f315f7c6030"
+    },
+    {
+      "path": "tests/Feature/SidangTaRoomBookingTest.php",
+      "source_before": null,
+      "docker_before": null,
+      "worktree_hash": "1629fc31c0ce776502db83a3140b9e368b0027641180c4db9cffeeffd96ecd7c",
+      "source_after": "1629fc31c0ce776502db83a3140b9e368b0027641180c4db9cffeeffd96ecd7c"
+    },
+    {
+      "path": "tests/Feature/SidangTaRoomMysqlUpgradeTest.php",
+      "source_before": null,
+      "docker_before": null,
+      "worktree_hash": "3e3d8ceb179522e32ce05ea5cc3503a08a9c23323bf4a692a274bd7e1d1b98cd",
+      "source_after": "3e3d8ceb179522e32ce05ea5cc3503a08a9c23323bf4a692a274bd7e1d1b98cd"
+    },
+    {
+      "path": "tests/Feature/SidangTaRoomSchemaCompatibilityTest.php",
+      "source_before": null,
+      "docker_before": null,
+      "worktree_hash": "ba5ff35340fd1cf221aa5a558c249e841e16f65bb78b577086062e27615bfca9",
+      "source_after": "ba5ff35340fd1cf221aa5a558c249e841e16f65bb78b577086062e27615bfca9"
+    },
+    {
+      "path": "tests/Feature/WeeklyRoomScheduleImportTest.php",
+      "source_before": null,
+      "docker_before": null,
+      "worktree_hash": "6e4ca4b0e529e97e9bd73f656ca719f79f2cc6af6b80a3295971ac3cac4d5991",
+      "source_after": "6e4ca4b0e529e97e9bd73f656ca719f79f2cc6af6b80a3295971ac3cac4d5991"
+    },
+    {
+      "path": "tests/Support/TaRoomCommittedTestCase.php",
+      "source_before": null,
+      "docker_before": null,
+      "worktree_hash": "530b4f447ff91ced834348415bea70588109488cecc74edde82a439f4602cefc",
+      "source_after": "530b4f447ff91ced834348415bea70588109488cecc74edde82a439f4602cefc"
+    },
+    {
+      "path": "tests/Support/TaRoomConcurrencyHarness.php",
+      "source_before": null,
+      "docker_before": null,
+      "worktree_hash": "ac20ba6133afed663f16c85e74196da0b19c4c097f9e28234168cba7ffd9033d",
+      "source_after": "ac20ba6133afed663f16c85e74196da0b19c4c097f9e28234168cba7ffd9033d"
+    },
+    {
+      "path": "tests/Support/TaRoomScenario.php",
+      "source_before": null,
+      "docker_before": null,
+      "worktree_hash": "6196e18cbc26b24e74ba79fe2e0017c8a483e1dc34548edfa5cc9a5eaaa5eaf8",
+      "source_after": "6196e18cbc26b24e74ba79fe2e0017c8a483e1dc34548edfa5cc9a5eaaa5eaf8"
+    },
+    {
+      "path": "tests/Unit/RoomTimeWindowsTest.php",
+      "source_before": null,
+      "docker_before": null,
+      "worktree_hash": "0fbcdd0ca4f0ef7fdef99d5b836c9556bd5c625dd899683ade8c364217634ec4",
+      "source_after": "0fbcdd0ca4f0ef7fdef99d5b836c9556bd5c625dd899683ade8c364217634ec4"
+    },
+    {
+      "path": "tests/Unit/WeeklyRoomScheduleNormalizerTest.php",
+      "source_before": null,
+      "docker_before": null,
+      "worktree_hash": "cbb172d62a99e66deb5bd5568859d795bc0a6f0ae4df765a7b841845304e086d",
+      "source_after": "cbb172d62a99e66deb5bd5568859d795bc0a6f0ae4df765a7b841845304e086d"
+    }
+  ]
+}

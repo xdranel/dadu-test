@@ -7,6 +7,7 @@ use App\Models\SidangTaRegistration;
 class SidangTaHistoryPresenter
 {
     public const LABELS = [
+        'schedule_updated' => 'Jadwal pelaksanaan sidang diperbarui',
         'submitted' => 'Pengajuan pendaftaran sidang dikirim',
         'needs_review' => 'Pengajuan diminta revisi oleh admin',
         'approved' => 'Pengajuan disetujui admin',

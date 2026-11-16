@@ -1,0 +1,5 @@
+dadu-test.gendhiramona.site {
+    header X-Dadu-Release "57d06d7"
+    encode zstd gzip
+    reverse_proxy dadu-test-web:8080
+}

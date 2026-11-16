@@ -102,6 +102,7 @@
                         <th>Nama Ruangan</th>
                         <th>Lokasi Gedung</th>
                         <th>Kapasitas</th>
+                        <th>Klasifikasi TA</th>
                         <th class="!text-center">Status</th>
                         <th class="!text-center">Aksi</th>
                     </tr>
@@ -121,6 +122,7 @@
                             <td class="whitespace-nowrap font-semibold text-slate-700">
                                 {{ $r->capacity }} orang
                             </td>
+                            <td>{{ $r->is_classroom===null ? 'Belum dipastikan' : ($r->is_classroom ? 'Ruang kelas' : 'Bukan kelas') }}</td>
                             <td class="whitespace-nowrap text-center">
                                 @if($r->status === 'Dapat Dipakai')
                                     <span class="badge badge-success">
@@ -160,7 +162,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="6" class="empty-state">
+                            <td colspan="7" class="empty-state">
                                 <div class="empty-state-icon">
                                     <svg class="w-12 h-12 mx-auto text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>

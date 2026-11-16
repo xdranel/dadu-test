@@ -4,10 +4,13 @@ namespace App\Http\Controllers;
 
 use App\Jobs\ProcessCampusScraping;
 use App\Jobs\SyncMasterDataJob;
-use App\Models\Lecturer;
-use App\Models\Student;
 use App\Models\Course;
 use App\Models\CourseLecturer;
+use App\Models\GraduationPeriod;
+use App\Models\GraduationRegistration;
+use App\Models\Lecturer;
+use App\Models\RoomWeeklyPattern;
+use App\Models\Student;
 use App\Models\StudentActivity;
 use App\Models\StudentAttendance;
 use App\Models\StudentBasilaApproval;
@@ -19,16 +22,24 @@ use App\Models\StudentFinalProject;
 use App\Models\StudentFinalProjectGrade;
 use App\Models\StudentGrade;
 use App\Models\StudentSidangTingkat;
-use App\Models\StudentTak;
 use App\Models\SyncLog;
 use App\Models\SyncSetting;
+use App\Services\FlatTermKrsImportService;
+use App\Services\OfficialKrsJsonImportService;
+use App\Services\RoomScheduleImportService;
 use App\Services\StudentAcademicProfileImportService;
 use App\Support\JsonSourceLocations;
+use App\Support\OfficialKrsJsonNormalizer;
 use App\Support\SyncImportIssues;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Str;
 
 class SyncController extends Controller
 {
@@ -39,12 +50,46 @@ class SyncController extends Controller
             ->get();
 
         $latestLogs = SyncLog::select(['id', 'module', 'status', 'total_records', 'processed_records',
-                'skipped_records', 'triggered_by', 'started_at', 'completed_at', 'created_at'])
+            'skipped_records', 'triggered_by', 'started_at', 'completed_at', 'created_at'])
             ->selectRaw("CASE WHEN (error_message IS NOT NULL AND error_message <> '') OR (issue_details IS NOT NULL AND issue_details <> '[]') OR skipped_records > 0 OR status = 'failed' THEN 1 ELSE 0 END AS has_issues")
             ->orderBy('created_at', 'desc')
             ->take(20)
             ->get()
             ->groupBy('module');
+
+        // Sertakan riwayat import jadwal ruangan iGracias (room_import_logs) ke Log Sinkronisasi
+        $roomImportLogs = DB::table('room_import_logs')
+            ->orderBy('created_at', 'desc')
+            ->take(10)
+            ->get();
+
+        if ($roomImportLogs->isNotEmpty()) {
+            $roomLogEntries = $roomImportLogs->map(function ($log) {
+                $errors = is_array($log->errors) ? $log->errors : json_decode($log->errors ?? '[]', true);
+                $hasErrors = is_array($errors) && count($errors) > 0;
+                $successful = $log->rows_imported > 0 && ! $hasErrors;
+                $createdAt = Carbon::parse($log->created_at);
+                $user = DB::table('users')->where('id', $log->user_id)->first();
+
+                return (object) [
+                    'id' => 'room_'.$log->id,
+                    'module' => 'room_schedule',
+                    'status' => $successful ? 'completed' : 'failed',
+                    'total_records' => $log->rows_imported,
+                    'processed_records' => $successful ? $log->rows_imported : 0,
+                    'skipped_records' => 0,
+                    'triggered_by' => $user?->email ?? 'Admin',
+                    'started_at' => null,
+                    'completed_at' => $createdAt,
+                    'created_at' => $createdAt,
+                    'has_issues' => $hasErrors ? 1 : 0,
+                    'status_badge' => $successful ? 'badge-success' : 'badge-danger',
+                    'durasi' => '—',
+                ];
+            });
+
+            $latestLogs->put('room_schedule', $roomLogEntries);
+        }
 
         $dataStats = $this->getDataStats();
 
@@ -66,6 +111,7 @@ class SyncController extends Controller
             $issues = [['nim' => null, 'name' => null, 'record' => null, 'path' => null,
                 'line' => null, 'message' => 'Proses gagal; rincian belum tersedia untuk log ini.']];
         }
+
         return response()->json(['id' => $syncLog->id, 'issues' => $issues]);
     }
 
@@ -76,8 +122,8 @@ class SyncController extends Controller
     {
         $request->validate([
             'cookie_string' => ['required', 'string', 'min:10'],
-            'prodi_id'      => ['nullable', 'integer'],
-            'start_phase'   => ['nullable', 'integer', 'in:1,2,4,5'],
+            'prodi_id' => ['nullable', 'integer'],
+            'start_phase' => ['nullable', 'integer', 'in:1,2,4,5'],
         ]);
 
         $testUrl = config('igracias.endpoints.student_list');
@@ -90,50 +136,51 @@ class SyncController extends Controller
             'semester' => '', 'provinceid' => '', 'suku' => '', 'class1' => '', 'class2' => '', 'class3' => '',
         ];
 
-        $pageid  = config('igracias.pageid');
+        $pageid = config('igracias.pageid');
         $referer = 'https://igracias.telkomuniversity.ac.id/';
-        if (!empty($pageid)) {
-            $referer .= '?pageid=' . $pageid;
+        if (! empty($pageid)) {
+            $referer .= '?pageid='.$pageid;
         }
 
         try {
             $response = Http::withoutVerifying()
                 ->withHeaders([
-                    'Cookie'           => $request->cookie_string,
-                    'User-Agent'       => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
+                    'Cookie' => $request->cookie_string,
+                    'User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
                     'X-Requested-With' => 'XMLHttpRequest',
-                    'Accept'           => 'application/json, text/html',
-                    'Referer'          => $referer,
+                    'Accept' => 'application/json, text/html',
+                    'Referer' => $referer,
                 ])
                 ->timeout(15)
                 ->get($testUrl, $testParams);
         } catch (\Exception $e) {
             Log::warning('sync.scrapePortal: Pre-check request failed', ['error' => $e->getMessage()]);
+
             return back()->with('error', 'Gagal menghubungi server iGracias. Periksa koneksi internet dan coba lagi.');
         }
 
-        $body      = strtolower($response->body());
-        $status    = $response->status();
+        $body = strtolower($response->body());
+        $status = $response->status();
         $isExpired = false;
         $isPermissionDenied = false;
 
         Log::info('sync.scrapePortal: Pre-check response', [
-            'http_status'  => $status,
-            'body_length'  => strlen($response->body()),
+            'http_status' => $status,
+            'body_length' => strlen($response->body()),
             'body_preview' => substr($response->body(), 0, 500),
         ]);
 
         if (str_contains($body, 'you_dont_have_permission')) {
-            $controlProdi      = 113;
+            $controlProdi = 113;
             $controlTestParams = array_merge($testParams, ['studyProgram' => $controlProdi]);
             try {
                 $controlResponse = Http::withoutVerifying()
                     ->withHeaders([
-                        'Cookie'           => $request->cookie_string,
-                        'User-Agent'       => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
+                        'Cookie' => $request->cookie_string,
+                        'User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
                         'X-Requested-With' => 'XMLHttpRequest',
-                        'Accept'           => 'application/json, text/html',
-                        'Referer'          => $referer,
+                        'Accept' => 'application/json, text/html',
+                        'Referer' => $referer,
                     ])
                     ->timeout(15)
                     ->get($testUrl, $controlTestParams);
@@ -154,7 +201,7 @@ class SyncController extends Controller
             }
         }
 
-        if (!$isPermissionDenied) {
+        if (! $isPermissionDenied) {
             if (in_array($status, [401, 403]) || ($status >= 300 && $status < 400)) {
                 $isExpired = true;
             } else {
@@ -171,9 +218,9 @@ class SyncController extends Controller
                 }
             }
 
-            if (!$isExpired) {
+            if (! $isExpired) {
                 $json = $response->json();
-                if (!is_array($json) || !isset($json['aaData'])) {
+                if (! is_array($json) || ! isset($json['aaData'])) {
                     if (is_array($json) && isset($json['iTotalDisplayRecords'])) {
                         Log::info('sync.scrapePortal: Valid DataTables response (empty data, session OK)');
                     } else {
@@ -196,14 +243,14 @@ class SyncController extends Controller
         }
 
         $prodiFilter = $request->prodi_id ? [(int) $request->prodi_id] : null;
-        $startPhase  = (int) ($request->start_phase ?? 1);
+        $startPhase = (int) ($request->start_phase ?? 1);
         ProcessCampusScraping::dispatch($request->cookie_string, $prodiFilter, $startPhase);
 
         $totalStudents = Student::count();
-        $belumScrape    = Student::whereNull('gpa')->count();
-        $message = "Scraping job berhasil dijadwalkan! Mengambil data dari portal iGracias di background. "
-                 . "({$belumScrape} profil mahasiswa menunggu diperbarui dari total {$totalStudents} di database). "
-                 . "Pastikan queue worker berjalan: php artisan queue:work";
+        $belumScrape = Student::whereNull('gpa')->count();
+        $message = 'Scraping job berhasil dijadwalkan! Mengambil data dari portal iGracias di background. '
+                 ."({$belumScrape} profil mahasiswa menunggu diperbarui dari total {$totalStudents} di database). "
+                 .'Pastikan queue worker berjalan: php artisan queue:work';
 
         return redirect()->route('sync.index')->with('success', $message);
     }
@@ -215,8 +262,8 @@ class SyncController extends Controller
     {
         $request->validate([
             'cookie_string' => ['required', 'string', 'max:5000'],
-            'modules'       => ['required', 'array', 'min:1'],
-            'modules.*'     => ['string', 'exists:sync_settings,module'],
+            'modules' => ['required', 'array', 'min:1'],
+            'modules.*' => ['string', 'exists:sync_settings,module'],
         ]);
 
         $dispatched = [];
@@ -226,13 +273,13 @@ class SyncController extends Controller
                 ->where('is_active', true)
                 ->first();
 
-            if (!$setting || empty($setting->endpoint_url)) {
+            if (! $setting || empty($setting->endpoint_url)) {
                 continue;
             }
 
             $log = SyncLog::create([
-                'module'       => $module,
-                'status'       => 'pending',
+                'module' => $module,
+                'status' => 'pending',
                 'triggered_by' => auth()->user()->email,
             ]);
 
@@ -250,27 +297,29 @@ class SyncController extends Controller
         }
 
         $modules = implode(', ', $dispatched);
+
         return back()->with('success', "Sinkronisasi dijadwalkan untuk: {$modules}. Proses berjalan di background.");
     }
 
     public function settings()
     {
         $settings = SyncSetting::orderBy('urutan')->get();
+
         return view('sync.settings', compact('settings'));
     }
 
     public function saveSettings(Request $request)
     {
         $request->validate([
-            'endpoints'          => ['required', 'array'],
-            'endpoints.*.url'    => ['nullable', 'url', 'max:500'],
+            'endpoints' => ['required', 'array'],
+            'endpoints.*.url' => ['nullable', 'url', 'max:500'],
             'endpoints.*.active' => ['nullable', 'boolean'],
         ]);
 
         foreach ($request->endpoints as $module => $data) {
             SyncSetting::where('module', $module)->update([
-                'endpoint_url' => $data['url']    ?? null,
-                'is_active'    => isset($data['active']) ? true : false,
+                'endpoint_url' => $data['url'] ?? null,
+                'is_active' => isset($data['active']) ? true : false,
             ]);
         }
 
@@ -279,11 +328,11 @@ class SyncController extends Controller
 
     public function status(Request $request)
     {
-        $logs = SyncLog::when($request->module, fn($q, $m) => $q->where('module', $m))
+        $logs = SyncLog::when($request->module, fn ($q, $m) => $q->where('module', $m))
             ->orderBy('created_at', 'desc')
             ->take(10)
             ->get(['id', 'module', 'status', 'total_records',
-                   'processed_records', 'error_message', 'completed_at']);
+                'processed_records', 'error_message', 'completed_at']);
 
         return response()->json($logs);
     }
@@ -299,7 +348,7 @@ class SyncController extends Controller
     public function importJson(Request $request)
     {
         $rules = [
-            'type'      => ['required', 'string', 'in:student,krs,attendance,course,academic_profile'],
+            'type' => ['required', 'string', 'in:student,krs,attendance,course,academic_profile,room_schedule'],
             'json_file' => ['required', 'file', 'mimetypes:application/json,text/plain'],
         ];
         if ($request->input('type') === 'krs') {
@@ -314,21 +363,24 @@ class SyncController extends Controller
             return $this->importAcademicProfile($request);
         }
 
-        if (!$request->hasFile('json_file')) {
+        // ── Import Jadwal Ruangan iGracias ───────────────────────────────────
+        if ($request->type === 'room_schedule') {
+            return $this->importRoomSchedule($request);
+        }
+
+        if (! $request->hasFile('json_file')) {
             return back()->with('error', 'Silakan unggah file JSON.');
         }
 
         $jsonString = file_get_contents($request->file('json_file')->getRealPath());
 
-
-
         $data = json_decode($jsonString, true);
 
-        if (json_last_error() !== JSON_ERROR_NONE || !is_array($data)) {
-            return back()->with('error', 'Format JSON tidak valid: ' . json_last_error_msg());
+        if (json_last_error() !== JSON_ERROR_NONE || ! is_array($data)) {
+            return back()->with('error', 'Format JSON tidak valid: '.json_last_error_msg());
         }
 
-        if ($request->type === 'krs' && \App\Support\OfficialKrsJsonNormalizer::supports($data)) {
+        if ($request->type === 'krs' && OfficialKrsJsonNormalizer::supports($data)) {
             return $this->importOfficialKrs($data, JsonSourceLocations::rows($jsonString));
         }
 
@@ -348,64 +400,67 @@ class SyncController extends Controller
         }
 
         // Handle case where root JSON is a single object instead of an array
-        if (!empty($data) && !isset($data[0])) {
+        if (! empty($data) && ! isset($data[0])) {
             $data = [$data];
         }
 
         $log = SyncLog::create([
-            'module'       => $request->type,
-            'status'       => 'processing',
+            'module' => $request->type,
+            'status' => 'processing',
             'triggered_by' => auth()->user()->email,
-            'started_at'   => now(),
+            'started_at' => now(),
         ]);
 
         try {
             $processed = 0;
-            $skipped   = 0;
+            $skipped = 0;
             $errors = [];
 
             foreach ($data as $index => $row) {
-                if (!is_array($row)) {
+                if (! is_array($row)) {
                     $skipped++;
                     $errors[] = "Baris #{$index}: Record harus berupa objek atau daftar JSON.";
+
                     continue;
                 }
 
-                $result = match($request->type) {
-                    'student'    => $this->importStudentRow($row),
+                $result = match ($request->type) {
+                    'student' => $this->importStudentRow($row),
                     'attendance' => $this->importAttendanceRow($row),
-                    'course'     => $this->importCourseRow($row),
+                    'course' => $this->importCourseRow($row),
                     'graduation' => $this->importGraduationRow($row),
-                    default      => false,
+                    default => false,
                 };
 
                 $result ? $processed++ : $skipped++;
-                if (!$result) $errors[] = "Baris #{$index}: ".$this->skippedImportReason($request->type, $row);
+                if (! $result) {
+                    $errors[] = "Baris #{$index}: ".$this->skippedImportReason($request->type, $row);
+                }
             }
 
             if ($request->type === 'course') {
                 try {
-                    \Illuminate\Support\Facades\Artisan::call('courses:sync-study-program');
+                    Artisan::call('courses:sync-study-program');
                 } catch (\Exception $e) {
-                    \Illuminate\Support\Facades\Log::warning("Failed to auto-sync study programs: " . $e->getMessage());
+                    Log::warning('Failed to auto-sync study programs: '.$e->getMessage());
                 }
             }
 
             $log->update([
-                'status'            => 'completed',
-                'total_records'     => count($data),
+                'status' => 'completed',
+                'total_records' => count($data),
                 'processed_records' => $processed,
-                'skipped_records'   => $skipped,
+                'skipped_records' => $skipped,
                 'issue_details' => SyncImportIssues::fromErrors($errors, $data, $locations, $request->type),
                 'error_message' => SyncImportIssues::summary($errors),
-                'completed_at'      => now(),
+                'completed_at' => now(),
             ]);
 
             $moduleLabels = [
-                'student'    => 'Profil Mahasiswa',
-                'krs'        => 'KRS Mahasiswa',
+                'student' => 'Profil Mahasiswa',
+                'krs' => 'KRS Mahasiswa',
                 'attendance' => 'Jadwal/Kehadiran Mahasiswa',
-                'course'     => 'Mata Kuliah',
+                'course' => 'Mata Kuliah',
                 'graduation' => 'Data Yudisium (iGracias & BASILA)',
             ];
 
@@ -415,7 +470,7 @@ class SyncController extends Controller
                 ->with('success', "Import {$label} selesai: {$processed} data berhasil diimpor, {$skipped} data dilewati.");
 
         } catch (\Throwable $e) {
-            Log::error("ImportJson [{$request->type}]: " . $e->getMessage());
+            Log::error("ImportJson [{$request->type}]: ".$e->getMessage());
 
             $message = $e instanceof \InvalidArgumentException ? $e->getMessage() : 'Penyimpanan data gagal; periksa format dan log aplikasi.';
             $errors[] = isset($index) ? "Baris #{$index}: {$message}" : $message;
@@ -430,18 +485,50 @@ class SyncController extends Controller
         }
     }
 
+    /**
+     * Import jadwal ruangan dari file JSON/TXT iGracias (data[] atau aaData).
+     * Logic ini dipindahkan dari RoomBookingController::import().
+     */
+    private function importRoomSchedule(Request $request)
+    {
+        $request->validate(['json_file' => ['required', 'file', 'mimes:json,txt', 'max:20480']]);
+        $contents = file_get_contents($request->file('json_file')->getRealPath());
+        $payload = json_decode($contents, true);
+        if (json_last_error() !== JSON_ERROR_NONE || ! is_array($payload)) {
+            return back()->withErrors(['json_file' => 'JSON tidak valid: '.json_last_error_msg()]);
+        }
+
+        $result = app(RoomScheduleImportService::class)->import(
+            $payload,
+            $request->user(),
+            $request->file('json_file')->getClientOriginalName()
+        );
+        if (! $result['successful']) {
+            return redirect()->route('sync.index')
+                ->withErrors(['json_file' => 'Import dibatalkan. Jadwal valid sebelumnya tetap dipakai.'])
+                ->with('import_errors', $result['errors']);
+        }
+
+        $message = ($result['mode'] ?? null) === 'weekly'
+            ? "Import {$result['imported']} pola mingguan ruangan berhasil untuk semester sumber."
+            : "Import {$result['imported']} jadwal tanggal tertentu berhasil. Sumber pola semester tetap perlu dilengkapi untuk pencarian Sidang TA.";
+
+        return redirect()->route('sync.index')->with('success', $message);
+    }
+
     private function previewFlatTermKrs(Request $request, array $payload, string $jsonString)
     {
         $root = isset($payload['data']) && is_array($payload['data']) ? 'data' : null;
         $rows = $root ? $payload['data'] : $payload;
-        if (!array_is_list($rows) || $rows === []) {
+        if (! array_is_list($rows) || $rows === []) {
             return back()->withErrors(['json_file' => 'Mode term memerlukan daftar objek KRS yang tidak kosong.']);
         }
-        $plans = app(\App\Services\FlatTermKrsImportService::class)->preview($rows);
-        $token = \Illuminate\Support\Str::random(48);
+        $plans = app(FlatTermKrsImportService::class)->preview($rows);
+        $token = Str::random(48);
         $request->session()->put('krs_term_preview', ['token' => $token, 'user_id' => auth()->id(),
             'expires_at' => now()->addMinutes(30)->timestamp, 'rows' => $rows, 'plans' => $plans,
             'locations' => JsonSourceLocations::rows($jsonString, $root)]);
+
         return response()->view('sync.krs-term-preview', compact('plans', 'token'));
     }
 
@@ -449,17 +536,19 @@ class SyncController extends Controller
     {
         $request->validate(['preview_token' => ['required', 'string'], 'confirmed' => ['accepted']]);
         $preview = $request->session()->get('krs_term_preview');
-        if (!$preview || $preview['user_id'] !== auth()->id() || $preview['expires_at'] < now()->timestamp
-            || !hash_equals($preview['token'], $request->input('preview_token'))) {
+        if (! $preview || $preview['user_id'] !== auth()->id() || $preview['expires_at'] < now()->timestamp
+            || ! hash_equals($preview['token'], $request->input('preview_token'))) {
             return back()->withErrors(['preview_token' => 'Pratinjau tidak berlaku. Unggah ulang dan tinjau KRS terlebih dahulu.']);
         }
         try {
-            $result = app(\App\Services\FlatTermKrsImportService::class)->apply($preview['rows'], $preview['plans']);
+            $result = app(FlatTermKrsImportService::class)->apply($preview['rows'], $preview['plans']);
         } catch (\InvalidArgumentException $exception) {
             $request->session()->forget('krs_term_preview');
+
             return redirect()->route('sync.index')->withErrors(['preview_token' => $exception->getMessage()]);
         } catch (\Throwable $exception) {
             Log::warning('Flat term KRS import rolled back', ['exception' => $exception::class]);
+
             return redirect()->route('sync.index')->with('error', 'Penyimpanan KRS dibatalkan. Periksa data lalu unggah ulang.');
         }
         $request->session()->forget('krs_term_preview');
@@ -468,13 +557,14 @@ class SyncController extends Controller
             'triggered_by' => auth()->user()->email, 'started_at' => now(), 'completed_at' => now(),
             'error_message' => SyncImportIssues::summary($result['errors']),
             'issue_details' => SyncImportIssues::fromErrors($result['errors'], $preview['rows'], $preview['locations'], 'krs')]);
+
         return redirect()->route('sync.index')->with('success', "Import KRS selesai: {$result['processed']} disimpan, {$result['repaired']} tautan diperbaiki, {$result['skipped']} dilewati.");
     }
 
     private function importOfficialKrs(array $payload, array $locations = [])
     {
         try {
-            $rows = (new \App\Support\OfficialKrsJsonNormalizer)->rows($payload);
+            $rows = (new OfficialKrsJsonNormalizer)->rows($payload);
         } catch (\InvalidArgumentException $exception) {
             return back()->withErrors(['json_file' => $exception->getMessage()]);
         }
@@ -483,7 +573,7 @@ class SyncController extends Controller
             'triggered_by' => auth()->user()->email, 'started_at' => now(),
         ]);
         try {
-            $result = app(\App\Services\OfficialKrsJsonImportService::class)->import($rows);
+            $result = app(OfficialKrsJsonImportService::class)->import($rows);
             $skipped = $result['skipped'] + $result['mismatched'];
             $log->update([
                 'status' => 'completed', 'processed_records' => $result['processed'],
@@ -495,32 +585,46 @@ class SyncController extends Controller
             $message = "Import KRS resmi selesai: {$result['processed']} mahasiswa diproses, "
                 ."{$result['courses']} entri mata kuliah disimpan, {$result['skipped']} dilewati, "
                 ."{$result['mismatched']} NIM-nama mismatch, {$result['removed']} KRS lama pada periode terkait dihapus.";
-            if ($result['errors'] !== []) $message .= ' Ada catatan pada log sinkronisasi.';
+            if ($result['errors'] !== []) {
+                $message .= ' Ada catatan pada log sinkronisasi.';
+            }
+
             return redirect()->route('sync.index')->with('success', $message);
         } catch (\Throwable $exception) {
             Log::warning('Official KRS import failed', ['exception' => $exception::class]);
             $log->update(['status' => 'failed', 'error_message' => 'Import KRS resmi gagal.', 'completed_at' => now()]);
+
             return back()->with('error', 'Import KRS resmi gagal. Periksa log aplikasi.');
         }
     }
 
     private function skippedImportReason(string $type, array $row): string
     {
-        if ($type === 'course') return 'Kode mata kuliah kosong; record dilewati.';
+        if ($type === 'course') {
+            return 'Kode mata kuliah kosong; record dilewati.';
+        }
         $nim = $row['nim'] ?? $row['student_number'] ?? ($type === 'krs' ? ($row[0] ?? null) : null);
-        if (empty($nim)) return 'NIM kosong; record dilewati.';
+        if (empty($nim)) {
+            return 'NIM kosong; record dilewati.';
+        }
         if (in_array($type, ['krs', 'attendance'], true)) {
             $code = $row['kode_matakuliah'] ?? $row['course_code'] ?? null;
-            if (empty($code)) return 'Kode mata kuliah kosong; record dilewati.';
+            if (empty($code)) {
+                return 'Kode mata kuliah kosong; record dilewati.';
+            }
+
             return 'Mahasiswa belum terdaftar; impor profil mahasiswa terlebih dahulu.';
         }
+
         return 'Record tidak dapat diimpor; periksa nilai wajib.';
     }
 
     private function importStudentRow(array $row): bool
     {
         $nim = $row['nim'] ?? $row['student_number'] ?? null;
-        if (empty($nim)) return false;
+        if (empty($nim)) {
+            return false;
+        }
 
         $entryYearSuffix = '';
         if (strlen($nim) === 10) {
@@ -530,23 +634,23 @@ class SyncController extends Controller
         } else {
             $entryYearSuffix = substr($nim, 4, 2);
         }
-        $studentAcademicYear = '20' . $entryYearSuffix;
-        if (!is_numeric($studentAcademicYear) || (int)$studentAcademicYear < 2000 || (int)$studentAcademicYear > 2090) {
+        $studentAcademicYear = '20'.$entryYearSuffix;
+        if (! is_numeric($studentAcademicYear) || (int) $studentAcademicYear < 2000 || (int) $studentAcademicYear > 2090) {
             $studentAcademicYear = date('Y');
         }
 
         Student::updateOrCreate(
             ['student_number' => $nim],
             [
-                'name'              => $row['nama_siswa']        ?? $row['name']          ?? $row['nama'] ?? '',
-                'gender'            => $row['kelamin']           ?? $row['gender']        ?? $row['jenis_kelamin'] ?? null,
-                'religion'          => $row['agama']             ?? $row['religion']      ?? null,
-                'study_program'     => $row['prodi']             ?? $row['study_program'] ?? $row['program_studi'] ?? '',
-                'class_name'        => $row['kelas']             ?? $row['class_name']    ?? null,
-                'academic_year'     => $row['academic_year']     ?? $row['tahun_akademik'] ?? (int)$studentAcademicYear,
-                'active_semester'   => $row['active_semester']   ?? $row['semester_aktif'] ?? 1,
-                'email'             => $row['email']             ?? null,
-                'status'            => 'Aktif',
+                'name' => $row['nama_siswa'] ?? $row['name'] ?? $row['nama'] ?? '',
+                'gender' => $row['kelamin'] ?? $row['gender'] ?? $row['jenis_kelamin'] ?? null,
+                'religion' => $row['agama'] ?? $row['religion'] ?? null,
+                'study_program' => $row['prodi'] ?? $row['study_program'] ?? $row['program_studi'] ?? '',
+                'class_name' => $row['kelas'] ?? $row['class_name'] ?? null,
+                'academic_year' => $row['academic_year'] ?? $row['tahun_akademik'] ?? (int) $studentAcademicYear,
+                'active_semester' => $row['active_semester'] ?? $row['semester_aktif'] ?? 1,
+                'email' => $row['email'] ?? null,
+                'status' => 'Aktif',
             ]
         );
 
@@ -557,11 +661,15 @@ class SyncController extends Controller
     {
         $nim = $row['nim'] ?? $row['student_number'] ?? null;
         $courseCode = $row['kode_matakuliah'] ?? $row['course_code'] ?? null;
-        if (empty($nim) || empty($courseCode)) return false;
+        if (empty($nim) || empty($courseCode)) {
+            return false;
+        }
 
-        if (!Student::where('student_number', $nim)->exists()) return false;
+        if (! Student::where('student_number', $nim)->exists()) {
+            return false;
+        }
 
-        if (!Course::where('course_code', $courseCode)->exists()) {
+        if (! Course::where('course_code', $courseCode)->exists()) {
             $sem = (int) ($row['semester'] ?? 1);
             $acadYear = $row['academic_year'] ?? $row['tahun_akademik'] ?? null;
             $semesterTerm = ($sem % 2 === 0) ? 'GENAP' : 'GANJIL';
@@ -569,21 +677,21 @@ class SyncController extends Controller
                 [
                     'academic_year' => $acadYear,
                     'semester_term' => $semesterTerm,
-                    'course_code'   => $courseCode,
+                    'course_code' => $courseCode,
                 ],
                 [
-                    'name'          => $row['nama_matakuliah'] ?? $row['course_name'] ?? $courseCode,
+                    'name' => $row['nama_matakuliah'] ?? $row['course_name'] ?? $courseCode,
                     'study_program' => substr($row['prodi'] ?? 'Umum', 0, 50),
-                    'class'         => substr($row['kelas'] ?? '-', 0, 10),
-                    'semester'      => $sem,
-                    'credits'       => 3,
-                    'type'          => 'Wajib',
-                    'status'        => 'Aktif',
+                    'class' => substr($row['kelas'] ?? '-', 0, 10),
+                    'semester' => $sem,
+                    'credits' => 3,
+                    'type' => 'Wajib',
+                    'status' => 'Aktif',
                 ]
             );
         }
 
-        if (!Course::where('course_code', $courseCode)->exists()) {
+        if (! Course::where('course_code', $courseCode)->exists()) {
             $sem = (int) ($row['semester'] ?? 1);
             $acadYear = $row['academic_year'] ?? $row['tahun_akademik'] ?? null;
             $semesterTerm = ($sem % 2 === 0) ? 'GENAP' : 'GANJIL';
@@ -591,34 +699,35 @@ class SyncController extends Controller
                 [
                     'academic_year' => $acadYear,
                     'semester_term' => $semesterTerm,
-                    'course_code'   => $courseCode,
+                    'course_code' => $courseCode,
                 ],
                 [
-                    'name'          => $row['nama_matakuliah'] ?? $row['course_name'] ?? $courseCode,
+                    'name' => $row['nama_matakuliah'] ?? $row['course_name'] ?? $courseCode,
                     'study_program' => substr($row['prodi'] ?? 'Umum', 0, 50),
-                    'class'         => substr($row['kelas'] ?? '-', 0, 10),
-                    'semester'      => $sem,
-                    'credits'       => 3,
-                    'type'          => 'Wajib',
-                    'status'        => 'Aktif',
+                    'class' => substr($row['kelas'] ?? '-', 0, 10),
+                    'semester' => $sem,
+                    'credits' => 3,
+                    'type' => 'Wajib',
+                    'status' => 'Aktif',
                 ]
             );
         }
 
         StudentAttendance::updateOrCreate(
             [
-                'student_number'  => $nim,
-                'course_code'     => $courseCode,
-                'academic_year'   => $row['academic_year']  ?? $row['tahun_akademik'] ?? '',
-                'semester'        => $row['semester']       ?? 1,
+                'student_number' => $nim,
+                'course_code' => $courseCode,
+                'academic_year' => $row['academic_year'] ?? $row['tahun_akademik'] ?? '',
+                'semester' => $row['semester'] ?? 1,
             ],
             [
-                'course_name'     => $row['nama_matakuliah'] ?? $row['course_name'] ?? '',
-                'class'           => $row['kelas']            ?? $row['class']       ?? null,
-                'attended_count'  => $row['jumlah_hadir']     ?? $row['attended_count'] ?? 0,
-                'meetings_count'  => $row['jumlah_pertemuan'] ?? $row['meetings_count'] ?? 0,
+                'course_name' => $row['nama_matakuliah'] ?? $row['course_name'] ?? '',
+                'class' => $row['kelas'] ?? $row['class'] ?? null,
+                'attended_count' => $row['jumlah_hadir'] ?? $row['attended_count'] ?? 0,
+                'meetings_count' => $row['jumlah_pertemuan'] ?? $row['meetings_count'] ?? 0,
             ]
         );
+
         return true;
     }
 
@@ -627,13 +736,15 @@ class SyncController extends Controller
         // ── Format flat array (aaData dari DataTables iGracias) ───────────────
         if (isset($row[0])) {
             $courseCode = $row[1] ?? null;
-            if (empty($courseCode)) return false;
+            if (empty($courseCode)) {
+                return false;
+            }
 
             // Index 14 di flat format menyimpan academic_year (contoh: "2425" → "2024/2025")
             $academicYearRaw = $row[14] ?? '';
-            $academicYear    = $academicYearRaw;
+            $academicYear = $academicYearRaw;
             if (strlen($academicYear) === 4 && is_numeric($academicYear)) {
-                $academicYear = '20' . substr($academicYear, 0, 2) . '/20' . substr($academicYear, 2, 2);
+                $academicYear = '20'.substr($academicYear, 0, 2).'/20'.substr($academicYear, 2, 2);
             }
 
             $semesterTerm = $row[13] ?? null;
@@ -646,31 +757,31 @@ class SyncController extends Controller
                 [
                     'academic_year' => $academicYear ?: null,
                     'semester_term' => $semesterTerm,
-                    'course_code'   => $courseCode,
+                    'course_code' => $courseCode,
                 ],
                 [
                     'academic_year' => $academicYear ?: null,
                     'semester_term' => $semesterTerm,
-                    'course_code'   => $courseCode,
+                    'course_code' => $courseCode,
                 ],
                 [
-                    'course_id'       => $row[0]  ?? null,
-                    'name'            => $row[2]  ?? '',
-                    'study_program'   => 'Umum',
-                    'class'           => substr($row[3] ?? '', 0, 10),
-                    'semester'        => is_numeric($row[6] ?? null)
+                    'course_id' => $row[0] ?? null,
+                    'name' => $row[2] ?? '',
+                    'study_program' => 'Umum',
+                    'class' => substr($row[3] ?? '', 0, 10),
+                    'semester' => is_numeric($row[6] ?? null)
                                             ? (int) $row[6]
                                             : (strtoupper($semesterTerm ?? '') === 'GENAP' ? 2 : 1),
-                    'semester_term'   => $semesterTerm,
+                    'semester_term' => $semesterTerm,
 
-                    'academic_year'   => $academicYear ?: null,
-                    'credits'         => is_numeric($row[4] ?? null) ? (int) $row[4] : 3,
+                    'academic_year' => $academicYear ?: null,
+                    'credits' => is_numeric($row[4] ?? null) ? (int) $row[4] : 3,
                     // enrolled_count TIDAK disimpan — kolom sudah dihapus dari tabel courses.
                     // Gunakan $course->enrolled_count accessor yang menghitung dari student_courses.
-                    'status_dosen'    => $row[11] ?? null,
+                    'status_dosen' => $row[11] ?? null,
                     'learning_method' => $row[18] ?? null,
-                    'type'            => 'Wajib',
-                    'status'          => 'Aktif',
+                    'type' => 'Wajib',
+                    'status' => 'Aktif',
                 ]
             );
 
@@ -689,12 +800,16 @@ class SyncController extends Controller
             if ($teamCode !== '') {
                 $teams = array_filter(array_map('trim', explode(',', $teamCode)));
                 foreach ($teams as $tc) {
-                    if ($tc === '') continue; // skip string kosong
-                    if (!Lecturer::where('lecturer_code', $tc)->exists()) continue;
+                    if ($tc === '') {
+                        continue;
+                    } // skip string kosong
+                    if (! Lecturer::where('lecturer_code', $tc)->exists()) {
+                        continue;
+                    }
                     CourseLecturer::firstOrCreate([
-                        'course_code'   => $courseCode,
+                        'course_code' => $courseCode,
                         'lecturer_code' => $tc,
-                        'role'          => 'team_member',
+                        'role' => 'team_member',
                     ]);
                 }
             }
@@ -705,7 +820,9 @@ class SyncController extends Controller
 
         // ── Format associative array ──────────────────────────────────────────
         $courseCode = $row['course_code'] ?? $row['kode_matakuliah'] ?? null;
-        if (empty($courseCode)) return false;
+        if (empty($courseCode)) {
+            return false;
+        }
 
         $academicYear = $row['academic_year'] ?? $row['tahun_akademik'] ?? null;
         $semesterTerm = $row['semester_term'] ?? null;
@@ -717,28 +834,28 @@ class SyncController extends Controller
             [
                 'academic_year' => $academicYear,
                 'semester_term' => $semesterTerm,
-                'course_code'   => $courseCode,
+                'course_code' => $courseCode,
             ],
             [
                 'academic_year' => $academicYear,
                 'semester_term' => $semesterTerm,
-                'course_code'   => $courseCode,
+                'course_code' => $courseCode,
             ],
             [
-                'course_id'       => $row['course_id']       ?? null,
-                'name'            => $row['name']            ?? $row['nama_matakuliah'] ?? '',
-                'study_program'   => substr($row['study_program'] ?? $row['prodi'] ?? 'Umum', 0, 50),
-                'class'           => substr($row['class']         ?? $row['kelas'] ?? '', 0, 10),
-                'semester'        => (int) ($row['semester']      ?? 1),
-                'semester_term'   => $semesterTerm,
-                'semester_term'   => $semesterTerm,
-                'academic_year'   => $academicYear,
-                'credits'         => (int) ($row['credits']       ?? $row['sks'] ?? 3),
+                'course_id' => $row['course_id'] ?? null,
+                'name' => $row['name'] ?? $row['nama_matakuliah'] ?? '',
+                'study_program' => substr($row['study_program'] ?? $row['prodi'] ?? 'Umum', 0, 50),
+                'class' => substr($row['class'] ?? $row['kelas'] ?? '', 0, 10),
+                'semester' => (int) ($row['semester'] ?? 1),
+                'semester_term' => $semesterTerm,
+                'semester_term' => $semesterTerm,
+                'academic_year' => $academicYear,
+                'credits' => (int) ($row['credits'] ?? $row['sks'] ?? 3),
                 // enrolled_count TIDAK disimpan — gunakan accessor dinamis.
-                'status_dosen'    => $row['status_dosen']    ?? null,
+                'status_dosen' => $row['status_dosen'] ?? null,
                 'learning_method' => $row['learning_method'] ?? $row['metode_pembelajaran'] ?? null,
-                'type'            => $row['type']            ?? 'Wajib',
-                'status'          => $row['status']          ?? 'Aktif',
+                'type' => $row['type'] ?? 'Wajib',
+                'status' => $row['status'] ?? 'Aktif',
             ]
         );
 
@@ -754,12 +871,16 @@ class SyncController extends Controller
         if ($teamCode !== '') {
             $teams = array_filter(array_map('trim', explode(',', $teamCode)));
             foreach ($teams as $tc) {
-                if ($tc === '') continue;
-                if (!Lecturer::where('lecturer_code', $tc)->exists()) continue;
+                if ($tc === '') {
+                    continue;
+                }
+                if (! Lecturer::where('lecturer_code', $tc)->exists()) {
+                    continue;
+                }
                 CourseLecturer::firstOrCreate([
-                    'course_code'   => $courseCode,
+                    'course_code' => $courseCode,
                     'lecturer_code' => $tc,
-                    'role'          => 'team_member',
+                    'role' => 'team_member',
                 ]);
             }
         }
@@ -778,7 +899,7 @@ class SyncController extends Controller
         ]);
         $source = file_get_contents($request->file('json_file')->getRealPath());
         $payload = json_decode($source, true);
-        if (json_last_error() !== JSON_ERROR_NONE || !is_array($payload)) {
+        if (json_last_error() !== JSON_ERROR_NONE || ! is_array($payload)) {
             return back()->withErrors(['json_file' => 'Format JSON tidak valid.']);
         }
 
@@ -786,10 +907,14 @@ class SyncController extends Controller
         unset($source);
         $wrapped = array_key_exists('data', $payload);
         $data = $wrapped ? $payload['data'] : $payload;
-        if (!is_array($data)) return back()->withErrors(['json_file' => 'Data profil harus berupa array.']);
-        if (!array_is_list($data)) $data = [$data];
+        if (! is_array($data)) {
+            return back()->withErrors(['json_file' => 'Data profil harus berupa array.']);
+        }
+        if (! array_is_list($data)) {
+            $data = [$data];
+        }
         $context = $wrapped ? array_intersect_key($payload, array_flip(['selected_menus', 'finance_period'])) : [];
-        $context = \Illuminate\Support\Facades\Validator::make($context, [
+        $context = Validator::make($context, [
             'selected_menus' => ['sometimes', 'array', 'list'],
             'selected_menus.*' => ['required', 'string'],
             'finance_period' => ['sometimes', 'nullable', 'string', 'regex:/^\d{4}\/[12]$/D'],
@@ -814,11 +939,15 @@ class SyncController extends Controller
             ]);
             $message = "Import Profil Akademik selesai: {$result['created']} baru, {$result['updated']} diperbarui, "
                 ."{$result['skipped']} dilewati, {$result['mismatched']} NIM-nama mismatch.";
-            if ($result['errors'] !== []) $message .= ' Ada catatan pada log sinkronisasi.';
+            if ($result['errors'] !== []) {
+                $message .= ' Ada catatan pada log sinkronisasi.';
+            }
+
             return redirect()->route('sync.index')->with('success', $message);
         } catch (\Throwable $exception) {
             Log::warning('ImportAcademicProfile failed', ['exception' => $exception::class]);
             $log->update(['status' => 'failed', 'error_message' => 'Import profil akademik gagal.', 'completed_at' => now()]);
+
             return back()->with('error', 'Import profil akademik gagal. Periksa format dan log aplikasi.');
         }
     }
@@ -826,7 +955,9 @@ class SyncController extends Controller
     private function importGraduationRow(array $row): bool
     {
         $nim = $row['nim'] ?? $row['student_number'] ?? null;
-        if (empty($nim)) return false;
+        if (empty($nim)) {
+            return false;
+        }
 
         $failedCourses = $row['failed_courses'] ?? $row['mk_belum_lulus'] ?? null;
         if (is_string($failedCourses)) {
@@ -839,7 +970,7 @@ class SyncController extends Controller
         }
 
         $photoStatus = $row['ibasila_photo_approval_status'] ?? $row['status_foto_ibasila'] ?? 'pending';
-        if (!in_array($photoStatus, ['pending', 'approved', 'rejected'])) {
+        if (! in_array($photoStatus, ['pending', 'approved', 'rejected'])) {
             $photoStatus = 'pending';
         }
 
@@ -850,53 +981,51 @@ class SyncController extends Controller
             $level3Status = 'not_passed';
         }
 
-        $activePeriod = \App\Models\GraduationPeriod::where('is_active', true)->value('name') ?? (date('Y') . '/' . (date('Y')+1));
+        $activePeriod = GraduationPeriod::where('is_active', true)->value('name') ?? (date('Y').'/'.(date('Y') + 1));
 
         $updateData = array_filter([
-            'student_name'                  => $row['student_name'] ?? $row['nama'] ?? null,
-            'graduation_period'             => $row['graduation_period'] ?? $row['periode_yudisium'] ?? $activePeriod,
-            'study_program'                 => $row['study_program'] ?? $row['prodi'] ?? null,
-            'student_email'                 => $row['student_email'] ?? $row['email'] ?? null,
-            'academic_advisor_name'         => $row['academic_advisor_name'] ?? $row['dosen_wali_nama'] ?? null,
-            'academic_advisor_code'         => $row['academic_advisor_code'] ?? $row['dosen_wali_kode'] ?? null,
-            'thesis_title_id'               => $row['thesis_title_id'] ?? $row['judul_ta_id'] ?? null,
-            'thesis_title_en'               => $row['thesis_title_en'] ?? $row['judul_ta_en'] ?? null,
-            'advisor_1_code'                => $row['advisor_1_code'] ?? $row['pembimbing_1_kode'] ?? null,
-            'advisor_1_name'                => $row['advisor_1_name'] ?? $row['pembimbing_1_nama'] ?? null,
-            'advisor_2_code'                => $row['advisor_2_code'] ?? $row['pembimbing_2_kode'] ?? null,
-            'advisor_2_name'                => $row['advisor_2_name'] ?? $row['pembimbing_2_nama'] ?? null,
-            'examiner_1_code'               => $row['examiner_1_code'] ?? $row['penguji_1_kode'] ?? null,
-            'examiner_1_name'               => $row['examiner_1_name'] ?? $row['penguji_1_nama'] ?? null,
-            'examiner_2_code'               => $row['examiner_2_code'] ?? $row['penguji_2_kode'] ?? null,
-            'examiner_2_name'               => $row['examiner_2_name'] ?? $row['penguji_2_nama'] ?? null,
-            'examiner_3_code'               => $row['examiner_3_code'] ?? $row['penguji_3_kode'] ?? null,
-            'examiner_3_name'               => $row['examiner_3_name'] ?? $row['penguji_3_nama'] ?? null,
-            'tak_score'                     => isset($row['tak_score']) ? (int)$row['tak_score'] : (isset($row['total_tak']) ? (int)$row['total_tak'] : null),
-            'eprt_score'                    => isset($row['eprt_score']) ? (float)$row['eprt_score'] : (isset($row['skor_eprt']) ? (float)$row['skor_eprt'] : null),
-            'gpa'                           => isset($row['gpa']) ? (float)$row['gpa'] : (isset($row['ipk']) ? (float)$row['ipk'] : null),
-            'passed_credits'                => isset($row['passed_credits']) ? (int)$row['passed_credits'] : (isset($row['sks_lulus']) ? (int)$row['sks_lulus'] : null),
-            'remaining_credits_db'          => isset($row['remaining_credits_db']) ? (int)$row['remaining_credits_db'] : (isset($row['sks_belum_lulus']) ? (int)$row['sks_belum_lulus'] : null),
-            'active_semester_db'            => isset($row['active_semester_db']) ? (int)$row['active_semester_db'] : (isset($row['semester_aktif']) ? (int)$row['semester_aktif'] : null),
-            'payment_status'                => $row['payment_status'] ?? $row['status_keuangan'] ?? null,
-            'thesis_grade_index'            => $row['thesis_grade_index'] ?? $row['indeks_nilai_ta'] ?? null,
-            'exam_date'                     => $row['exam_date'] ?? $row['tgl_sidang'] ?? null,
+            'student_name' => $row['student_name'] ?? $row['nama'] ?? null,
+            'graduation_period' => $row['graduation_period'] ?? $row['periode_yudisium'] ?? $activePeriod,
+            'study_program' => $row['study_program'] ?? $row['prodi'] ?? null,
+            'student_email' => $row['student_email'] ?? $row['email'] ?? null,
+            'academic_advisor_name' => $row['academic_advisor_name'] ?? $row['dosen_wali_nama'] ?? null,
+            'academic_advisor_code' => $row['academic_advisor_code'] ?? $row['dosen_wali_kode'] ?? null,
+            'thesis_title_id' => $row['thesis_title_id'] ?? $row['judul_ta_id'] ?? null,
+            'thesis_title_en' => $row['thesis_title_en'] ?? $row['judul_ta_en'] ?? null,
+            'advisor_1_code' => $row['advisor_1_code'] ?? $row['pembimbing_1_kode'] ?? null,
+            'advisor_1_name' => $row['advisor_1_name'] ?? $row['pembimbing_1_nama'] ?? null,
+            'advisor_2_code' => $row['advisor_2_code'] ?? $row['pembimbing_2_kode'] ?? null,
+            'advisor_2_name' => $row['advisor_2_name'] ?? $row['pembimbing_2_nama'] ?? null,
+            'examiner_1_code' => $row['examiner_1_code'] ?? $row['penguji_1_kode'] ?? null,
+            'examiner_1_name' => $row['examiner_1_name'] ?? $row['penguji_1_nama'] ?? null,
+            'examiner_2_code' => $row['examiner_2_code'] ?? $row['penguji_2_kode'] ?? null,
+            'examiner_2_name' => $row['examiner_2_name'] ?? $row['penguji_2_nama'] ?? null,
+            'examiner_3_code' => $row['examiner_3_code'] ?? $row['penguji_3_kode'] ?? null,
+            'examiner_3_name' => $row['examiner_3_name'] ?? $row['penguji_3_nama'] ?? null,
+            'tak_score' => isset($row['tak_score']) ? (int) $row['tak_score'] : (isset($row['total_tak']) ? (int) $row['total_tak'] : null),
+            'eprt_score' => isset($row['eprt_score']) ? (float) $row['eprt_score'] : (isset($row['skor_eprt']) ? (float) $row['skor_eprt'] : null),
+            'gpa' => isset($row['gpa']) ? (float) $row['gpa'] : (isset($row['ipk']) ? (float) $row['ipk'] : null),
+            'passed_credits' => isset($row['passed_credits']) ? (int) $row['passed_credits'] : (isset($row['sks_lulus']) ? (int) $row['sks_lulus'] : null),
+            'remaining_credits_db' => isset($row['remaining_credits_db']) ? (int) $row['remaining_credits_db'] : (isset($row['sks_belum_lulus']) ? (int) $row['sks_belum_lulus'] : null),
+            'active_semester_db' => isset($row['active_semester_db']) ? (int) $row['active_semester_db'] : (isset($row['semester_aktif']) ? (int) $row['semester_aktif'] : null),
+            'payment_status' => $row['payment_status'] ?? $row['status_keuangan'] ?? null,
+            'thesis_grade_index' => $row['thesis_grade_index'] ?? $row['indeks_nilai_ta'] ?? null,
+            'exam_date' => $row['exam_date'] ?? $row['tgl_sidang'] ?? null,
             'ibasila_photo_approval_status' => $photoStatus,
-            'level_3_exam_status'           => $level3Status,
-            'failed_courses'                => $failedCourses,
-            'retaken_courses'               => $retakenCourses,
-            'last_synced_at'                => now(),
-            'json_imported_at'              => now(),
-        ], fn($v) => !is_null($v));
+            'level_3_exam_status' => $level3Status,
+            'failed_courses' => $failedCourses,
+            'retaken_courses' => $retakenCourses,
+            'last_synced_at' => now(),
+            'json_imported_at' => now(),
+        ], fn ($v) => ! is_null($v));
 
-        \App\Models\GraduationRegistration::updateOrCreate(
+        GraduationRegistration::updateOrCreate(
             ['student_number' => $nim],
             $updateData
         );
 
         return true;
     }
-
-
 
     /**
      * jumlah record semua entitas yang menjadi target scraping.
@@ -918,6 +1047,7 @@ class SyncController extends Controller
             ['key' => 'ta_grade',        'label' => 'Nilai TA',        'count' => StudentFinalProjectGrade::count()],
             ['key' => 'course_issues',   'label' => 'MK Issue',        'count' => StudentCourseIssue::count()],
             ['key' => 'bpp',             'label' => 'BPP',             'count' => StudentBppPayment::count()],
+            ['key' => 'room_schedules',  'label' => 'Jadwal iGracias', 'count' => DB::table('room_schedules')->where('source', 'igracias')->count() + RoomWeeklyPattern::count()],
         ];
     }
 }

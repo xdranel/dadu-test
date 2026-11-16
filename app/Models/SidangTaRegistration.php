@@ -2,11 +2,12 @@
 
 namespace App\Models;
 
+use App\Support\SidangTaMeetRequirements;
 use Illuminate\Database\Eloquent\Model;
 
 class SidangTaRegistration extends Model
 {
-    public const DOCUMENT_TYPES = \App\Support\SidangTaMeetRequirements::LABELS;
+    public const DOCUMENT_TYPES = SidangTaMeetRequirements::LABELS;
 
     public const DOCUMENT_DESCRIPTIONS = [
         'ta_data_capture' => 'Ambil dari menu TA/PA di iGracias.',
@@ -45,6 +46,11 @@ class SidangTaRegistration extends Model
         'reviewed_at' => 'datetime',
         'lock_version' => 'integer',
     ];
+
+    public function roomSchedule()
+    {
+        return $this->hasOne(SidangTaSchedule::class, 'sidang_ta_registration_id');
+    }
 
     public function period()
     {

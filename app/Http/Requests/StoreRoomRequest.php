@@ -22,10 +22,12 @@ class StoreRoomRequest extends FormRequest
     {
         return [
             'room_code' => ['required', 'string', 'max:20', 'unique:rooms,room_code'],
-            'name'      => ['required', 'string', 'max:255'],
-            'building'  => ['required', 'string', 'max:100'],
-            'capacity'  => ['required', 'integer', 'min:1', 'max:1000'],
-            'status'    => ['required', Rule::in(['Dapat Dipakai', 'Tidak Dapat Dipakai'])],
+            'name' => ['required', 'string', 'max:255'],
+            'building' => ['required', 'string', 'max:100'],
+            'capacity' => ['required', 'integer', 'min:1', 'max:1000'],
+            'is_classroom' => ['nullable', 'boolean'],
+            'igracias_aliases' => ['nullable', 'string', 'max:5000'],
+            'status' => ['required', Rule::in(['Dapat Dipakai', 'Tidak Dapat Dipakai'])],
         ];
     }
 
@@ -33,7 +35,7 @@ class StoreRoomRequest extends FormRequest
     {
         $this->merge([
             'room_code' => strtoupper(trim($this->room_code)),
-            'name'      => trim($this->name),
+            'name' => trim($this->name),
         ]);
     }
 }

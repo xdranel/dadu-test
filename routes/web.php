@@ -1,30 +1,47 @@
 <?php
 
-use App\Http\Controllers\Auth\SsoController;
+use App\Http\Controllers\AcademicPeriodController;
+use App\Http\Controllers\Admin\GradeAppealPeriodController;
+use App\Http\Controllers\Admin\GraduationPeriodController;
+use App\Http\Controllers\Admin\ModulePermissionController;
+use App\Http\Controllers\Admin\QueueHistoryController;
+use App\Http\Controllers\Admin\SidangTaExecutionController;
 use App\Http\Controllers\Admin\SidangTaFormGuideController;
+use App\Http\Controllers\Auth\ForgotPasswordController;
+use App\Http\Controllers\Auth\PasswordController;
+use App\Http\Controllers\Auth\SsoController;
 use App\Http\Controllers\CourseController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DocumentCategoryController;
 use App\Http\Controllers\DocumentController;
 use App\Http\Controllers\ExamScheduleController;
+use App\Http\Controllers\GradeAppealController;
+use App\Http\Controllers\GraduationRegistrationController;
+use App\Http\Controllers\GraduationRegistrationDocumentController;
 use App\Http\Controllers\KrsController;
 use App\Http\Controllers\LecturerController;
 use App\Http\Controllers\ManualUserController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\PublicDocumentController;
+use App\Http\Controllers\QueueController;
 use App\Http\Controllers\RoleController;
+use App\Http\Controllers\RoleSwitchController;
+use App\Http\Controllers\RoomBookingController;
 use App\Http\Controllers\RoomController;
 use App\Http\Controllers\SearchController;
+use App\Http\Controllers\SidangTaBookingController;
 use App\Http\Controllers\SidangTaDraftController;
 use App\Http\Controllers\SidangTaRegistrationController;
+use App\Http\Controllers\StudentAcademicDataController;
 use App\Http\Controllers\StudentController;
 use App\Http\Controllers\StudentCourseController;
 use App\Http\Controllers\SyncController;
-use App\Http\Controllers\GradeAppealController;
-use App\Http\Controllers\GraduationRegistrationController;
-use App\Http\Controllers\GraduationRegistrationDocumentController;
 use App\Http\Controllers\UserRoleController;
+use App\Models\Document;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Str;
 
 /**
  * Register a resource route with granular Spatie permissions.
@@ -57,14 +74,14 @@ Route::middleware('guest')->group(function () {
     Route::post('/auth/login-proses', [SsoController::class, 'loginApi'])->name('sso.api.login');
 
     // Forgot Password (Self-Service Reset)
-    Route::get('/forgot-password', [App\Http\Controllers\Auth\ForgotPasswordController::class, 'showStep1'])
+    Route::get('/forgot-password', [ForgotPasswordController::class, 'showStep1'])
         ->name('forgot-password.step1');
-    Route::post('/forgot-password/verify', [App\Http\Controllers\Auth\ForgotPasswordController::class, 'submitStep1'])
+    Route::post('/forgot-password/verify', [ForgotPasswordController::class, 'submitStep1'])
         ->middleware('throttle:3,15')
         ->name('forgot-password.verify');
-    Route::get('/forgot-password/reset', [App\Http\Controllers\Auth\ForgotPasswordController::class, 'showStep2'])
+    Route::get('/forgot-password/reset', [ForgotPasswordController::class, 'showStep2'])
         ->name('forgot-password.step2');
-    Route::post('/forgot-password/reset', [App\Http\Controllers\Auth\ForgotPasswordController::class, 'submitStep2'])
+    Route::post('/forgot-password/reset', [ForgotPasswordController::class, 'submitStep2'])
         ->middleware('throttle:3,15')
         ->name('forgot-password.reset');
 
@@ -75,9 +92,9 @@ Route::middleware('guest')->group(function () {
 
 // Force Change Password (harus di luar middleware password.changed agar bisa diakses)
 Route::middleware('auth')->group(function () {
-    Route::get('/password/force-change', [App\Http\Controllers\Auth\PasswordController::class, 'forceChange'])
+    Route::get('/password/force-change', [PasswordController::class, 'forceChange'])
         ->name('password.force-change');
-    Route::post('/password/force-change', [App\Http\Controllers\Auth\PasswordController::class, 'forceChangeUpdate'])
+    Route::post('/password/force-change', [PasswordController::class, 'forceChangeUpdate'])
         ->name('password.force-change.update');
 });
 
@@ -93,7 +110,7 @@ Route::prefix('public-documents')->name('public_documents.')->group(function () 
 // Protected routes (auth required, not under /dashboard)
 Route::middleware(['auth', 'password.changed'])->group(function () {
     Route::post('/logout', [SsoController::class, 'logout'])->name('logout');
-    Route::post('/switch-role', [\App\Http\Controllers\RoleSwitchController::class, 'switch'])->name('role.switch');
+    Route::post('/switch-role', [RoleSwitchController::class, 'switch'])->name('role.switch');
 
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
@@ -132,9 +149,9 @@ Route::middleware(['auth', 'password.changed'])->group(function () {
         Route::post('students/scrape-portal', [StudentController::class, 'scrapePortal'])
             ->middleware(['permission:student_create', 'throttle:5,1'])
             ->name('students.scrape-portal');
-        Route::get('students/{student}/academic-data/edit', [\App\Http\Controllers\StudentAcademicDataController::class, 'edit'])
+        Route::get('students/{student}/academic-data/edit', [StudentAcademicDataController::class, 'edit'])
             ->middleware('permission:student_update')->name('students.academic-data.edit');
-        Route::put('students/{student}/academic-data', [\App\Http\Controllers\StudentAcademicDataController::class, 'update'])
+        Route::put('students/{student}/academic-data', [StudentAcademicDataController::class, 'update'])
             ->middleware('permission:student_update')->name('students.academic-data.update');
         registerResourceWithPermissions('students', StudentController::class, 'student');
 
@@ -166,6 +183,17 @@ Route::middleware(['auth', 'password.changed'])->group(function () {
         registerResourceWithPermissions('courses', CourseController::class, 'course');
 
         // Ruangan (Rooms)
+        Route::get('room-bookings', [RoomBookingController::class, 'dashboard'])->name('room-bookings.index');
+        Route::get('room-bookings/my', [RoomBookingController::class, 'index'])->name('room-bookings.my');
+        Route::get('room-bookings/create', [RoomBookingController::class, 'create'])->middleware('permission:room_booking_create')->name('room-bookings.create');
+        Route::post('room-bookings/availability', [RoomBookingController::class, 'checkAvailability'])->middleware('permission:room_booking_create')->name('room-bookings.availability');
+        Route::post('room-bookings', [RoomBookingController::class, 'store'])->middleware('permission:room_booking_create')->name('room-bookings.store');
+        Route::post('room-bookings/{booking}/cancel', [RoomBookingController::class, 'cancel'])->middleware('permission:room_booking_update')->name('room-bookings.cancel');
+        Route::get('admin/room-bookings', [RoomBookingController::class, 'review'])->name('admin.room-bookings.review');
+        Route::post('admin/room-bookings/{booking}/decision', [RoomBookingController::class, 'decide'])->name('admin.room-bookings.decision');
+        Route::post('admin/room-bookings/{booking}/cancel', [RoomBookingController::class, 'adminCancel'])->name('admin.room-bookings.cancel');
+        Route::get('room-bookings/calendar-detail', [RoomBookingController::class, 'calendarDayDetail'])->middleware('permission:room_booking_read')->name('room-bookings.calendar.detail');
+        Route::get('admin/room-bookings/calendar-detail', [RoomBookingController::class, 'calendarDayDetail'])->middleware('permission:room_booking_review')->name('admin.room-bookings.calendar.detail');
         Route::get('rooms/export', [RoomController::class, 'export'])
             ->middleware('permission:room_read')
             ->name('rooms.export');
@@ -279,13 +307,13 @@ Route::middleware(['auth', 'password.changed'])->group(function () {
             ->middleware('permission:student_read')
             ->only(['index']);
 
-        Route::get('student-courses/periods', [\App\Http\Controllers\AcademicPeriodController::class, 'index'])
+        Route::get('student-courses/periods', [AcademicPeriodController::class, 'index'])
             ->middleware('permission:student_read')->name('academic_periods.index');
-        Route::post('student-courses/periods', [\App\Http\Controllers\AcademicPeriodController::class, 'store'])
+        Route::post('student-courses/periods', [AcademicPeriodController::class, 'store'])
             ->middleware('permission:student_update')->name('academic_periods.store');
-        Route::put('student-courses/periods/{academicPeriod}', [\App\Http\Controllers\AcademicPeriodController::class, 'update'])
+        Route::put('student-courses/periods/{academicPeriod}', [AcademicPeriodController::class, 'update'])
             ->middleware('permission:student_update')->name('academic_periods.update');
-        Route::post('student-courses/periods/{academicPeriod}/activate', [\App\Http\Controllers\AcademicPeriodController::class, 'activate'])
+        Route::post('student-courses/periods/{academicPeriod}/activate', [AcademicPeriodController::class, 'activate'])
             ->middleware('permission:student_update')->name('academic_periods.activate');
 
         // Student Courses (KRS Module)
@@ -322,6 +350,16 @@ Route::middleware(['auth', 'password.changed'])->group(function () {
 
         // Autocomplete search
         Route::get('api/search/courses', [SearchController::class, 'courses'])->name('api.search.courses');
+
+        Route::get('sidang-ta-bookings/{sidang_ta_registration}', [SidangTaBookingController::class, 'show'])->middleware('permission:sidang_ta_registration_read')->name('sidang-ta-bookings.index');
+        Route::post('sidang-ta-bookings/{sidang_ta_registration}/search', [SidangTaBookingController::class, 'preview'])->middleware('permission:sidang_ta_registration_create')->name('sidang-ta-bookings.search');
+        Route::post('sidang-ta-bookings/{sidang_ta_registration}/confirm', [SidangTaBookingController::class, 'confirm'])->middleware('permission:sidang_ta_registration_create')->name('sidang-ta-bookings.confirm');
+        Route::prefix('admin/sidang-ta-bookings')->name('admin.sidang-ta-bookings.')->middleware('permission:sidang_ta_registration_review')->group(function () {
+            Route::get('{sidang_ta_registration}', [App\Http\Controllers\Admin\SidangTaBookingController::class, 'show'])->name('show');
+            foreach (['mark-lecturer' => 'mark_lecturer', 'link-lecturer' => 'link', 'reschedule' => 'reschedule', 'cancel' => 'cancel'] as $path => $operation) {
+                Route::post('{sidang_ta_registration}/'.$path, [App\Http\Controllers\Admin\SidangTaBookingController::class, 'update'])->defaults('operation', $operation)->name($path);
+            }
+        });
 
         // Graduation Registration
         Route::get('graduation-registrations', [GraduationRegistrationController::class, 'index'])
@@ -419,6 +457,8 @@ Route::middleware(['auth', 'password.changed'])->group(function () {
         });
 
         Route::prefix('admin')->name('admin.')->group(function () {
+            Route::get('sidang-ta-execution', [SidangTaExecutionController::class, 'index'])->middleware('permission:sidang_ta_period_read')->name('sidang-ta-execution.index');
+            Route::put('sidang-ta-execution/{period}', [SidangTaExecutionController::class, 'update'])->middleware('permission:sidang_ta_period_update')->name('sidang-ta-execution.update');
             Route::get('sidang-ta-periods', [SidangTaRegistrationController::class, 'managePeriods'])
                 ->middleware('permission:sidang_ta_period_read')->name('sidang-ta-periods.index');
             Route::post('sidang-ta-periods', [SidangTaRegistrationController::class, 'storePeriod'])
@@ -435,7 +475,7 @@ Route::middleware(['auth', 'password.changed'])->group(function () {
         Route::middleware('permission:graduation_registration_review')->prefix('admin')->name('admin.')->group(function () {
             Route::get('graduation-registrations', [GraduationRegistrationController::class, 'adminIndex'])
                 ->name('graduation-registrations.index');
-                // Export Data Excel
+            // Export Data Excel
             Route::get('graduation-registrations-export', [GraduationRegistrationController::class, 'exportExcel'])->name('graduation-registrations.export');
             Route::get('graduation-registrations/{graduation_registration}', [GraduationRegistrationController::class, 'adminShow'])
                 ->name('graduation-registrations.show');
@@ -446,23 +486,23 @@ Route::middleware(['auth', 'password.changed'])->group(function () {
                 ->name('graduation-registrations.destroy');
 
             // Graduation Period Settings
-            Route::post('graduation-periods', [\App\Http\Controllers\Admin\GraduationPeriodController::class, 'store'])
+            Route::post('graduation-periods', [GraduationPeriodController::class, 'store'])
                 ->name('graduation-periods.store');
-            Route::put('graduation-periods/{period}', [\App\Http\Controllers\Admin\GraduationPeriodController::class, 'update'])
+            Route::put('graduation-periods/{period}', [GraduationPeriodController::class, 'update'])
                 ->name('graduation-periods.update');
-            Route::post('graduation-periods/{period}/set-active', [\App\Http\Controllers\Admin\GraduationPeriodController::class, 'setActive'])
+            Route::post('graduation-periods/{period}/set-active', [GraduationPeriodController::class, 'setActive'])
                 ->name('graduation-periods.set-active');
-            Route::delete('graduation-periods/{period}', [\App\Http\Controllers\Admin\GraduationPeriodController::class, 'destroy'])
+            Route::delete('graduation-periods/{period}', [GraduationPeriodController::class, 'destroy'])
                 ->name('graduation-periods.destroy');
 
             // Module Permission Settings (Super Admin only)
-            Route::get('module-permissions', [\App\Http\Controllers\Admin\ModulePermissionController::class, 'index'])
+            Route::get('module-permissions', [ModulePermissionController::class, 'index'])
                 ->middleware('permission:role_read')
                 ->name('module-permissions.index');
-            Route::put('module-permissions/{module}', [\App\Http\Controllers\Admin\ModulePermissionController::class, 'update'])
+            Route::put('module-permissions/{module}', [ModulePermissionController::class, 'update'])
                 ->middleware('permission:role_update')
                 ->name('module-permissions.update');
-            Route::post('module-permissions/{module}/reset', [\App\Http\Controllers\Admin\ModulePermissionController::class, 'reset'])
+            Route::post('module-permissions/{module}/reset', [ModulePermissionController::class, 'reset'])
                 ->middleware('permission:role_update')
                 ->name('module-permissions.reset');
         });
@@ -505,21 +545,21 @@ Route::middleware(['auth', 'password.changed'])->group(function () {
                 ->name('grade-appeals.review');
 
             // Grade Appeal Period Management
-            Route::post('grade-appeal-periods', [\App\Http\Controllers\Admin\GradeAppealPeriodController::class, 'store'])
+            Route::post('grade-appeal-periods', [GradeAppealPeriodController::class, 'store'])
                 ->name('grade-appeal-periods.store');
-            Route::put('grade-appeal-periods/{period}', [\App\Http\Controllers\Admin\GradeAppealPeriodController::class, 'update'])
+            Route::put('grade-appeal-periods/{period}', [GradeAppealPeriodController::class, 'update'])
                 ->name('grade-appeal-periods.update');
-            Route::post('grade-appeal-periods/{period}/set-active', [\App\Http\Controllers\Admin\GradeAppealPeriodController::class, 'setActive'])
+            Route::post('grade-appeal-periods/{period}/set-active', [GradeAppealPeriodController::class, 'setActive'])
                 ->name('grade-appeal-periods.set-active');
-            Route::delete('grade-appeal-periods/{period}', [\App\Http\Controllers\Admin\GradeAppealPeriodController::class, 'destroy'])
+            Route::delete('grade-appeal-periods/{period}', [GradeAppealPeriodController::class, 'destroy'])
                 ->name('grade-appeal-periods.destroy');
         });
     });
 
     // Chatbot Proxy Route
-    Route::post('chatbot/chat', function (\Illuminate\Http\Request $request) {
+    Route::post('chatbot/chat', function (Request $request) {
         $question = $request->input('question');
-        if (!$question) {
+        if (! $question) {
             return response()->json(['error' => 'Pertanyaan tidak boleh kosong'], 400);
         }
 
@@ -544,18 +584,18 @@ Route::middleware(['auth', 'password.changed'])->group(function () {
         }
 
         try {
-            $response = \Illuminate\Support\Facades\Http::withHeaders([
-                'X-API-Key' => env('CHATBOT_API_KEY', 'ganti-dengan-api-key-yang-aman')
-            ])->timeout(65)->post(env('CHATBOT_API_URL', 'http://127.0.0.1:8005') . '/chat', [
+            $response = Http::withHeaders([
+                'X-API-Key' => env('CHATBOT_API_KEY', 'ganti-dengan-api-key-yang-aman'),
+            ])->timeout(65)->post(env('CHATBOT_API_URL', 'http://127.0.0.1:8005').'/chat', [
                 'question' => $question,
-                'history'  => $history,
+                'history' => $history,
             ]);
 
             if ($response->failed()) {
                 return response()->json([
                     'answer' => 'Maaf, terjadi masalah pada layanan asisten akademik. Silakan coba beberapa saat lagi.',
                     'sources' => [],
-                    'chunks_used' => 0
+                    'chunks_used' => 0,
                 ], 200);
             }
 
@@ -568,12 +608,12 @@ Route::middleware(['auth', 'password.changed'])->group(function () {
             $enrichedSources = [];
             $rawSources = $data['sources'] ?? [];
             foreach ($rawSources as $srcFilename) {
-                $doc = \App\Models\Document::where('file_path', 'like', "%{$srcFilename}")->first();
+                $doc = Document::where('file_path', 'like', "%{$srcFilename}")->first();
                 if ($doc) {
                     $enrichedSources[] = [
                         'filename' => $srcFilename,
                         'id' => $doc->id,
-                        'title' => $doc->title
+                        'title' => $doc->title,
                     ];
                 } else {
                     $cleanTitle = preg_replace('/^\d{14}_/', '', $srcFilename);
@@ -581,16 +621,16 @@ Route::middleware(['auth', 'password.changed'])->group(function () {
                     $cleanTitle = pathinfo($cleanTitle, PATHINFO_FILENAME);
                     $cleanTitle = str_replace(['_', '-'], ' ', $cleanTitle);
                     $cleanTitle = mb_strtolower($cleanTitle);
-                    $cleanTitle = \Illuminate\Support\Str::title($cleanTitle);
+                    $cleanTitle = Str::title($cleanTitle);
                     $cleanTitle = preg_replace_callback(
                         '/\b(Dan|Atau|Di|Ke|Dari|Yang|Untuk|Dengan|Pada|Serta|Versi)\b/',
-                        fn($m) => mb_strtolower($m[0]),
+                        fn ($m) => mb_strtolower($m[0]),
                         $cleanTitle
                     );
                     $enrichedSources[] = [
                         'filename' => $srcFilename,
                         'id' => null,
-                        'title' => $cleanTitle
+                        'title' => $cleanTitle,
                     ];
                 }
             }
@@ -599,14 +639,14 @@ Route::middleware(['auth', 'password.changed'])->group(function () {
                 'answer' => $answer,
                 'sources' => $enrichedSources,
                 'interaction_id' => $data['interaction_id'] ?? null,
-                'chunks_used' => $data['chunks_used'] ?? 0
+                'chunks_used' => $data['chunks_used'] ?? 0,
             ]);
 
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             return response()->json([
                 'answer' => 'Maaf, koneksi ke asisten akademik terputus. Silakan hubungi administrator.',
                 'sources' => [],
-                'chunks_used' => 0
+                'chunks_used' => 0,
             ], 200);
         }
     })->name('chatbot.chat');
@@ -614,52 +654,52 @@ Route::middleware(['auth', 'password.changed'])->group(function () {
 
 // Visitor / Student Queue Routes
 Route::prefix('queue')->name('queue.')->group(function () {
-    Route::get('/take', [\App\Http\Controllers\QueueController::class, 'take'])->name('take');
-    Route::get('/lookup-student', [\App\Http\Controllers\QueueController::class, 'lookupStudent'])
+    Route::get('/take', [QueueController::class, 'take'])->name('take');
+    Route::get('/lookup-student', [QueueController::class, 'lookupStudent'])
         ->middleware('throttle:60,1')
         ->name('lookup-student');
-    Route::post('/take', [\App\Http\Controllers\QueueController::class, 'store'])
+    Route::post('/take', [QueueController::class, 'store'])
         ->middleware('throttle:queue-take')
         ->name('store');
-    Route::get('/status', [\App\Http\Controllers\QueueController::class, 'status'])->name('status');
-    Route::get('/status/json', [\App\Http\Controllers\QueueController::class, 'statusJson'])
+    Route::get('/status', [QueueController::class, 'status'])->name('status');
+    Route::get('/status/json', [QueueController::class, 'statusJson'])
         ->middleware('throttle:queue-status')
         ->name('status.json');
     // Monitor publik — tanpa login
-    Route::get('/display', [\App\Http\Controllers\QueueController::class, 'display'])->name('display');
-    Route::get('/display/json', [\App\Http\Controllers\QueueController::class, 'displayJson'])
+    Route::get('/display', [QueueController::class, 'display'])->name('display');
+    Route::get('/display/json', [QueueController::class, 'displayJson'])
         ->middleware('throttle:120,1')
         ->name('display.json');
 });
 
 // Admin Queue Routes
 Route::middleware(['auth'])->prefix('admin/queue')->name('admin.queue.')->group(function () {
-    Route::get('/', [\App\Http\Controllers\Admin\QueueController::class, 'index'])->middleware('permission:queue_ticket_read')->name('index');
-    Route::get('/json', [\App\Http\Controllers\Admin\QueueController::class, 'indexJson'])->middleware('permission:queue_ticket_read')->name('json');
-    Route::get('/stats', [\App\Http\Controllers\Admin\QueueController::class, 'stats'])->middleware('permission:queue_ticket_read')->name('stats');
-    Route::post('/claim', [\App\Http\Controllers\Admin\QueueController::class, 'claim'])->middleware('permission:queue_ticket_update')->name('claim');
-    Route::post('/release', [\App\Http\Controllers\Admin\QueueController::class, 'release'])->middleware('permission:queue_ticket_update')->name('release');
-    Route::post('/next', [\App\Http\Controllers\Admin\QueueController::class, 'next'])->middleware('permission:queue_ticket_update')->name('next');
-    Route::post('/skip', [\App\Http\Controllers\Admin\QueueController::class, 'skip'])->middleware('permission:queue_ticket_update')->name('skip');
-    Route::post('/back', [\App\Http\Controllers\Admin\QueueController::class, 'back'])->middleware('permission:queue_ticket_update')->name('back');
+    Route::get('/', [App\Http\Controllers\Admin\QueueController::class, 'index'])->middleware('permission:queue_ticket_read')->name('index');
+    Route::get('/json', [App\Http\Controllers\Admin\QueueController::class, 'indexJson'])->middleware('permission:queue_ticket_read')->name('json');
+    Route::get('/stats', [App\Http\Controllers\Admin\QueueController::class, 'stats'])->middleware('permission:queue_ticket_read')->name('stats');
+    Route::post('/claim', [App\Http\Controllers\Admin\QueueController::class, 'claim'])->middleware('permission:queue_ticket_update')->name('claim');
+    Route::post('/release', [App\Http\Controllers\Admin\QueueController::class, 'release'])->middleware('permission:queue_ticket_update')->name('release');
+    Route::post('/next', [App\Http\Controllers\Admin\QueueController::class, 'next'])->middleware('permission:queue_ticket_update')->name('next');
+    Route::post('/skip', [App\Http\Controllers\Admin\QueueController::class, 'skip'])->middleware('permission:queue_ticket_update')->name('skip');
+    Route::post('/back', [App\Http\Controllers\Admin\QueueController::class, 'back'])->middleware('permission:queue_ticket_update')->name('back');
 
     // Riwayat, Detail, dan Export Antrian
-    Route::get('/history', [\App\Http\Controllers\Admin\QueueHistoryController::class, 'index'])->middleware('permission:queue_ticket_read')->name('history');
-    Route::get('/history/export', [\App\Http\Controllers\Admin\QueueHistoryController::class, 'exportCsv'])->middleware(['permission:queue_ticket_read', 'throttle:10,1'])->name('history.export');
-    Route::get('/history/exports/{filename}', [\App\Http\Controllers\Admin\QueueHistoryController::class, 'downloadExport'])->middleware('permission:queue_ticket_read')->name('history.download-export');
-    Route::get('/history/{id}', [\App\Http\Controllers\Admin\QueueHistoryController::class, 'show'])->middleware('permission:queue_ticket_read')->name('history.show');
+    Route::get('/history', [QueueHistoryController::class, 'index'])->middleware('permission:queue_ticket_read')->name('history');
+    Route::get('/history/export', [QueueHistoryController::class, 'exportCsv'])->middleware(['permission:queue_ticket_read', 'throttle:10,1'])->name('history.export');
+    Route::get('/history/exports/{filename}', [QueueHistoryController::class, 'downloadExport'])->middleware('permission:queue_ticket_read')->name('history.download-export');
+    Route::get('/history/{id}', [QueueHistoryController::class, 'show'])->middleware('permission:queue_ticket_read')->name('history.show');
 });
 
 // Alias matching /dashboard/admin/queue/
-Route::post('/dashboard/admin/queue/skip', [\App\Http\Controllers\Admin\QueueController::class, 'skip'])
+Route::post('/dashboard/admin/queue/skip', [App\Http\Controllers\Admin\QueueController::class, 'skip'])
     ->middleware(['auth', 'permission:queue_ticket_update']);
-Route::get('/dashboard/admin/queue/history', [\App\Http\Controllers\Admin\QueueHistoryController::class, 'index'])
+Route::get('/dashboard/admin/queue/history', [QueueHistoryController::class, 'index'])
     ->middleware(['auth', 'permission:queue_ticket_read']);
-Route::get('/dashboard/admin/queue/history/export', [\App\Http\Controllers\Admin\QueueHistoryController::class, 'exportCsv'])
+Route::get('/dashboard/admin/queue/history/export', [QueueHistoryController::class, 'exportCsv'])
     ->middleware(['auth', 'permission:queue_ticket_read', 'throttle:10,1']);
-Route::get('/dashboard/admin/queue/history/exports/{filename}', [\App\Http\Controllers\Admin\QueueHistoryController::class, 'downloadExport'])
+Route::get('/dashboard/admin/queue/history/exports/{filename}', [QueueHistoryController::class, 'downloadExport'])
     ->middleware(['auth', 'permission:queue_ticket_read']);
-Route::get('/dashboard/admin/queue/history/{id}', [\App\Http\Controllers\Admin\QueueHistoryController::class, 'show'])
+Route::get('/dashboard/admin/queue/history/{id}', [QueueHistoryController::class, 'show'])
     ->middleware(['auth', 'permission:queue_ticket_read']);
 
-require __DIR__ . '/auth.php';
+require __DIR__.'/auth.php';
