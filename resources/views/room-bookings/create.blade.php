@@ -8,6 +8,14 @@
             <div class="p-4 bg-amber-50 border border-amber-200 rounded-xl text-sm text-amber-800">Jadwal iGracias belum berhasil disinkronisasi. Anda tetap dapat mengisi waktu, tetapi cek ketersediaan dan pengajuan akan aktif setelah sinkronisasi.</div>
         @endunless
         @php
+            $todayDate = now('Asia/Jakarta')->toDateString();
+            $oldStartAt = old('start_at');
+            $oldEndAt = old('end_at');
+            $initialStartDate = $oldStartAt ? substr($oldStartAt, 0, 10) : old('start_date', $todayDate);
+            $initialStartTime = $oldStartAt ? substr($oldStartAt, 11, 5) : '08:00';
+            $initialEndDate = $oldEndAt ? substr($oldEndAt, 0, 10) : old('end_date', $todayDate);
+            $initialEndTime = $oldEndAt ? substr($oldEndAt, 11, 5) : '09:00';
+
             $timeSlots = [];
             for ($m = 6 * 60 + 30; $m <= 21 * 60 + 30; $m += 30) {
                 $timeSlots[] = sprintf('%02d:%02d', intdiv($m, 60), $m % 60);
@@ -23,7 +31,8 @@
                             <span id="startTodayBadge" class="ml-1 rounded-full bg-indigo-50 px-2 py-0.5 text-xs font-semibold text-indigo-700">Hari ini</span>
                         </label>
                         <input type="date" id="start_date"
-                               value="{{ old('start_date', now('Asia/Jakarta')->toDateString()) }}"
+                               value="{{ $initialStartDate }}"
+                               min="{{ $todayDate }}"
                                class="campus-input w-full ring-1 ring-indigo-200" required>
                     </div>
                     <div>
@@ -33,7 +42,7 @@
                         </label>
                         <select id="start_time_select" class="campus-select w-full" required>
                             @foreach($timeSlots as $slot)
-                                <option value="{{ $slot }}" {{ $slot === '08:00' ? 'selected' : '' }}>{{ $slot }} WIB</option>
+                                <option value="{{ $slot }}" {{ $slot === $initialStartTime ? 'selected' : '' }}>{{ $slot }} WIB</option>
                             @endforeach
                         </select>
                     </div>
@@ -47,7 +56,8 @@
                             <span id="endTodayBadge" class="ml-1 rounded-full bg-indigo-50 px-2 py-0.5 text-xs font-semibold text-indigo-700">Hari ini</span>
                         </label>
                         <input type="date" id="end_date"
-                               value="{{ old('end_date', now('Asia/Jakarta')->toDateString()) }}"
+                               value="{{ $initialEndDate }}"
+                               min="{{ $todayDate }}"
                                class="campus-input w-full ring-1 ring-indigo-200" required>
                     </div>
                     <div>
@@ -57,12 +67,13 @@
                         </label>
                         <select id="end_time_select" class="campus-select w-full" required>
                             @foreach($timeSlots as $slot)
-                                <option value="{{ $slot }}" {{ $slot === '09:00' ? 'selected' : '' }}>{{ $slot }} WIB</option>
+                                <option value="{{ $slot }}" {{ $slot === $initialEndTime ? 'selected' : '' }}>{{ $slot }} WIB</option>
                             @endforeach
                         </select>
                     </div>
                 </div>
             </div>
+            <p class="text-xs text-slate-500 italic">* Untuk peminjaman berulang (multi-hari), jam harian yang dipilih akan diterapkan pada setiap hari dalam rentang tanggal.</p>
 
             <input type="hidden" id="start_at">
             <input type="hidden" id="end_at">
@@ -237,6 +248,8 @@
             }
             startSubmit.value = start.value;
             endSubmit.value = end.value;
+            submit.disabled = true;
+            submit.textContent = 'Mengirim...';
         });
     });
     </script>

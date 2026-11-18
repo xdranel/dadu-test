@@ -1,0 +1,82 @@
+{
+  "source_head": "9bf3a00c620fa196b7f50f2d423737c8352a2146",
+  "target_head": "a3e513301208e81557552bc39803ff46e8caaaaf",
+  "source_files_checked": 795,
+  "identical": 785,
+  "intentional_differences": [
+    ".env.example",
+    ".gitignore",
+    "README.md",
+    "app/Policies/DocumentCategoryPolicy.php",
+    "app/Policies/DocumentPolicy.php",
+    "database/seeders/RolePermissionSeeder.php",
+    "deploy.sh",
+    "phpunit.xml",
+    "resources/css/app.css",
+    "resources/views/queue-tickets/admin.blade.php"
+  ],
+  "files_copied": [
+    {
+      "path": "app/Http/Controllers/RoomBookingController.php",
+      "source_sha256": "93e31be72b4b3781c177d490d71898313b53ad1dcd724073550e9ee9566afa22",
+      "target_sha256": "35dda920a3eaed91a486f9a9e6ad0a207bd69c8265bd0007c04aa31e9158310b",
+      "protected": false
+    },
+    {
+      "path": "app/Services/RoomBookingTransitionService.php",
+      "source_sha256": "5e4de64c95b373b0524b272bd6373e2060fc70cf874981ce052ad04260f2ca18",
+      "target_sha256": "2f63a8abc29e244dc7f304af158ac78ece08eb114f1f7910b427c0ce7ed67bf7",
+      "protected": false
+    },
+    {
+      "path": "resources/views/room-bookings/create.blade.php",
+      "source_sha256": "1826d6c53537afc7dcae4c0eae8b0b9d1ccefc2a2818ecefcec6945adcf29de6",
+      "target_sha256": "9f02e2d91c37ea8d13de754c45a00ccc723131e6aa57a38bc826aea57054a399",
+      "protected": false
+    },
+    {
+      "path": "resources/views/room-bookings/dashboard.blade.php",
+      "source_sha256": "3dc17b3cca2e3769c7ec6dabd87e7f4b50949560dc7a460b199855a733fd7bbb",
+      "target_sha256": "88f288ead43a5eca0d37b961999bd464b7ebedc3020d59906537fb061ca51ac8",
+      "protected": false
+    },
+    {
+      "path": "resources/views/room-bookings/index.blade.php",
+      "source_sha256": "f64f2ac6f3e063ca11ad9d2b95a853532d19d07fb21dd52a0aaf3202ff4e6b08",
+      "target_sha256": "0ab73fa81611cbf35f47d0c9c809aa809b37fd44ff06cbe5c25f5c02377fc66a",
+      "protected": false
+    },
+    {
+      "path": "resources/views/room-bookings/review.blade.php",
+      "source_sha256": "ab7095f003e0f8602d533ed3f45756371a000b6d1e9b74dae3182af6814c0751",
+      "target_sha256": "3219afcdfc62b2fb0c2638a0523d0d4d48b6142f7c72cb62b436f860966bfc7d",
+      "protected": false
+    },
+    {
+      "path": "tests/Feature/RoomBookingFeatureCompleteTest.php",
+      "source_sha256": "4ed11b9180d5f6081c8741ea452645b4322daec530729ec2c022fde85678650a",
+      "target_sha256": null,
+      "protected": false
+    }
+  ],
+  "copied_hashes_match": true,
+  "other_target_tracked_files_unchanged": 981,
+  "git_staging_unchanged": true,
+  "student_booking_enabled_both": true,
+  "source_unmodified": true,
+  "source_docs_docker_absent": true,
+  "verification": {
+    "php_lint_files": 3,
+    "php_lint_passed": true,
+    "frontend_build_passed": true,
+    "test_cases": 76,
+    "assertions": 301,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "warnings": 76,
+    "warning_detail": "Dotenv reads absent target .env; reproduced with --display-warnings. Test environment supplied through process.",
+    "full_suite_rerun": false,
+    "diff_checks_passed": true
+  }
+}

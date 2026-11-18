@@ -29,7 +29,6 @@ class RoomBookingController extends Controller
     {
         $isLocalTestAccount = app()->environment(['local', 'testing'])
             && $user->isManualAccount()
-            && strtolower((string) $user->email) === 'krisna@dosen.test'
             && $user->hasRole('Pelaksana');
 
         return $isLocalTestAccount || ($user->isSsoAccount() && $user->hasRole('Pelaksana'));
@@ -38,6 +37,25 @@ class RoomBookingController extends Controller
     private function hasSuccessfulImport(): bool
     {
         return RoomScheduleSource::where('is_complete', true)->exists();
+    }
+
+    private function validateBookingDateRange(string $startDate, string $endDate): ?string
+    {
+        $today = now('Asia/Jakarta')->toDateString();
+        if ($startDate < $today) {
+            return 'Tanggal peminjaman tidak boleh di masa lampau.';
+        }
+
+        $activePeriod = AcademicPeriod::current();
+        if ($activePeriod && $activePeriod->start_date && $activePeriod->end_date) {
+            $periodStart = $activePeriod->start_date->toDateString();
+            $periodEnd = $activePeriod->end_date->toDateString();
+            if ($startDate < $periodStart || $endDate > $periodEnd) {
+                return "Peminjaman hanya dapat diajukan dalam rentang semester aktif berjalan ({$activePeriod->label}: {$periodStart} s.d. {$periodEnd}).";
+            }
+        }
+
+        return null;
     }
 
     private function computeFreeSlots(array $bookedSlots, int $windowStartMin = 390, int $windowEndMin = 1290, int $minGapMin = 60): array
@@ -136,14 +154,20 @@ class RoomBookingController extends Controller
         $bookings = Booking::with(['room', 'user', 'occurrences'])
             ->where('user_id', $user->id)
             ->latest()
-            ->paginate(15);
+            ->paginate(15)
+            ->withQueryString();
 
         return view('room-bookings.index', compact('bookings'));
     }
 
     public function dashboard(Request $request)
     {
-        abort_unless($this->isLecturer($request->user()) && $request->user()->can('room_booking_read'), 403);
+        $user = $request->user();
+        if ($user->hasRole('Akademik') || ($this->isReviewer($user) && ! $this->isLecturer($user))) {
+            return redirect()->route('admin.room-bookings.review');
+        }
+
+        abort_unless($this->isLecturer($user) && $user->can('room_booking_read'), 403);
         $monthInput = $request->input('month');
         if ($monthInput && preg_match('/^\d{4}-\d{2}$/', $monthInput)) {
             $month = Carbon::createFromFormat('!Y-m', $monthInput, 'Asia/Jakarta');
@@ -164,7 +188,7 @@ class RoomBookingController extends Controller
         $calendar = $this->availabilityCalendar($start, $end);
         $today = now('Asia/Jakarta')->toDateString();
         $bookings = Booking::with(['room', 'user', 'occurrences'])->whereIn('status', ['pending', 'approved'])
-            ->latest()->paginate(10);
+            ->latest()->paginate(10)->withQueryString();
         $hasImported = $this->hasSuccessfulImport();
 
         return view('room-bookings.dashboard', compact('calendar', 'month', 'bookings', 'hasImported', 'today'));
@@ -192,6 +216,9 @@ class RoomBookingController extends Controller
         $startAt = Carbon::createFromFormat('Y-m-d\\TH:i', $data['start_at']);
         $endAt = Carbon::createFromFormat('Y-m-d\\TH:i', $data['end_at']);
         $data = ['start_date' => $startAt->toDateString(), 'end_date' => $endAt->toDateString(), 'start_time' => $startAt->format('H:i'), 'end_time' => $endAt->format('H:i')];
+        if ($dateError = $this->validateBookingDateRange($data['start_date'], $data['end_date'])) {
+            return response()->json(['message' => $dateError], 422);
+        }
         if ($data['start_time'] < '06:30' || $data['end_time'] > '21:30' || $data['start_time'] >= $data['end_time']) {
             return response()->json(['message' => 'Jam penggunaan harus berada pada rentang 06.30–21.30 WIB.'], 422);
         }
@@ -254,6 +281,9 @@ class RoomBookingController extends Controller
             'start_time' => $startAt->format('H:i'), 'end_time' => $endAt->format('H:i'),
             'purpose' => $input['purpose'], 'participants' => 0,
         ];
+        if ($dateError = $this->validateBookingDateRange($data['start_date'], $data['end_date'])) {
+            return back()->withInput()->withErrors(['start_at' => $dateError]);
+        }
         if ($data['start_time'] < '06:30' || $data['end_time'] > '21:30' || $data['start_time'] >= $data['end_time']) {
             return back()->withInput()->withErrors(['start_time' => 'Jam peminjaman harus berada pada rentang 06.30–21.30 WIB.']);
         }
@@ -317,16 +347,18 @@ class RoomBookingController extends Controller
     {
         abort_unless($this->isReviewer($request->user()), 403);
         $filters = $request->validate(['month' => ['nullable', 'date_format:Y-m']]);
-        $bookings = Booking::with(['room', 'user', 'occurrences'])->latest()->paginate(20);
+        $bookings = Booking::with(['room', 'user', 'occurrences'])->latest()->paginate(20)->withQueryString();
         $lastImport = DB::table('room_import_logs')->where('rows_imported', '>', 0)->latest('created_at')->first();
-        $lecturers = Lecturer::query()->get()->keyBy(fn ($l) => mb_strtolower(trim($l->name)));
+        $lecturersList = Lecturer::query()->get();
+        $lecturers = $lecturersList->keyBy(fn ($l) => mb_strtolower(trim($l->name)));
+        $lecturersByNip = $lecturersList->whereNotNull('nip_ypt')->keyBy(fn ($l) => trim($l->nip_ypt));
         $month = isset($filters['month'])
             ? Carbon::createFromFormat('!Y-m', $filters['month'], 'Asia/Jakarta')
             : now('Asia/Jakarta');
         $calendar = $this->availabilityCalendar($month->copy()->startOfMonth()->toDateString(), $month->copy()->endOfMonth()->toDateString());
         $today = now('Asia/Jakarta')->toDateString();
 
-        return view('room-bookings.review', compact('bookings', 'lastImport', 'lecturers', 'calendar', 'month', 'today'));
+        return view('room-bookings.review', compact('bookings', 'lastImport', 'lecturers', 'lecturersByNip', 'calendar', 'month', 'today'));
     }
 
     public function decide(Request $request, Booking $booking)

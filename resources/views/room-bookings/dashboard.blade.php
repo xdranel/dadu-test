@@ -1,6 +1,53 @@
 <x-app-layout>
     <x-slot name="header">Dashboard Peminjaman Ruangan</x-slot>
     <div class="p-6 space-y-6">
+        @if(session('success'))
+            <div class="p-4 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-xl flex items-center gap-2">
+                <svg class="w-5 h-5 text-emerald-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                </svg>
+                <span class="font-medium text-sm">{{ session('success') }}</span>
+            </div>
+        @endif
+        @if(session('error'))
+            <div class="p-4 bg-rose-50 border border-rose-200 text-rose-700 rounded-xl flex items-center gap-2">
+                <svg class="w-5 h-5 text-rose-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+                <span class="font-medium text-sm">{{ session('error') }}</span>
+            </div>
+        @endif
+        @if($errors->any())
+            <div class="p-4 bg-rose-50 border border-rose-200 text-rose-700 rounded-xl">
+                <ul class="list-disc pl-5 text-sm space-y-1">
+                    @foreach($errors->all() as $error)<li>{{ $error }}</li>@endforeach
+                </ul>
+            </div>
+        @endif
+
+        <div class="flex flex-wrap items-center justify-between gap-3">
+            <div>
+                <h3 class="text-base font-bold text-slate-800">Peminjaman Ruangan</h3>
+                <p class="text-xs text-slate-400 mt-0.5">Informasi ketersediaan ruangan perkuliahan dan peminjaman</p>
+            </div>
+            <div class="flex items-center gap-2">
+                <a class="btn btn-secondary text-xs" href="{{ route('room-bookings.my') }}">
+                    <svg class="w-4 h-4 mr-1.5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    Riwayat Peminjaman Saya
+                </a>
+                @can('room_booking_create')
+                    <a class="btn btn-primary text-xs" href="{{ route('room-bookings.create') }}">
+                        <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                        </svg>
+                        Ajukan Peminjaman
+                    </a>
+                @endcan
+            </div>
+        </div>
+
         @unless($hasImported)
             <div class="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
                 Jadwal belum tersedia untuk pencarian. Lengkapi sinkronisasi pola semester terlebih dahulu.
@@ -83,11 +130,21 @@
                     <tbody>
                         @forelse($bookings as $booking)
                             <tr class="border-b border-slate-100 hover:bg-slate-50/50">
+                                @php($isMultiDay = $booking->start_date->ne($booking->end_date))
                                 <td class="p-2 font-medium text-slate-700">{{ $booking->user->name }}</td>
                                 <td class="text-slate-600">{{ $booking->room->name }}</td>
                                 <td class="text-slate-600">{{ $booking->purpose }}</td>
-                                <td class="text-slate-600">{{ $booking->start_date->format('d/m/Y') }} {{ substr($booking->start_time,0,5) }} WIB</td>
-                                <td class="text-slate-600">{{ $booking->end_date->format('d/m/Y') }} {{ substr($booking->end_time,0,5) }} WIB</td>
+                                <td class="text-slate-600">
+                                    {{ $booking->start_date->format('d/m/Y') }}
+                                    <span class="text-xs text-slate-400 font-mono">{{ substr($booking->start_time,0,5) }} WIB</span>
+                                </td>
+                                <td class="text-slate-600">
+                                    {{ $booking->end_date->format('d/m/Y') }}
+                                    <span class="text-xs text-slate-400 font-mono">{{ substr($booking->end_time,0,5) }} WIB</span>
+                                    @if($isMultiDay)
+                                        <span class="block text-[11px] text-indigo-600">({{ $booking->occurrences->count() }} hari sesi)</span>
+                                    @endif
+                                </td>
                                 <td>
                                     <span class="badge {{ match($booking->status) {
                                         'pending' => 'badge-warning',

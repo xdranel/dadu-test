@@ -48,6 +48,13 @@ class RoomBookingTransitionService
             }
             abort_unless($locked->status === 'pending', 422, 'Pengajuan bukan berstatus menunggu persetujuan.');
             if ($decision === 'approved') {
+                $room = Room::query()->whereKey($locked->room_id)->lockForUpdate()->first();
+                if (! $room || $room->status !== 'Dapat Dipakai') {
+                    throw ValidationException::withMessages([
+                        'availability' => 'Ruangan ini sedang tidak dapat digunakan (status: '.($room?->status ?? 'Tidak Ditemukan').'). Pengajuan tidak dapat disetujui.',
+                    ]);
+                }
+
                 $service = app(RoomAvailabilityService::class);
                 $first = $locked->occurrences->min('usage_date')?->toDateString();
                 $last = $locked->occurrences->max('usage_date')?->toDateString();
@@ -76,7 +83,7 @@ class RoomBookingTransitionService
     public function cancel(User $actor, RoomBookingRequest $booking, string $reason): RoomBookingRequest
     {
         return $this->inContext($booking, function ($locked) use ($actor, $reason) {
-            $lecturer = ($actor->isSsoAccount() && $actor->hasRole('Pelaksana')) || (app()->environment(['local', 'testing']) && $actor->isManualAccount() && strtolower($actor->email) === 'krisna@dosen.test' && $actor->hasRole('Pelaksana'));
+            $lecturer = ($actor->isSsoAccount() && $actor->hasRole('Pelaksana')) || (app()->environment(['local', 'testing']) && $actor->isManualAccount() && $actor->hasRole('Pelaksana'));
             $ownerPending = $locked->booking_origin === 'ordinary' && $locked->status === 'pending' && $locked->user_id === $actor->id && $lecturer && $actor->can('room_booking_update');
             if (! $ownerPending) {
                 if ($locked->sidang_ta_registration_id) {
@@ -88,7 +95,7 @@ class RoomBookingTransitionService
             abort_unless(in_array($locked->status, ['pending', 'approved'], true), 422, 'Peminjaman sudah tidak aktif.');
             if ($locked->sidang_ta_registration_id && $locked->status === 'approved') {
                 $first = $locked->occurrences->sortBy(fn ($o) => $o->usage_date->toDateString().' '.$o->start_time)->first();
-                if (! $first || $first->usage_date->toDateString().' '.$first->start_time <= now()->format('Y-m-d H:i:s')) {
+                if (! $first || $first->usage_date->toDateString().' '.$first->start_time <= now('Asia/Jakarta')->format('Y-m-d H:i:s')) {
                     throw ValidationException::withMessages(['schedule' => 'Pelaksanaan sidang telah dimulai. Jadwal historis dipertahankan.']);
                 }
             }

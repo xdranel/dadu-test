@@ -2,9 +2,9 @@
 set -eu
 cd /var/www/html
 if [ "$(id -u)" = 0 ]; then
-    mkdir -p storage/app/public storage/framework/cache/data \
+    mkdir -p storage/app/public storage/app/private storage/framework/cache/data \
         storage/framework/sessions storage/framework/views storage/logs bootstrap/cache
-    chown www-data:www-data storage storage/app storage/app/public \
+    chown www-data:www-data storage storage/app storage/app/public storage/app/private \
         storage/framework storage/framework/cache storage/framework/cache/data \
         storage/framework/sessions storage/framework/views storage/logs bootstrap/cache
     if [ "${1:-}" = php-fpm ]; then

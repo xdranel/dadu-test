@@ -20,7 +20,7 @@ FROM php-base AS source
 COPY . .
 RUN chmod -R a+rX app bootstrap config database public resources routes docker \
     && chmod a+r artisan composer.json composer.lock \
-    && mkdir -p storage/app/public storage/framework/cache/data storage/framework/sessions \
+    && mkdir -p storage/app/public storage/app/private storage/framework/cache/data storage/framework/sessions \
         storage/framework/views storage/logs bootstrap/cache \
     && composer dump-autoload --no-dev --optimize --no-scripts \
     && php artisan package:discover --ansi \

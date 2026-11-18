@@ -14,11 +14,12 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware) {
         $middleware->alias([
-            'role'               => \Spatie\Permission\Middleware\RoleMiddleware::class,
-            'permission'         => \Spatie\Permission\Middleware\PermissionMiddleware::class,
-            'role_or_permission' => \Spatie\Permission\Middleware\RoleOrPermissionMiddleware::class,
-            'cek.visibilitas'    => \App\Http\Middleware\CekVisibilitasDokumen::class,
-            'password.changed'   => \App\Http\Middleware\EnsurePasswordIsChanged::class,
+            'role'                   => \Spatie\Permission\Middleware\RoleMiddleware::class,
+            'permission'             => \Spatie\Permission\Middleware\PermissionMiddleware::class,
+            'role_or_permission'     => \Spatie\Permission\Middleware\RoleOrPermissionMiddleware::class,
+            'cek.visibilitas'        => \App\Http\Middleware\CekVisibilitasDokumen::class,
+            'password.changed'       => \App\Http\Middleware\EnsurePasswordIsChanged::class,
+            'public_document.access' => \App\Http\Middleware\EnsurePublicDocumentAccess::class,
         ]);
         $middleware->web([
             HandleCors::class,

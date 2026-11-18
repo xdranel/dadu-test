@@ -94,8 +94,15 @@
                 <article class="campus-card p-5 mb-4">
                     <div class="flex flex-wrap items-start justify-between gap-2">
                         <div>
-                            <p class="font-semibold text-slate-800">{{ $booking->user->name }}</p>
-                            @php($lecturer = $lecturers->get(mb_strtolower(trim($booking->user->name))))
+                            <div class="flex items-center gap-2">
+                                <p class="font-semibold text-slate-800">{{ $booking->user->name }}</p>
+                                @if($booking->sidang_ta_registration_id || $booking->booking_origin === 'sidang_ta_automatic')
+                                    <span class="text-[10px] font-semibold uppercase px-2 py-0.5 rounded bg-sky-100 text-sky-800 border border-sky-300">Sidang TA</span>
+                                @else
+                                    <span class="text-[10px] font-semibold uppercase px-2 py-0.5 rounded bg-slate-100 text-slate-700">Dosen</span>
+                                @endif
+                            </div>
+                            @php($lecturer = ($booking->user->employee_id && isset($lecturersByNip) ? $lecturersByNip->get(trim($booking->user->employee_id)) : null) ?? $lecturers->get(mb_strtolower(trim($booking->user->name))))
                             <p class="text-xs text-slate-500">NIP: {{ $lecturer->nip_ypt ?? $booking->user->employee_id ?? '-' }} · Prodi: {{ $lecturer->study_program ?? '-' }}</p>
                             <p class="text-sm text-slate-500">{{ $booking->room->name }} &middot; Kapasitas {{ $booking->room->capacity }}</p>
                         </div>
@@ -132,6 +139,7 @@
                     {{-- Aksi admin --}}
                     @if($booking->status === 'pending')
                         <form method="POST" action="{{ route('admin.room-bookings.decision', $booking) }}"
+                              onsubmit="this.querySelectorAll('button').forEach(b => b.disabled = true);"
                               class="flex flex-wrap items-center gap-2 mt-4 pt-4 border-t border-slate-100">
                             @csrf
                             <input name="note" placeholder="Catatan (opsional)"
@@ -143,7 +151,7 @@
                         </form>
                     @elseif($booking->status === 'approved')
                         <form method="POST" action="{{ route('admin.room-bookings.cancel', $booking) }}"
-                              onsubmit="return confirm('Batalkan seluruh jadwal dalam pengajuan ini? Pastikan alasan pembatalan sudah benar.');"
+                              onsubmit="if(confirm('Batalkan seluruh jadwal dalam pengajuan ini? Pastikan alasan pembatalan sudah benar.')){ this.querySelector('button').disabled = true; return true; } return false;"
                               class="flex flex-wrap items-center gap-2 mt-4 pt-4 border-t border-slate-100">
                             @csrf
                             <input name="reason" required placeholder="Alasan pembatalan"
