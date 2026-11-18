@@ -47,11 +47,14 @@ class SidangTaRegistrationController extends Controller
         foreach ($drafts as $draft) {
             SidangTaDocumentRequirements::assertKnownVersion($draft);
         }
-        $latestApproved = app(SidangTaBookingService::class)->latestApprovedFor($number);
-        $bookingRegistrations = SidangTaRegistration::with('period.executionSetting', 'roomSchedule.booking.room', 'roomSchedule.booking.occurrences')
-            ->where('student_number', $number)->where('status', 'approved')
-            ->where(fn ($q) => $q->whereKey($latestApproved?->id)->orWhereHas('roomSchedule', fn ($c) => $c->whereNotNull('active_student_number')))
-            ->orderByDesc('submitted_at')->orderByDesc('id')->get();
+        $bookingRegistrations = collect();
+        if (config('sidang_ta.student_booking_enabled', false)) {
+            $latestApproved = app(SidangTaBookingService::class)->latestApprovedFor($number);
+            $bookingRegistrations = SidangTaRegistration::with('period.executionSetting', 'roomSchedule.booking.room', 'roomSchedule.booking.occurrences')
+                ->where('student_number', $number)->where('status', 'approved')
+                ->where(fn ($q) => $q->whereKey($latestApproved?->id)->orWhereHas('roomSchedule', fn ($c) => $c->whereNotNull('active_student_number')))
+                ->orderByDesc('submitted_at')->orderByDesc('id')->get();
+        }
         $schedulePeriods = SidangTaPeriod::query()->visibleToStudents()->get();
 
         return view('sidang_ta_registrations.index', compact('registrations', 'openPeriods', 'drafts', 'activeRegistration', 'schedulePeriods', 'bookingRegistrations'));

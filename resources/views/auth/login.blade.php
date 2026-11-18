@@ -57,9 +57,9 @@
                                 class="form-input"
                                 placeholder="Username SSO"
                                 value="{{ old('username') }}"
-                                required
+                                {{--required--}}
                                 autocomplete="username"
-                                autofocus
+                                {{--autofocus--}}
                             >
                             <svg class="input-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
@@ -76,7 +76,7 @@
                                 id="password"
                                 class="form-input"
                                 placeholder="Password"
-                                required
+                                {{--required--}}
                                 autocomplete="current-password"
                                 style="padding-right: 2.75rem;"
                             >

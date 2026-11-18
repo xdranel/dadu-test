@@ -155,7 +155,8 @@ test('sso login works for mock dosen and syncs to database', function () {
     expect($user->username)->toBe('krisna_dosen');
     expect($user->name)->toBe('KRISNA DOSEN');
     expect($user->employee_id)->toBe('987654321');
-    expect($user->hasRole('Petugas'))->toBeTrue();
+    expect($user->hasRole('Pelaksana'))->toBeTrue();
+    expect($user->hasRole('Petugas'))->toBeFalse();
 });
 
 test('sso login fails with wrong password and returns expected error message', function () {

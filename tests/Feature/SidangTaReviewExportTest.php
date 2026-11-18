@@ -92,8 +92,7 @@ test('p2b_export_keeps_historical_snapshot_after_live_student_changes', function
     [, $rows] = ($this->exportRows)();
     $row = $rows->first();
     expect($row['Nama Mahasiswa'])->toBe('Nama Pengajuan');
-    expect($row['Snapshot Nama'])->toBe('Nama Snapshot');
-    expect($row['Snapshot Prodi'])->toBe('Prodi Snapshot');
+    expect($row)->not->toHaveKey('Snapshot Nama')->not->toHaveKey('Snapshot Prodi');
     expect($row['IPK'])->toBe(0);
     expect($row['SKS Lulus'])->toBe(0);
     expect($row['TAK'])->toBe('Belum tersedia');
@@ -109,7 +108,7 @@ test('p2b_xlsx_preserves_text_ids_phones_and_literal_formula_like_content', func
     $uploaded = ($this->attach)($registration, 'thesis_draft', 'rejected', true, '=SUM(2,3)');
     [, $rows, $path] = ($this->exportRows)();
     $row = $rows->first();
-    expect($row)->toHaveCount(57);
+    expect($row)->toHaveCount(46);
     expect($row['NIM'])->toBe('001234567890123456');
     expect($row['HP Mahasiswa'])->toBe('001234567890');
     expect($row['HP Orang Tua/Wali'])->toBe('000987654321');
@@ -135,7 +134,7 @@ test('p2b_xlsx_preserves_text_ids_phones_and_literal_formula_like_content', func
         throw new RuntimeException('Kolom tidak ditemukan: '.$column);
     };
     expect($textCell('Nama Mahasiswa'))->toBe('=2+2');
-    expect($textCell('Catatan Petugas'))->toBe('=HYPERLINK("https://example.invalid","x")');
+    expect($row)->not->toHaveKey('Catatan Petugas');
     expect($textCell('IPK'))->toBe('=1+1');
     expect($textCell('Judul TA Indonesia'))->toBe('=SUM(1,2)');
     expect($textCell(SidangTaRegistration::DOCUMENT_TYPES['thesis_draft'].' — Catatan'))->toBe('=SUM(2,3)');
@@ -158,10 +157,10 @@ test('p2b_export_document_columns_distinguish_na_missing_and_unavailable', funct
     $capture = SidangTaRegistration::DOCUMENT_TYPES['ta_data_capture'];
     $pdmLabel = SidangTaRegistration::DOCUMENT_TYPES['pdm_submission_proof'];
     expect($a[$thesis.' — Status'])->toBe('Terverifikasi');
-    expect($a[$thesis.' — Ketersediaan'])->toBe('Tidak ditemukan');
+    expect($a[$thesis.' — File'])->toBe('Tidak ditemukan');
     expect($a[$capture.' — Status'])->toBe('Belum ada dokumen');
-    expect($a[$capture.' — Ketersediaan'])->toBe('Tidak ada metadata');
-    foreach (['Status', 'Ketersediaan', 'Catatan'] as $column) expect($a[$pdmLabel.' — '.$column])->toBe('N/A');
+    expect($a)->not->toHaveKey($capture.' — File');
+    foreach (['Status', 'Catatan'] as $column) expect($a[$pdmLabel.' — '.$column])->toBe('N/A');
     expect($b[$pdmLabel.' — Status'])->toBe('Perlu perbaikan');
     expect($b[$pdmLabel.' — Catatan'])->toBe('Perbaiki PDM');
     foreach (['diploma_statement', 'diploma_biodata_form'] as $type) {
@@ -260,22 +259,25 @@ test('p2b_uploaded_documents_are_clickable_in_existing_columns_for_both_branches
         $documents[$type] = ($this->attach)($registration, $type, 'pending', true, 'Catatan berkas');
     }
     [, $rows, $path] = ($this->exportRows)();
-    expect($rows->first())->toHaveCount(57);
+    expect($rows->first())->toHaveCount(46);
     $xpath = export106Sheet($path);
-    expect($xpath->query('//*[local-name()="f"]')->length)->toBe(7);
+    $linkedTypes = array_filter($required, fn ($type) => array_key_exists(SidangTaRegistration::DOCUMENT_TYPES[$type].' — File', $rows->first()));
+    expect($xpath->query('//*[local-name()="f"]')->length)->toBe(count($linkedTypes));
     $addresses = [];
     foreach ($xpath->query('//*[local-name()="row" and @r="1"]/*[local-name()="c"]') as $cell) {
         $header = $xpath->evaluate('string(.//*[local-name()="t"])', $cell);
         $addresses[$header] = preg_replace('/1$/', '2', $cell->getAttribute('r'));
     }
     foreach (SidangTaRegistration::DOCUMENT_TYPES as $type => $label) {
-        $cell = '//*[local-name()="c" and @r="'.$addresses[$label.' — Ketersediaan'].'"]';
-        $formula = $xpath->evaluate('string('.$cell.'/*[local-name()="f"])');
-        if (in_array($type, $required, true)) {
-            expect($formula)->toBe('HYPERLINK("'.route('sidang-ta-registration-documents.preview', $documents[$type]).'","Lihat PDF")');
-        } else {
-            expect($formula)->toBe('');
-            expect($rows->first()[$label.' — Ketersediaan'])->toBe('N/A');
+        if (isset($addresses[$label.' — File'])) {
+            $cell = '//*[local-name()="c" and @r="'.$addresses[$label.' — File'].'"]';
+            $formula = $xpath->evaluate('string('.$cell.'/*[local-name()="f"])');
+            if (in_array($type, $required, true)) {
+                expect($formula)->toBe('HYPERLINK("'.route('sidang-ta-registration-documents.preview', $documents[$type]).'","Lihat PDF")');
+            } else {
+                expect($formula)->toBe('');
+                expect($rows->first()[$label.' — File'])->toBe('N/A');
+            }
         }
         expect($rows->first()[$label.' — Status'])->toBe(in_array($type, $required, true) ? 'Menunggu verifikasi' : 'N/A');
     }
@@ -293,9 +295,9 @@ test('p2b_missing_or_inapplicable_uploads_do_not_create_broken_links', function 
     [, $rows, $path] = ($this->exportRows)();
     expect(export106Sheet($path)->query('//*[local-name()="f"]')->length)->toBe(0);
     $row = $rows->first();
-    expect($row[SidangTaRegistration::DOCUMENT_TYPES['thesis_draft'].' — Ketersediaan'])->toBe('Tidak ditemukan');
-    expect($row[SidangTaRegistration::DOCUMENT_TYPES['ta_data_capture'].' — Ketersediaan'])->toBe('Tidak ada metadata');
-    expect($row[SidangTaRegistration::DOCUMENT_TYPES['pdm_submission_proof'].' — Ketersediaan'])->toBe('N/A');
+    expect($row[SidangTaRegistration::DOCUMENT_TYPES['thesis_draft'].' — File'])->toBe('Tidak ditemukan');
+    expect($row)->not->toHaveKey(SidangTaRegistration::DOCUMENT_TYPES['ta_data_capture'].' — File');
+    expect($row)->not->toHaveKey(SidangTaRegistration::DOCUMENT_TYPES['pdm_submission_proof'].' — File');
 });
 
 test('p2b_export_pdf_links_open_the_protected_preview_without_mutating_data', function () {

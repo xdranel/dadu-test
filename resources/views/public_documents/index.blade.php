@@ -89,6 +89,99 @@
             </form>
         @endif
 
+        @if($isStudent && $myDocuments && !request('kategori'))
+            <!-- Bagian Dokumen Saya (Hanya Mahasiswa Login) -->
+            <div class="max-w-5xl mx-auto mb-8 p-6 bg-gradient-to-br from-white to-sky-50/40 rounded-2xl border border-sky-200/80 shadow-sm">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 pb-3 border-b border-sky-100">
+                    <div class="flex items-center gap-2.5">
+                        <div class="p-2 bg-sky-100 text-sky-700 rounded-xl">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                            </svg>
+                        </div>
+                        <div>
+                            <h2 class="text-lg font-bold text-slate-900 tracking-tight">Dokumen Saya</h2>
+                            <p class="text-xs text-slate-500 font-medium">Dokumen terverifikasi untuk NIM {{ auth()->user()->nim }}</p>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        @if(isset($myDocumentTypes) && $myDocumentTypes->isNotEmpty())
+                            <form method="GET" action="{{ route('public_documents.index') }}" class="flex items-center gap-1.5">
+                                @if(request('search'))
+                                    <input type="hidden" name="search" value="{{ request('search') }}">
+                                @endif
+                                @if(request('year'))
+                                    <input type="hidden" name="year" value="{{ request('year') }}">
+                                @endif
+                                <select name="document_type" onchange="this.form.submit()" class="text-xs py-1 px-2.5 bg-white border border-slate-200 rounded-lg text-slate-700 focus:ring-1 focus:ring-sky-500">
+                                    <option value="">Semua Jenis Dokumen</option>
+                                    @foreach($myDocumentTypes as $type)
+                                        <option value="{{ $type }}" {{ request('document_type') === $type ? 'selected' : '' }}>
+                                            {{ $type }}
+                                        </option>
+                                    @endforeach
+                                </select>
+                            </form>
+                        @endif
+                        <span class="text-xs font-bold px-2.5 py-1 rounded-full bg-sky-100 text-sky-700">
+                            {{ $myDocuments->total() }} Dokumen
+                        </span>
+                    </div>
+                </div>
+
+                @if($myDocuments->count() > 0)
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
+                        @foreach ($myDocuments as $myDoc)
+                            <div class="bg-white rounded-xl border border-slate-200/80 shadow-sm hover:shadow hover:border-sky-300 transition-all p-4 flex flex-col justify-between">
+                                <div>
+                                    <div class="flex items-center justify-between gap-2 mb-2">
+                                        <div class="flex items-center gap-1.5 flex-wrap">
+                                            <span class="px-2 py-0.5 text-[10px] font-bold uppercase rounded {{ $myDoc->file_type === 'pdf' ? 'bg-red-50 text-[#DA2D3B]' : 'bg-slate-100 text-slate-700' }}">
+                                                {{ strtoupper($myDoc->file_type) }}
+                                            </span>
+                                            @if($myDoc->document_type)
+                                                <span class="px-2 py-0.5 text-[10px] font-semibold rounded bg-sky-50 text-sky-700 border border-sky-100">
+                                                    {{ $myDoc->document_type }}
+                                                </span>
+                                            @endif
+                                        </div>
+                                        <span class="text-[11px] text-slate-400 font-medium">{{ $myDoc->file_size_formatted }}</span>
+                                    </div>
+                                    <h3 class="font-bold text-slate-800 text-sm mb-1 leading-snug line-clamp-2" title="{{ $myDoc->title }}">
+                                        {{ $myDoc->title }}
+                                    </h3>
+                                    @if($myDoc->description)
+                                        <p class="text-xs text-slate-500 line-clamp-2 mb-2">{{ $myDoc->description }}</p>
+                                    @endif
+                                </div>
+                                <div class="pt-3 border-t border-slate-100 mt-2 flex items-center justify-between gap-2">
+                                    <span class="text-[11px] text-slate-400 font-medium">{{ $myDoc->created_at->translatedFormat('d M Y') }}</span>
+                                    <div class="flex items-center gap-1.5">
+                                        @if(strtolower($myDoc->file_type) === 'pdf')
+                                            <a href="{{ route('public_documents.preview', $myDoc) }}" target="_blank"
+                                               class="px-2.5 py-1 text-xs font-bold text-slate-700 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors">
+                                                Lihat
+                                            </a>
+                                        @endif
+                                        <a href="{{ route('public_documents.download', $myDoc) }}"
+                                           class="px-2.5 py-1 text-xs font-bold text-white bg-[#DA2D3B] hover:bg-[#b92532] rounded-lg transition-colors shadow-sm">
+                                            Unduh
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                        @endforeach
+                    </div>
+                    {{ $myDocuments->withQueryString()->links() }}
+                @else
+                    <div class="text-center py-6 text-slate-400">
+                        <p class="text-sm font-semibold text-slate-600">Belum ada dokumen yang ditautkan ke akun Anda</p>
+                        <p class="text-xs text-slate-400 mt-0.5">Dokumen mahasiswa akan otomatis tampil di sini saat diverifikasi admin.</p>
+                    </div>
+                @endif
+            </div>
+        @endif
+
         <!-- Dynamic Content Area -->
         @if(request('kategori') || request('search') || request('year'))
             <!-- Results View Header: Minimalist and Modern -->
@@ -210,7 +303,7 @@
                     Kategori Dokumen
                 </h2>
                 @if($kategoriList->count() > 0)
-                    <div class="grid grid-cols-[repeat(auto-fill,minmax(130px,1fr))] gap-3">
+                    <div class="folder-grid grid grid-cols-[repeat(auto-fill,132px)] gap-x-3 gap-y-4 justify-start" style="grid-template-columns: repeat(auto-fill, 132px);">
                         @foreach ($kategoriList as $kat)
                             <x-folder-card
                                 :category="$kat"

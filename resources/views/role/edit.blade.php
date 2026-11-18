@@ -201,8 +201,8 @@
                     <form action="{{ route('role.assign-user', $role->id) }}" method="POST" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 items-end">
                         @csrf
                         <div class="md:col-span-{{ in_array($role->name, ['Pelaksana', 'Pemimpin']) ? '1' : '3' }}">
-                            <label class="block text-xs font-semibold text-slate-700 mb-1">Username SSO / NIM</label>
-                            <input type="text" name="username" required placeholder="misal: 103072400079 atau username"
+                            <label class="block text-xs font-semibold text-slate-700 mb-1">Username SSO</label>
+                            <input type="text" name="username" required placeholder="misal: 103072400079, username, atau akun@student.telkomuniversity.ac.id"
                                    class="form-control campus-input w-full text-xs">
                         </div>
                         @if(in_array($role->name, ['Pelaksana', 'Pemimpin']))

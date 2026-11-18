@@ -23,6 +23,9 @@ class Lecturer extends Model
         'academic_interest',
         'lecturer_code',
         'email_domain',
+        'phone',
+        'coe',
+        'kk',
         'is_external',
         'institution',
     ];

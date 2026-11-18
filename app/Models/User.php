@@ -87,15 +87,34 @@ class User extends Authenticatable
             'email'    => $this->email,
             'phone'    => $this->phone,
             'photo'    => $this->photo,
-            'nim'      => $this->employee_id,
+            'nim'      => $this->nim,
             'role_id'  => self::ROLE_ID_MAP[$roleName] ?? null,
             'unit_id'  => $this->unit_id,
         ];
     }
 
-    // 101 → mahasiswa  (Pengguna: pengaju layanan / mahasiswa)
-    // 102 → Petugas    (Front Desk / operator loket SSO auto-assign)
-    // 103 → Pelaksana  (Staf unit kerja teknis)
+    /**
+     * Accessor untuk NIM mahasiswa (dari employee_id).
+     * HANYA mengembalikan nilai untuk user dengan role mahasiswa.
+     * Untuk dosen/staf, employee_id adalah NIP/NIK dan tidak boleh dianggap NIM.
+     */
+    public function getNimAttribute(): ?string
+    {
+        if (! $this->hasRole(['mahasiswa', 'Mahasiswa'])) {
+            return null;
+        }
+
+        if (isset($this->attributes['employee_id']) && $this->attributes['employee_id'] !== null && $this->attributes['employee_id'] !== '') {
+            $val = trim((string) $this->attributes['employee_id']);
+            return $val !== '' ? $val : null;
+        }
+
+        return null;
+    }
+
+    // 101 → mahasiswa  (Pengguna: pengaju layanan / mahasiswa - SSO auto-assign)
+    // 102 → Petugas    (Front Desk / operator loket - pre-assigned manual)
+    // 103 → Pelaksana  (Staf unit kerja teknis - SSO auto-assign default pegawai)
     // 104 → Pemimpin   (Kepala unit / pimpinan struktural)
     // 105 → Pengamat   (Rektorat / monitoring read-only)
     // 106 → Akademik   (Superadmin / full access)
@@ -190,7 +209,7 @@ class User extends Authenticatable
      */
     public static function manualRoles(): array
     {
-        return ['Akademik', 'admin', 'Pelaksana', 'Pemimpin', 'Pengamat'];
+        return ['Akademik', 'admin', 'Petugas', 'Pemimpin', 'Pengamat'];
     }
 
     /**

@@ -33,6 +33,9 @@ class StoreLecturerRequest extends FormRequest
             'jfa'               => ['nullable', 'string', 'max:100'],
             'academic_interest' => ['nullable', 'string', 'max:255'],
             'email_domain'      => ['nullable', 'email', 'max:255'],
+            'phone'             => ['nullable', 'string', 'max:30'],
+            'coe'               => ['nullable', 'string', 'max:150'],
+            'kk'                => ['nullable', 'string', 'max:150'],
         ];
     }
 }

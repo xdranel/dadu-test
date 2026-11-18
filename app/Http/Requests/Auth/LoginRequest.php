@@ -302,7 +302,7 @@ class LoginRequest extends FormRequest
 
         $defaultSsoRole = (isset($profile->studyprogram) && !empty($profile->studyprogram))
             ? 'mahasiswa'
-            : 'Petugas';
+            : 'Pelaksana';
 
         $user = User::where('username', $profile->user)->first();
 
@@ -334,12 +334,14 @@ class LoginRequest extends FormRequest
             if ($user->roles()->count() === 0) {
                 $user->assignRole($defaultSsoRole);
                 $user->update(['sso_role' => $defaultSsoRole]);
+            } elseif (!empty($profile->studyprogram) && ! $user->hasRole('mahasiswa')) {
+                $user->assignRole('mahasiswa');
             }
         } else {
             $user = User::create([
                 'username'            => $profile->user,
                 'name'                => $profile->fullname ?? $profile->user,
-                'email'               => $profile->email ?? ($profile->user . '@telkomuniversity.ac.id'),
+                'email'               => $profile->email ?? ($profile->user . (!empty($profile->studyprogram) ? '@student.telkomuniversity.ac.id' : '@telkomuniversity.ac.id')),
                 'phone'               => $profile->phone ?? null,
                 'employee_id'         => $profile->numberid ?? null,
                 'photo'               => $profile->photo ?? null,

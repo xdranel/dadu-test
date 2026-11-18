@@ -9,12 +9,16 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
+        :root { --header-height: 64px; }
+        [x-cloak] { display: none !important; }
         /* Anti-FOUC: kunci dimensi ikon & logo sidebar sebelum bundle CSS termuat.
            Selector dipersempit agar chevron accordion (button > svg) tidak terkena. */
         aside nav a svg,
         aside nav button span svg { width: 1.25rem; height: 1.25rem; flex-shrink: 0; }
-        aside img { height: 1.25rem; width: auto; flex-shrink: 0; }
+        aside img { height: 1.5rem; width: auto; flex-shrink: 0; }
     </style>
+    <!-- Alpine Plugins -->
+    <script defer src="https://cdn.jsdelivr.net/npm/@alpinejs/collapse@3.x.x/dist/cdn.min.js"></script>
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     <link rel="icon" href="{{ asset('assets/daduLogo.svg') }}" type="image/svg+xml">
 </head>
@@ -22,17 +26,24 @@
 
 <div class="flex h-screen overflow-hidden" 
      x-data="{ 
-         sidebarOpen: window.innerWidth >= 1024,
-         isDesktop: window.innerWidth >= 1024,
-         handleResize() {
-             const currentlyDesktop = window.innerWidth >= 1024;
-             if (this.isDesktop !== currentlyDesktop) {
-                 this.isDesktop = currentlyDesktop;
-                 this.sidebarOpen = currentlyDesktop;
-             }
-         }
-     }"
-     @resize.window.debounce.150ms="handleResize()">
+        sidebarOpen: (() => {
+            // Mobile: drawer selalu tertutup saat load
+            if (window.innerWidth < 1024) return false;
+            try { return localStorage.getItem('sidebar_open') !== 'false'; }
+            catch (e) { return true; }
+        })(),
+        ready: false,
+        init() {
+            this.$watch('sidebarOpen', v => {
+                // Simpan hanya untuk desktop, drawer mobile tidak ikut disimpan
+                if (window.innerWidth >= 1024) {
+                    try { localStorage.setItem('sidebar_open', v ? 'true' : 'false'); } catch (e) {}
+                }
+            });
+            // Aktifkan animasi hanya setelah render pertama (mencegah animasi geser saat load)
+            this.$nextTick(() => requestAnimationFrame(() => this.ready = true));
+        }
+     }">
 
     <!-- Backdrop Overlay untuk Mobile (Menutup sidebar saat area luar diklik) -->
     <div x-show="sidebarOpen" 
@@ -53,24 +64,22 @@
     <div class="flex-1 min-w-0 flex flex-col h-full overflow-hidden">
 
         <!-- Topbar -->
-        <header class="bg-white border-b border-slate-200/80 flex items-center justify-between px-4 sm:px-6 py-4 flex-shrink-0">
-            <div class="flex items-center gap-4">
-                <!-- Toggle Sidebar -->
-                <button @click="sidebarOpen = !sidebarOpen"
-                        class="text-slate-400 hover:text-slate-600 focus:outline-none p-1.5 rounded-lg hover:bg-slate-100 transition-colors"
-                        aria-label="Toggle Sidebar">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                              d="M4 6h16M4 12h16M4 18h16"/>
-                    </svg>
-                </button>
+        <header class="shrink-0 box-border flex items-center gap-4 px-6 bg-white border-b border-slate-200"
+                style="height: var(--header-height);">
+            <!-- Toggle Sidebar -->
+            <button @click="sidebarOpen = !sidebarOpen"
+                    class="text-slate-400 hover:text-slate-600 focus:outline-none p-1.5 rounded-lg hover:bg-slate-100 transition-colors"
+                    aria-label="Toggle Sidebar">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                          d="M4 6h16M4 12h16M4 18h16"/>
+                </svg>
+            </button>
 
-                <!-- Page Title -->
-                <h1 class="text-lg font-semibold text-slate-800">
-                    {{ $header ?? 'Dashboard' }}
-                </h1>
-            </div>
-
+            <!-- Page Title -->
+            <h1 class="text-lg font-semibold text-slate-800">
+                {{ $header ?? 'Dashboard' }}
+            </h1>
         </header>
 
         <!-- Page Content -->

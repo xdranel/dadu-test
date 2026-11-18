@@ -51,6 +51,15 @@
                         </span>
                     </div>
                 </div>
+                @if(!empty($fileMissing))
+                <button type="button" disabled
+                   class="inline-flex items-center justify-center gap-2 px-6 h-12 text-sm font-bold text-slate-400 bg-slate-100 rounded-xl shadow-sm opacity-60 cursor-not-allowed flex-shrink-0">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
+                    </svg>
+                    <span>File Tidak Tersedia</span>
+                </button>
+                @else
                 <a href="{{ route('public_documents.download', $document) }}"
                    class="inline-flex items-center justify-center gap-2 px-6 h-12 text-sm font-bold text-white bg-[#DA2D3B] hover:bg-[#b92532] rounded-xl shadow-sm transition-all active:scale-[0.98] flex-shrink-0">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
@@ -58,6 +67,7 @@
                     </svg>
                     <span>Unduh Dokumen</span>
                 </a>
+                @endif
             </div>
 
             @if($document->description)
@@ -86,14 +96,30 @@
             </div>
 
             <!-- PDF Preview (if applicable) -->
-            @if($document->file_type === 'pdf')
+            @if(!empty($fileMissing))
+                <div class="rounded-2xl border border-amber-200 bg-amber-50 p-6 text-center mb-6">
+                    <div class="w-12 h-12 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center mx-auto mb-3">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+                    </div>
+                    <h4 class="text-sm font-bold text-amber-800">File fisik tidak ditemukan di penyimpanan</h4>
+                    <p class="text-xs text-amber-700 mt-1">File tidak ditemukan di server. Silakan hubungi admin sistem.</p>
+                </div>
+            @elseif($document->file_type === 'pdf')
                 <div class="mb-2">
                     <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3.5">Pratinjau Dokumen</h3>
                     <div class="border border-slate-200/80 rounded-2xl overflow-hidden bg-slate-100 shadow-inner">
-                        <iframe src="/storage/{{ $document->file_path }}"
+                        <iframe src="{{ route('public_documents.preview', $document) }}#toolbar=1&navpanes=0"
                                 class="w-full"
-                                style="height: 600px; border: none;"></iframe>
+                                style="height: 600px; border: none;"
+                                title="Pratinjau {{ $document->title }}"
+                                loading="lazy"></iframe>
                     </div>
+                </div>
+            @else
+                <div class="rounded-2xl border border-slate-200 bg-slate-50 py-10 flex flex-col items-center text-center mb-6">
+                    <x-file-icon :type="$document->file_type" size="lg" />
+                    <p class="mt-4 text-sm font-semibold text-slate-700">Pratinjau tidak tersedia untuk tipe {{ strtoupper($document->file_type) }}</p>
+                    <p class="text-xs text-slate-400 mt-1">Unduh dokumen untuk melihat isinya.</p>
                 </div>
             @endif
         </div>

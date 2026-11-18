@@ -122,9 +122,13 @@ class QueueHistoryController extends Controller
                 'Jam Dipanggil',
                 'Jam Selesai',
                 'Jam Dilewati',
+                'Catatan Petugas',
+                'Durasi Pelayanan',
             ]);
 
             $rowCount = 0;
+            $totalSeconds = 0;
+            $validCount = 0;
 
             foreach ($combinedQuery->cursor() as $row) {
                 $rowCount++;
@@ -137,6 +141,19 @@ class QueueHistoryController extends Controller
                     'unserved' => 'Tidak Terlayani',
                     default => ucfirst($row->status),
                 };
+
+                if ($row->status === 'skipped') {
+                    $durationStr = '-';
+                } else {
+                    $seconds = $this->calculateServiceSeconds($row->called_at, $row->finished_at);
+                    if ($seconds !== null) {
+                        $durationStr = $this->formatDuration($seconds);
+                        $totalSeconds += $seconds;
+                        $validCount++;
+                    } else {
+                        $durationStr = '-';
+                    }
+                }
 
                 fputcsv($handle, [
                     $this->sanitizeCsv($row->queue_date),
@@ -154,8 +171,38 @@ class QueueHistoryController extends Controller
                     $this->sanitizeCsv($row->called_at ? Carbon::parse($row->called_at)->timezone('Asia/Jakarta')->format('H:i:s') : '-'),
                     $this->sanitizeCsv($row->finished_at ? Carbon::parse($row->finished_at)->timezone('Asia/Jakarta')->format('H:i:s') : '-'),
                     $this->sanitizeCsv(isset($row->skipped_at) && $row->skipped_at ? Carbon::parse($row->skipped_at)->timezone('Asia/Jakarta')->format('H:i:s') : '-'),
+                    $this->sanitizeCsv($row->staff_notes ?? '-'),
+                    $this->sanitizeCsv($durationStr),
                 ]);
             }
+
+            // Satu baris kosong pemisah
+            fputcsv($handle, []);
+
+            // Baris ringkasan rata-rata
+            $avgDurationStr = ($validCount > 0)
+                ? $this->formatDuration((int) round($totalSeconds / $validCount))
+                : '-';
+
+            fputcsv($handle, [
+                'Rata-rata Durasi Pelayanan',
+                '',
+                '',
+                '',
+                '',
+                '',
+                '',
+                '',
+                '',
+                '',
+                '',
+                '',
+                '',
+                '',
+                '',
+                '',
+                $avgDurationStr,
+            ]);
 
             fclose($handle);
 
@@ -243,6 +290,7 @@ class QueueHistoryController extends Controller
                 'study_program',
                 'service_category',
                 'notes',
+                'staff_notes',
                 'queue_date',
                 'status',
                 'counter_id',
@@ -265,6 +313,7 @@ class QueueHistoryController extends Controller
                 'study_program',
                 'service_category',
                 'notes',
+                'staff_notes',
                 'queue_date',
                 'status',
                 'counter_id',
@@ -370,15 +419,57 @@ class QueueHistoryController extends Controller
     /**
      * Sanitasi sel teks pencegah CSV Formula Injection
      */
-    private function sanitizeCsv(?string $val): string
+    public function sanitizeCsv(?string $val): string
     {
         if ($val === null) {
             return '';
         }
         $val = (string) $val;
+        if ($val === '-') {
+            return '-';
+        }
         if (strlen($val) > 0 && in_array($val[0], ['=', '+', '-', '@', "\t", "\r"], true)) {
             return "'" . $val;
         }
         return $val;
+    }
+
+    /**
+     * Hitung durasi pelayanan dalam satuan detik (finished_at - called_at).
+     * Valid hanya jika keduanya ada dan finished_at >= called_at.
+     */
+    public function calculateServiceSeconds($calledAt, $finishedAt): ?int
+    {
+        if (empty($calledAt) || empty($finishedAt)) {
+            return null;
+        }
+
+        try {
+            $called = $calledAt instanceof Carbon ? $calledAt : Carbon::parse($calledAt);
+            $finished = $finishedAt instanceof Carbon ? $finishedAt : Carbon::parse($finishedAt);
+
+            $diff = $finished->getTimestamp() - $called->getTimestamp();
+
+            return $diff >= 0 ? $diff : null;
+        } catch (\Throwable $e) {
+            return null;
+        }
+    }
+
+    /**
+     * Format durasi detik menjadi string HH:MM:SS (jam tidak di-wrap bila >= 24)
+     */
+    public function formatDuration(int $seconds): string
+    {
+        if ($seconds < 0) {
+            $seconds = 0;
+        }
+
+        $hours = intdiv($seconds, 3600);
+        $remainder = $seconds % 3600;
+        $minutes = intdiv($remainder, 60);
+        $secs = $remainder % 60;
+
+        return sprintf('%02d:%02d:%02d', $hours, $minutes, $secs);
     }
 }

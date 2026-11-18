@@ -10,6 +10,7 @@ use App\Models\QueueState;
 use App\Services\QueueCounterService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Carbon\Carbon;
 
 class QueueController extends Controller
@@ -153,6 +154,29 @@ class QueueController extends Controller
     }
 
     /**
+     * Paksa keluar petugas dari loket (khusus role admin & superadmin atau yang memiliki permission queue_ticket_force_release).
+     */
+    public function forceRelease(Request $request)
+    {
+        $user = $request->user();
+        if (!$user->can('queue_ticket_force_release') && !$user->isSuperAdmin() && !$user->hasRole('admin')) {
+            abort(403, 'Anda tidak memiliki hak akses untuk mengeluarkan petugas dari loket.');
+        }
+
+        $validated = $request->validate([
+            'counter_id' => 'required|integer|exists:queue_counters,id',
+        ]);
+
+        $result = $this->counterService->forceRelease($user, (int) $validated['counter_id']);
+
+        if (!$result['ok']) {
+            return redirect()->back()->with('error', $result['message']);
+        }
+
+        return redirect()->back()->with('success', $result['message']);
+    }
+
+    /**
      * JSON endpoint for auto-refresh of dashboard stats
      */
     public function stats(Request $request)
@@ -218,6 +242,9 @@ class QueueController extends Controller
                     'study_program' => $t->study_program,
                     'service_category' => $t->service_category,
                     'notes' => $t->notes,
+                    'staff_notes' => $t->staff_notes,
+                    'staff_notes_seq' => (int) ($t->staff_notes_seq ?? 0),
+                    'staff_notes_updated_at' => $t->staff_notes_updated_at ? $t->staff_notes_updated_at->timezone('Asia/Jakarta')->format('H:i') : null,
                     'status' => $t->status,
                     'created_at_formatted' => $t->created_at ? $t->created_at->timezone('Asia/Jakarta')->format('H:i') : '-',
                     'created_at_iso' => $t->created_at ? $t->created_at->timezone('Asia/Jakarta')->toIso8601String() : null,
@@ -240,6 +267,9 @@ class QueueController extends Controller
                     'study_program' => $t->study_program,
                     'service_category' => $t->service_category,
                     'notes' => $t->notes,
+                    'staff_notes' => $t->staff_notes,
+                    'staff_notes_seq' => (int) ($t->staff_notes_seq ?? 0),
+                    'staff_notes_updated_at' => $t->staff_notes_updated_at ? $t->staff_notes_updated_at->timezone('Asia/Jakarta')->format('H:i') : null,
                     'status' => $t->status,
                     'counter_id' => $t->counter_id,
                     'can_skip' => (bool) ($selectedCounter && (int) $t->counter_id === (int) $selectedCounter->id),
@@ -267,6 +297,9 @@ class QueueController extends Controller
                     'study_program' => $t->study_program,
                     'service_category' => $t->service_category,
                     'notes' => $t->notes,
+                    'staff_notes' => $t->staff_notes,
+                    'staff_notes_seq' => (int) ($t->staff_notes_seq ?? 0),
+                    'staff_notes_updated_at' => $t->staff_notes_updated_at ? $t->staff_notes_updated_at->timezone('Asia/Jakarta')->format('H:i') : null,
                     'status' => $t->status,
                     'created_at_formatted' => $t->created_at ? $t->created_at->timezone('Asia/Jakarta')->format('H:i') : '-',
                     'created_at_iso' => $t->created_at ? $t->created_at->timezone('Asia/Jakarta')->toIso8601String() : null,
@@ -454,7 +487,7 @@ class QueueController extends Controller
             return redirect()->back()->with('error', 'Silakan pilih loket terlebih dahulu sebelum memanggil antrian.');
         }
 
-        $result = DB::transaction(function () use ($selectedCounter, $user) {
+        $result = DB::transaction(function () use ($selectedCounter, $user, $request) {
             $state = QueueState::where('counter_id', $selectedCounter->id)
                 ->lockForUpdate()
                 ->firstOrCreate(['counter_id' => $selectedCounter->id]);
@@ -462,10 +495,17 @@ class QueueController extends Controller
             if ($state->current_id) {
                 $currentTicket = QueueTicket::lockForUpdate()->find($state->current_id);
                 if ($currentTicket && $currentTicket->status === 'called' && (int) $currentTicket->counter_id === (int) $selectedCounter->id) {
-                    $currentTicket->update([
+                    $updateData = [
                         'status' => 'finished',
                         'finished_at' => now(),
-                    ]);
+                    ];
+                    if ($request->has('staff_notes')) {
+                        $notes = trim($request->input('staff_notes') ?? '');
+                        $updateData['staff_notes'] = $notes === '' ? null : mb_substr($notes, 0, 500);
+                        $updateData['staff_notes_seq'] = ($currentTicket->staff_notes_seq ?? 0) + 1;
+                        $updateData['staff_notes_updated_at'] = now();
+                    }
+                    $currentTicket->update($updateData);
                     $state->last_id = $currentTicket->id;
                 } else {
                     $state->last_id = null;
@@ -542,7 +582,7 @@ class QueueController extends Controller
             return redirect()->back()->with('error', $msg);
         }
 
-        $result = DB::transaction(function () use ($selectedCounter, $user) {
+        $result = DB::transaction(function () use ($selectedCounter, $user, $request) {
             $state = QueueState::where('counter_id', $selectedCounter->id)
                 ->lockForUpdate()
                 ->first();
@@ -566,11 +606,18 @@ class QueueController extends Controller
 
             $ticketCode = $currentTicket->code;
 
-            $currentTicket->update([
+            $updateData = [
                 'status' => 'skipped',
                 'skipped_at' => now('Asia/Jakarta'),
                 'skipped_by' => $user->id,
-            ]);
+            ];
+            if ($request->has('staff_notes')) {
+                $notes = trim($request->input('staff_notes') ?? '');
+                $updateData['staff_notes'] = $notes === '' ? null : mb_substr($notes, 0, 500);
+                $updateData['staff_notes_seq'] = ($currentTicket->staff_notes_seq ?? 0) + 1;
+                $updateData['staff_notes_updated_at'] = now();
+            }
+            $currentTicket->update($updateData);
 
             $state->current_id = null;
             $state->last_id = null;
@@ -655,5 +702,70 @@ class QueueController extends Controller
         });
 
         return redirect()->back()->with($result['status'], $result['message']);
+    }
+
+    /**
+     * Simpan atau ubah catatan petugas pada tiket (tiket berstatus called, finished, atau skipped)
+     */
+    public function updateStaffNotes(Request $request, QueueTicket $ticket)
+    {
+        $user = $request->user();
+        if (!$user || (!$user->can('queue_ticket_update') && !$user->hasAnyRole(['admin', 'Petugas', 'superadmin']))) {
+            abort(403, 'Anda tidak memiliki hak akses untuk mengubah catatan petugas.');
+        }
+
+        if (!in_array($ticket->status, ['called', 'finished', 'skipped'], true)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Catatan hanya dapat ditambahkan pada tiket dengan status dipanggil, selesai, atau dilewati.',
+                'errors' => [
+                    'ticket' => ['Status tiket saat ini tidak mengizinkan penambahan catatan.']
+                ],
+            ], 422);
+        }
+
+        $validated = $request->validate([
+            'staff_notes' => ['nullable', 'string', 'max:500'],
+            'client_seq' => ['nullable', 'integer', 'min:0'],
+            'is_final' => ['nullable', 'boolean'],
+        ]);
+
+        $clientSeq = $request->has('client_seq') ? (int) $request->input('client_seq') : null;
+
+        // Lindungi dari race condition / stale update: jika seq klien lebih lama dari yang tersimpan di DB, abaikan
+        if ($clientSeq !== null && $ticket->staff_notes_seq !== null && $clientSeq < (int) $ticket->staff_notes_seq) {
+            return response()->json([
+                'success' => true,
+                'ignored' => true,
+                'staff_notes' => $ticket->staff_notes,
+                'client_seq' => (int) $ticket->staff_notes_seq,
+                'saved_at' => $ticket->staff_notes_updated_at ? $ticket->staff_notes_updated_at->timezone('Asia/Jakarta')->format('H:i') : null,
+            ]);
+        }
+
+        $notes = isset($validated['staff_notes']) ? trim($validated['staff_notes']) : null;
+        if ($notes === '') {
+            $notes = null;
+        }
+
+        $ticket->staff_notes = $notes;
+        $ticket->staff_notes_seq = $clientSeq !== null ? $clientSeq : (($ticket->staff_notes_seq ?? 0) + 1);
+        $ticket->staff_notes_updated_at = now();
+        $ticket->save();
+
+        // Hanya log saat finalisasi atau status selesai/dilewati (jangan log setiap auto-save draf, dan jangan log isi catatan)
+        if ($request->boolean('is_final') || in_array($ticket->status, ['finished', 'skipped'], true)) {
+            Log::info('Staff note finalized for queue ticket', [
+                'user_id' => $user->id,
+                'ticket_id' => $ticket->id,
+            ]);
+        }
+
+        return response()->json([
+            'success' => true,
+            'staff_notes' => $ticket->staff_notes,
+            'client_seq' => (int) $ticket->staff_notes_seq,
+            'saved_at' => $ticket->staff_notes_updated_at ? $ticket->staff_notes_updated_at->timezone('Asia/Jakarta')->format('H:i') : now('Asia/Jakarta')->format('H:i'),
+        ]);
     }
 }

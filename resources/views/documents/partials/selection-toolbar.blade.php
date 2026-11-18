@@ -58,6 +58,20 @@
             Unduh
         </button>
 
+        {{-- Pindahkan --}}
+        @canany(['document_update', 'document_category_update'])
+        <button type="button"
+                @click="openMove()"
+                class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium text-slate-700 border border-slate-300 bg-white hover:bg-slate-50 transition-all"
+                title="Pindahkan item terpilih"
+                aria-label="Pindahkan item terpilih">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/>
+            </svg>
+            Pindahkan
+        </button>
+        @endcanany
+
         {{-- Ganti Nama — hanya saat 1 item --}}
         <button type="button"
                 x-show="isSingle"

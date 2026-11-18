@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class UpdateDocumentRequest extends FormRequest
 {
@@ -15,11 +16,12 @@ class UpdateDocumentRequest extends FormRequest
     {
         return [
             'document_category_id' => ['sometimes', 'required', 'exists:document_categories,id'],
-            'title'                => ['required', 'string', 'max:255'],
+            'title'                => ['sometimes', 'required', 'string', 'max:255'],
             'abbreviation'         => ['nullable', 'string', 'max:50'],
             'description'          => ['nullable', 'string', 'max:2000'],
-            'visibility'           => ['sometimes', 'required', 'in:publik,internal'],
-            'file'                 => ['nullable', 'file', 'max:15360',
+            'visibility'           => ['sometimes', 'required', Rule::in(array_keys(config('documents.visibility')))],
+            'nims'                 => ['nullable'],
+            'file'                 => ['nullable', 'file', 'max:20480',
                                        'mimes:pdf,doc,docx,xls,xlsx,ppt,pptx,zip,rar'],
         ];
     }
@@ -32,7 +34,7 @@ class UpdateDocumentRequest extends FormRequest
             'title.required'                => 'Judul dokumen wajib diisi.',
             'visibility.required'           => 'Visibilitas wajib dipilih.',
             'visibility.in'                 => 'Visibilitas harus bernilai Publik dan Mahasiswa atau Pegawai dan Dosen.',
-            'file.max'                      => 'Ukuran file maksimal 15MB.',
+            'file.max'                      => 'Ukuran file maksimal 20MB.',
             'file.mimes'                    => 'Format file harus berupa PDF, DOC, DOCX, XLS, XLSX, PPT, PPTX, ZIP, atau RAR.',
         ];
     }

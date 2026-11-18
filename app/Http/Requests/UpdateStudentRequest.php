@@ -23,7 +23,7 @@ class UpdateStudentRequest extends FormRequest
             'name'                => ['required', 'string', 'max:255'],
             'gender'              => ['nullable', 'in:Laki-laki,Perempuan'],
             'religion'            => ['nullable', 'string', 'max:30'],
-            'profile_photo'       => ['nullable', 'image', 'mimes:jpg,jpeg,png', 'max:2048'],
+            'profile_photo'       => ['nullable', 'image', 'mimes:jpg,jpeg,png', 'max:20480'],
             'faculty'             => ['nullable', 'string', 'max:100'],
             'study_program'       => ['required', Rule::in(\App\Constants\ProdiList::ALL)],
             'academic_year'       => ['required', 'string'],

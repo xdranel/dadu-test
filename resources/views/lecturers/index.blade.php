@@ -255,9 +255,9 @@
                 <div class="mb-5 p-3.5 bg-slate-50 rounded-xl border border-slate-200">
                     <p class="text-xs font-semibold text-slate-600 mb-1">Format header kolom Excel (atau langsung gunakan tombol Download):</p>
                     <code class="text-[10px] block leading-relaxed text-[#DA2D3B] font-medium">
-                        NAMA | Status Aktif | PRODI | NIP YPT | NIDN | NUPTK | STATUS Kepegawaian | GELAR DEPAN | GELAR BELAKANG | JFA | BIDANG KEILMUAN | KODE DOSEN | Email Domain
+                        NAMA | Status Aktif | PRODI | NIP YPT | NIDN | NUPTK | STATUS Kepegawaian | GELAR DEPAN | GELAR BELAKANG | JFA | BIDANG KEILMUAN | KODE DOSEN | Email Domain | No HP | COE | KK
                     </code>
-                    <p class="text-xs text-slate-400 mt-1.5">* Minimal NAMA dan (NIDN atau KODE DOSEN) wajib diisi. NIDN/Kode ganda akan dilewati.</p>
+                    <p class="text-xs text-slate-400 mt-1.5">* Wajib: NAMA dan minimal satu dari NIDN / NIP YPT / NUPTK. Pencocokan data lama berurutan: NIDN → NIP YPT → NUPTK (KODE DOSEN boleh berubah dan ikut diperbarui). Dosen baru wajib punya KODE DOSEN. Sel kosong tidak menimpa data lama.</p>
                 </div>
                 <div class="flex justify-end gap-3">
                     <button type="button"

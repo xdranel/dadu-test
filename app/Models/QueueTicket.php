@@ -19,6 +19,9 @@ class QueueTicket extends Model
         'study_program',
         'service_category',
         'notes',
+        'staff_notes',
+        'staff_notes_seq',
+        'staff_notes_updated_at',
         'queue_date',
         'status',
         'device_token',
@@ -35,6 +38,8 @@ class QueueTicket extends Model
         'called_at' => 'datetime',
         'finished_at' => 'datetime',
         'skipped_at' => 'datetime',
+        'staff_notes_updated_at' => 'datetime',
+        'staff_notes_seq' => 'integer',
     ];
 
     public function counter(): BelongsTo

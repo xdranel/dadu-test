@@ -211,4 +211,60 @@ class QueueCounterService
             ]);
         });
     }
+
+    /**
+     * Paksa lepas / keluarkan petugas dari loket tertentu (oleh Admin / Super Admin).
+     * Selesaikan tiket aktif jika ada agar tidak terlantar tanpa pemilik.
+     */
+    public function forceRelease(User $actor, int $counterId): array
+    {
+        return DB::transaction(function () use ($actor, $counterId) {
+            $counter = QueueCounter::lockForUpdate()->find($counterId);
+
+            if (!$counter) {
+                return [
+                    'ok' => false,
+                    'message' => 'Loket tidak ditemukan.',
+                ];
+            }
+
+            if (!$counter->active_user_id) {
+                return [
+                    'ok' => true,
+                    'message' => $counter->name . ' sudah dalam keadaan kosong.',
+                ];
+            }
+
+            $occupant = $counter->activeUser;
+            $occupantName = $occupant?->name ?? 'Petugas';
+
+            $state = QueueState::where('counter_id', $counter->id)->lockForUpdate()->first();
+            if ($state && $state->current_id) {
+                $current = QueueTicket::lockForUpdate()->find($state->current_id);
+                if ($current && $current->status === 'called') {
+                    $current->update([
+                        'status' => 'finished',
+                        'finished_at' => now(),
+                    ]);
+                    QueueTicketEvent::record('finished', $current, $counter->id, $actor->id);
+                }
+                $state->update([
+                    'current_id' => null,
+                    'last_id' => null,
+                ]);
+            }
+
+            $counter->update([
+                'active_user_id' => null,
+                'last_seen_at' => now(),
+            ]);
+
+            return [
+                'ok' => true,
+                'counter' => $counter,
+                'occupant_name' => $occupantName,
+                'message' => 'Berhasil mengeluarkan ' . $occupantName . ' dari ' . $counter->name . '. Loket kini dapat dipilih.',
+            ];
+        });
+    }
 }

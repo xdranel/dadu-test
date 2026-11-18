@@ -106,12 +106,11 @@
                         </label>
                         <select id="visibility" name="visibility"
                                 class="campus-select w-full @error('visibility') border-red-500 @enderror" required>
-                            <option value="publik" {{ old('visibility', $document->visibility) === 'publik' ? 'selected' : '' }}>
-                                Publik dan Mahasiswa
-                            </option>
-                            <option value="internal" {{ old('visibility', $document->visibility) === 'internal' ? 'selected' : '' }}>
-                                Pegawai dan Dosen
-                            </option>
+                            @foreach(config('documents.visibility', []) as $vKey => $vMeta)
+                                <option value="{{ $vKey }}" {{ old('visibility', $document->visibility) === $vKey ? 'selected' : '' }}>
+                                    {{ $vMeta['label'] }}
+                                </option>
+                            @endforeach
                         </select>
                         @error('visibility')
                             <p class="mt-1 text-xs text-red-600 font-medium">{{ $message }}</p>

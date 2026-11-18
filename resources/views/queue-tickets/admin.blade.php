@@ -1,12 +1,494 @@
 <x-app-layout>
     <x-slot name="header">Dashboard Antrian</x-slot>
 
-    <div x-data="{ 
-        activeTab: 'dashboard', 
-        showQrModal: false, 
+    <style>
+        [x-cloak] { display: none !important; }
+
+        /* Custom thin scrollbar for queue lists */
+        .queue-custom-scroll {
+            scrollbar-width: thin;
+            scrollbar-color: #cbd5e1 transparent;
+        }
+        .queue-custom-scroll::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        .queue-custom-scroll::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .queue-custom-scroll::-webkit-scrollbar-thumb {
+            background-color: #cbd5e1; /* slate-300 */
+            border-radius: 9999px;
+        }
+        .queue-custom-scroll::-webkit-scrollbar-thumb:hover {
+            background-color: #94a3b8; /* slate-400 */
+        }
+
+        .overscroll-contain {
+            overscroll-behavior: contain;
+        }
+
+        .min-h-0 {
+            min-height: 0px !important;
+        }
+
+        .queue-col-card {
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            height: 70dvh;
+            max-height: 560px;
+            min-height: 380px;
+        }
+        @media (min-width: 768px) {
+            .queue-col-card {
+                display: flex !important;
+                height: calc(100dvh - 16rem) !important;
+                min-height: 420px !important;
+                max-height: 680px !important;
+            }
+            .md\:flex {
+                display: flex !important;
+            }
+            .md\:h-\[calc\(100dvh-16rem\)\] {
+                height: calc(100dvh - 16rem) !important;
+            }
+            .md\:min-h-\[420px\] {
+                min-height: 420px !important;
+            }
+            .md\:max-h-\[680px\] {
+                max-height: 680px !important;
+            }
+            .md\:text-\[11px\] {
+                font-size: 11px !important;
+            }
+            .md\:text-\[10px\] {
+                font-size: 10px !important;
+            }
+        }
+    </style>
+
+    <script>
+        window.calledStaffNotesRegistry = window.calledStaffNotesRegistry || new Map();
+        window.currentCalledTicketId = {{ $currentCall ? $currentCall->id : 'null' }};
+
+        function calledStaffNotes(ticketId, initialNotes = '', initialSavedAt = '') {
+            return {
+                ticketId: ticketId,
+                open: false,
+                value: initialNotes || '',
+                lastSaved: initialNotes || '',
+                status: (initialNotes ? 'saved' : 'idle'), // 'idle' | 'dirty' | 'saving' | 'saved' | 'error'
+                savedAt: initialSavedAt || '',
+                seq: 0,
+                timer: null,
+                retryCount: 0,
+                maxRetries: 3,
+                inFlight: false,
+                pendingSave: false,
+                isFocused: false,
+                errorMessage: '',
+
+                init() {
+                    window.calledStaffNotesRegistry.set(Number(this.ticketId), this);
+
+                    this.$watch('value', (val) => {
+                        if (val !== this.lastSaved) {
+                            this.status = 'dirty';
+                            this.scheduleSave(800);
+                        } else if (this.status === 'dirty') {
+                            this.status = this.lastSaved ? 'saved' : 'idle';
+                            if (this.timer) {
+                                clearTimeout(this.timer);
+                                this.timer = null;
+                            }
+                        }
+                    });
+                },
+
+                destroy() {
+                    if (this.timer) clearTimeout(this.timer);
+                    window.calledStaffNotesRegistry.delete(Number(this.ticketId));
+                },
+
+                toggle() {
+                    this.open = !this.open;
+                    if (this.open) {
+                        this.$nextTick(() => {
+                            if (this.$refs.textarea) {
+                                this.$refs.textarea.focus();
+                            }
+                            if (this.$el && typeof this.$el.scrollIntoView === 'function') {
+                                this.$el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+                            }
+                        });
+                    }
+                },
+
+                cancel() {
+                    if (this.timer) {
+                        clearTimeout(this.timer);
+                        this.timer = null;
+                    }
+                    this.value = this.lastSaved;
+                    this.status = this.lastSaved ? 'saved' : 'idle';
+                    this.open = false;
+                },
+
+                async saveManual() {
+                    await this.saveImmediately(false);
+                },
+
+                onFocus() {
+                    this.isFocused = true;
+                },
+
+                onBlur() {
+                    this.isFocused = false;
+                    if (this.status === 'dirty' || this.value !== this.lastSaved) {
+                        this.saveImmediately();
+                    }
+                },
+
+                scheduleSave(delay = 800) {
+                    if (this.timer) clearTimeout(this.timer);
+                    this.timer = setTimeout(() => {
+                        this.timer = null;
+                        this.saveImmediately();
+                    }, delay);
+                },
+
+                async saveImmediately(isFinal = false) {
+                    if (this.timer) {
+                        clearTimeout(this.timer);
+                        this.timer = null;
+                    }
+
+                    if (this.inFlight) {
+                        this.pendingSave = true;
+                        return;
+                    }
+
+                    if (this.value === this.lastSaved && this.status !== 'dirty' && !this.pendingSave) {
+                        return;
+                    }
+
+                    this.inFlight = true;
+                    this.pendingSave = false;
+                    this.status = 'saving';
+                    this.errorMessage = '';
+                    this.seq += 1;
+                    const currentSeq = this.seq;
+                    const noteToSend = this.value;
+
+                    try {
+                        const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+                        const response = await fetch(`/queue/tickets/${this.ticketId}/staff-notes`, {
+                            method: 'PATCH',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Accept': 'application/json',
+                                'X-CSRF-TOKEN': csrfToken || '',
+                                'X-Requested-With': 'XMLHttpRequest'
+                            },
+                            body: JSON.stringify({
+                                staff_notes: noteToSend,
+                                client_seq: currentSeq,
+                                is_final: isFinal
+                            })
+                        });
+
+                        const data = await response.json();
+
+                        if (response.ok && data.success) {
+                            this.retryCount = 0;
+                            this.lastSaved = noteToSend;
+                            this.savedAt = data.saved_at || new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }).replace('.', ':');
+                            this.status = 'saved';
+                            this.errorMessage = '';
+                        } else {
+                            throw new Error(data.message || 'Gagal menyimpan catatan');
+                        }
+                    } catch (err) {
+                        this.status = 'error';
+                        this.errorMessage = err.message || 'Gagal menyimpan';
+                        this.handleRetry();
+                    } finally {
+                        this.inFlight = false;
+                        if (this.pendingSave || (this.value !== this.lastSaved && this.status !== 'error')) {
+                            this.saveImmediately(isFinal);
+                        }
+                    }
+                },
+
+                handleRetry() {
+                    if (this.retryCount < this.maxRetries) {
+                        this.retryCount++;
+                        const delay = Math.pow(2, this.retryCount) * 1000;
+                        this.scheduleSave(delay);
+                    }
+                },
+
+                manualRetry() {
+                    this.retryCount = 0;
+                    this.saveImmediately();
+                },
+
+                async flush() {
+                    if (this.timer) {
+                        clearTimeout(this.timer);
+                        this.timer = null;
+                    }
+                    if (this.status === 'dirty' || this.value !== this.lastSaved || this.inFlight || this.pendingSave) {
+                        await this.saveImmediately(true);
+                    }
+                    return this.status !== 'error';
+                }
+            };
+        }
+        window.calledStaffNotes = calledStaffNotes;
+
+        window.flushStaffNotes = async function(ticketId) {
+            if (!window.calledStaffNotesRegistry) return true;
+            if (ticketId) {
+                const comp = window.calledStaffNotesRegistry.get(Number(ticketId));
+                if (comp) {
+                    return await comp.flush();
+                }
+                return true;
+            }
+            let allOk = true;
+            for (const comp of window.calledStaffNotesRegistry.values()) {
+                const ok = await comp.flush();
+                if (!ok) allOk = false;
+            }
+            return allOk;
+        };
+
+        window.hasDirtyStaffNotes = function() {
+            if (!window.calledStaffNotesRegistry) return false;
+            return Array.from(window.calledStaffNotesRegistry.values()).some(
+                c => c.status === 'dirty' || c.status === 'saving' || c.inFlight
+            );
+        };
+
+        window.flushAllDirtyKeepalive = function() {
+            if (!window.calledStaffNotesRegistry) return;
+            const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+            for (const comp of window.calledStaffNotesRegistry.values()) {
+                if (comp.value !== comp.lastSaved || comp.status === 'dirty') {
+                    const payload = JSON.stringify({
+                        staff_notes: comp.value,
+                        client_seq: ++comp.seq,
+                        is_final: false
+                    });
+                    try {
+                        fetch(`/queue/tickets/${comp.ticketId}/staff-notes`, {
+                            method: 'PATCH',
+                            keepalive: true,
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-CSRF-TOKEN': csrfToken || '',
+                                'X-Requested-With': 'XMLHttpRequest'
+                            },
+                            body: payload
+                        });
+                    } catch (e) {
+                        try {
+                            const blob = new Blob([payload], { type: 'application/json' });
+                            navigator.sendBeacon(`/queue/tickets/${comp.ticketId}/staff-notes`, blob);
+                        } catch (ignore) {}
+                    }
+                }
+            }
+        };
+
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'hidden') {
+                window.flushAllDirtyKeepalive();
+            }
+        });
+        window.addEventListener('pagehide', () => {
+            window.flushAllDirtyKeepalive();
+        });
+        window.addEventListener('beforeunload', (e) => {
+            if (window.hasDirtyStaffNotes()) {
+                e.preventDefault();
+                e.returnValue = 'Ada catatan petugas yang belum tersimpan.';
+                return e.returnValue;
+            }
+        });
+
+        async function handleCallNext(event) {
+            event.preventDefault();
+            const form = event.target.closest('form');
+            if (!form) return;
+            const btn = form.querySelector('button[type="submit"]');
+            if (btn) btn.disabled = true;
+
+            const activeTicketId = window.currentCalledTicketId || {{ $currentCall ? $currentCall->id : 'null' }};
+            if (activeTicketId && window.calledStaffNotesRegistry?.has(Number(activeTicketId))) {
+                const comp = window.calledStaffNotesRegistry.get(Number(activeTicketId));
+                const hiddenInput = document.getElementById('next-staff-notes');
+                if (hiddenInput && comp) {
+                    hiddenInput.value = comp.value || '';
+                }
+            }
+
+            const flushOk = await window.flushStaffNotes(activeTicketId);
+            if (!flushOk) {
+                const proceed = confirm('Catatan belum tersimpan ke server. Lanjutkan memanggil antrian berikutnya?');
+                if (!proceed) {
+                    if (btn) btn.disabled = false;
+                    return;
+                }
+            }
+
+            form.submit();
+        }
+        window.handleCallNext = handleCallNext;
+
+        function staffNotesCard(initialNotes, ticketId) {
+            return {
+                open: false,
+                editing: false,
+                value: initialNotes || '',
+                saved: initialNotes || '',
+                loading: false,
+                error: '',
+                ticketId: ticketId,
+                toggle() {
+                    this.open = !this.open;
+                    if (!this.open) {
+                        this.editing = false;
+                        this.value = this.saved;
+                        this.error = '';
+                    } else {
+                        this.$nextTick(() => {
+                            if (this.$el && typeof this.$el.scrollIntoView === 'function') {
+                                this.$el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+                            }
+                        });
+                    }
+                },
+                startEdit() {
+                    this.open = true;
+                    this.value = this.saved;
+                    this.error = '';
+                    this.editing = true;
+                    this.$nextTick(() => {
+                        if (this.$refs.textarea) {
+                            this.$refs.textarea.focus();
+                        }
+                        if (this.$el && typeof this.$el.scrollIntoView === 'function') {
+                            this.$el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+                        }
+                    });
+                },
+                cancelEdit() {
+                    this.value = this.saved;
+                    this.error = '';
+                    this.editing = false;
+                },
+                async saveNote() {
+                    this.loading = true;
+                    this.error = '';
+                    try {
+                        const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+                        const res = await fetch(`/queue/tickets/${this.ticketId}/staff-notes`, {
+                            method: 'PATCH',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Accept': 'application/json',
+                                'X-CSRF-TOKEN': csrfToken || '',
+                                'X-Requested-With': 'XMLHttpRequest'
+                            },
+                            body: JSON.stringify({ staff_notes: this.value })
+                        });
+                        const data = await res.json();
+                        if (res.ok && data.success) {
+                            this.saved = data.staff_notes || '';
+                            this.value = this.saved;
+                            this.editing = false;
+                            this.open = true;
+                        } else {
+                            this.error = data.message || 'Gagal menyimpan catatan.';
+                        }
+                    } catch (e) {
+                        this.error = 'Terjadi kesalahan jaringan.';
+                    } finally {
+                        this.loading = false;
+                    }
+                }
+            };
+        }
+        window.staffNotesCard = staffNotesCard;
+
+        function queueScrollContainer(listId) {
+            return {
+                listId: listId,
+                canScrollUp: false,
+                canScrollDown: false,
+                showScrollTop: false,
+                init() {
+                    this.$nextTick(() => {
+                        const el = document.getElementById(this.listId);
+                        if (!el) return;
+                        this.updateScroll(el);
+
+                        if (typeof ResizeObserver !== 'undefined') {
+                            const ro = new ResizeObserver(() => this.updateScroll(el));
+                            ro.observe(el);
+                        }
+                        if (typeof MutationObserver !== 'undefined') {
+                            const mo = new MutationObserver(() => this.updateScroll(el));
+                            mo.observe(el, { childList: true, subtree: true });
+                        }
+                        el.addEventListener('scroll', () => this.updateScroll(el), { passive: true });
+                        window.addEventListener('resize', () => this.updateScroll(el), { passive: true });
+                    });
+                },
+                updateScroll(el) {
+                    if (!el) el = document.getElementById(this.listId);
+                    if (!el) return;
+                    const threshold = 4;
+                    const st = el.scrollTop;
+                    const ch = el.clientHeight;
+                    const sh = el.scrollHeight;
+                    this.canScrollUp = st > threshold;
+                    this.showScrollTop = st > 180;
+                    this.canScrollDown = (sh > ch + threshold) && (st + ch < sh - threshold);
+                },
+                scrollToTop() {
+                    const el = document.getElementById(this.listId);
+                    if (el) {
+                        el.scrollTo({ top: 0, behavior: 'smooth' });
+                    }
+                }
+            };
+        }
+        window.queueScrollContainer = queueScrollContainer;
+
+        document.addEventListener('alpine:init', () => {
+            if (window.Alpine) {
+                window.Alpine.data('staffNotesCard', staffNotesCard);
+                window.Alpine.data('queueScrollContainer', queueScrollContainer);
+            }
+        });
+        if (window.Alpine) {
+            window.Alpine.data('staffNotesCard', staffNotesCard);
+            window.Alpine.data('queueScrollContainer', queueScrollContainer);
+        }
+    </script>
+
+    <div x-data="{
+        activeTab: 'dashboard',
+        showQrModal: false,
         showConfirmBackModal: false,
         showCounterModal: {{ (!$selectedCounter) ? 'true' : 'false' }},
-        showReleaseModal: {{ session('queue_release_ticket') ? 'true' : 'false' }}
+        showReleaseModal: {{ session('queue_release_ticket') ? 'true' : 'false' }},
+        showForceReleaseModal: false,
+        forceReleaseCounter: { id: null, name: '', user: '' }
     }">
 
         <!-- Header Controls: Tab Buttons + Pilih Loket & Tampilkan QR (Sejajar) -->
@@ -24,7 +506,7 @@
                     Histori
                 </a>
             </div>
-            
+
             <div class="flex items-center gap-2 flex-wrap">
                 <!-- Button Ganti Loket (Statis di samping kiri Tampilkan QR) -->
                 <button type="button" @click="showCounterModal = true"
@@ -72,7 +554,7 @@
                         <div class="absolute top-[-30%] right-[-20%] w-[200px] h-[200px] rounded-full bg-[#DA2D3B] blur-[60px]"></div>
                         <div class="absolute bottom-[-20%] left-[-15%] w-[150px] h-[150px] rounded-full bg-[#DA2D3B] blur-[50px]"></div>
                     </div>
-                    
+
                     <div class="relative z-10 w-full">
                         <span class="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] block mb-2" id="admin-current-header">
                             {{ $selectedCounter ? 'Sedang Dipanggil di ' . $selectedCounter->name : 'Loket Belum Dipilih' }}
@@ -137,8 +619,9 @@
 
                     <div class="space-y-2.5">
                         @if($selectedCounter)
-                            <form action="{{ route('admin.queue.next') }}" method="POST">
+                            <form action="{{ route('admin.queue.next') }}" method="POST" id="form-call-next" onsubmit="handleCallNext(event)">
                                 @csrf
+                                <input type="hidden" name="staff_notes" id="next-staff-notes" value="">
                                 <button type="submit" class="w-full flex items-center justify-center gap-2 px-5 py-3.5 bg-[#DA2D3B] hover:bg-[#c12531] active:scale-[0.98] text-white font-bold text-sm rounded-xl transition-all shadow-md shadow-red-100">
                                     Panggil Berikutnya
                                 </button>
@@ -225,146 +708,162 @@
                     </div>
 
                     <!-- Desktop columns -->
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 items-stretch">
 
                         <!-- Menunggu -->
-                        <div :class="listTab === 'waiting' ? 'block' : 'hidden md:block'"
-                             class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col h-[480px]">
-                            <div class="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+                        <div :class="listTab === 'waiting' ? 'flex' : 'hidden md:flex'"
+                             x-data="queueScrollContainer('list-waiting')"
+                             class="queue-col-card bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col h-[70dvh] max-h-[560px] md:h-[calc(100dvh-16rem)] md:min-h-[420px] md:max-h-[680px]">
+                            <div class="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50 shrink-0">
                                 <span class="font-bold text-xs uppercase tracking-wider text-slate-700">Menunggu</span>
                                 <span id="badge-waiting" class="text-xs font-bold font-mono px-2 py-0.5 rounded-full bg-slate-200 text-slate-700">{{ count($waitingTickets) }}</span>
                             </div>
-                            <div id="list-waiting" class="p-3 space-y-2 overflow-y-auto flex-1 bg-white">
-                                @forelse($waitingTickets as $ticket)
-                                    <div class="p-3 bg-slate-50 border border-slate-100 rounded-xl space-y-1">
-                                        <div class="flex items-center justify-between">
-                                            <span class="font-bold text-slate-800 font-mono text-sm">{{ $ticket->code }}</span>
-                                            <span class="text-[9px] text-slate-400 font-medium">Ambil: {{ $ticket->created_at ? $ticket->created_at->timezone('Asia/Jakarta')->format('H:i') : '' }}</span>
-                                        </div>
-                                        @if($ticket->name)
-                                            <div class="flex items-center justify-between text-xs pt-1 border-t border-slate-200/50">
-                                                <span class="font-semibold text-slate-800 truncate max-w-[150px]">{{ $ticket->name }}</span>
-                                                <span class="text-[10px] font-mono text-slate-500">{{ $ticket->nim }}</span>
+                            <div class="relative flex-1 min-h-0">
+                                <!-- Top Shadow Indicator -->
+                                <div x-show="canScrollUp" x-transition.opacity.duration.150ms
+                                     class="pointer-events-none absolute top-0 left-0 right-0 h-6 bg-gradient-to-b from-slate-900/10 to-transparent z-10"
+                                     style="display: none;"></div>
+
+                                <div id="list-waiting"
+                                     @scroll.passive="updateScroll($el)"
+                                     tabindex="0"
+                                     role="region"
+                                     aria-label="Daftar Antrian Menunggu"
+                                     class="queue-custom-scroll absolute inset-0 min-h-0 p-3 space-y-2 overflow-y-auto overscroll-contain touch-pan-y [-webkit-overflow-scrolling:touch] bg-white focus:outline-none focus:ring-1 focus:ring-slate-300">
+                                    @forelse($waitingTickets as $ticket)
+                                        <div class="p-3 bg-slate-50 border border-slate-100 rounded-xl space-y-1">
+                                            <div class="flex items-center justify-between">
+                                                <span class="font-bold text-slate-800 font-mono text-sm">{{ $ticket->code }}</span>
+                                                <span class="text-[9px] text-slate-400 font-medium">Ambil: {{ $ticket->created_at ? $ticket->created_at->timezone('Asia/Jakarta')->format('H:i') : '' }}</span>
                                             </div>
-                                            <div class="flex items-center justify-between text-[11px] text-slate-600">
-                                                <span class="truncate max-w-[140px] text-slate-500">{{ $ticket->study_program }}</span>
-                                                <span class="font-semibold text-[#DA2D3B]">{{ $ticket->service_category }}</span>
-                                            </div>
-                                            @if($ticket->notes)
-                                                <div class="text-[10px] text-slate-500 italic bg-white p-1.5 rounded border border-slate-100 break-words">
-                                                    {{ $ticket->notes }}
+                                            @if($ticket->name)
+                                                <div class="flex items-center justify-between text-xs pt-1 border-t border-slate-200/50">
+                                                    <span class="font-semibold text-slate-800 truncate max-w-[150px]">{{ $ticket->name }}</span>
+                                                    <span class="text-[10px] font-mono text-slate-500">{{ $ticket->nim }}</span>
                                                 </div>
+                                                <div class="flex items-center justify-between text-[11px] text-slate-600">
+                                                    <span class="truncate max-w-[140px] text-slate-500">{{ $ticket->study_program }}</span>
+                                                    <span class="font-semibold text-[#DA2D3B]">{{ $ticket->service_category }}</span>
+                                                </div>
+                                                @if($ticket->notes)
+                                                    <div class="text-[10px] text-slate-500 italic bg-white p-1.5 rounded border border-slate-100 break-words">
+                                                        {{ $ticket->notes }}
+                                                    </div>
+                                                @endif
                                             @endif
-                                        @endif
-                                    </div>
-                                @empty
-                                    <div class="text-center py-8 text-slate-400 text-xs">Tidak ada antrian menunggu</div>
-                                @endforelse
+                                        </div>
+                                    @empty
+                                        <div class="text-center py-8 text-slate-400 text-xs">Tidak ada antrian menunggu</div>
+                                    @endforelse
+                                </div>
+
+                                <!-- Bottom Shadow Indicator -->
+                                <div x-show="canScrollDown" x-transition.opacity.duration.150ms
+                                     class="pointer-events-none absolute bottom-0 left-0 right-0 h-8 bg-gradient-to-t from-slate-900/10 to-transparent z-10"
+                                     style="display: none;"></div>
+
+                                <!-- Tombol Scroll ke Atas -->
+                                <button type="button"
+                                        x-show="showScrollTop"
+                                        x-transition.opacity.duration.150ms
+                                        @click="scrollToTop()"
+                                        title="Kembali ke atas"
+                                        class="absolute bottom-2.5 right-3 z-20 p-1.5 rounded-full bg-white/95 text-slate-600 shadow-md border border-slate-200 hover:text-slate-900 hover:bg-white active:scale-95 transition-all text-xs flex items-center justify-center focus:outline-none"
+                                        style="display: none;">
+                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 10l7-7m0 0l7 7m-7-7v18"/></svg>
+                                </button>
                             </div>
                         </div>
 
                         <!-- Dipanggil -->
-                        <div :class="listTab === 'called' ? 'block' : 'hidden md:block'"
-                             class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col h-[480px]">
-                            <div class="p-4 border-b border-slate-100 flex items-center justify-between bg-red-50/30">
+                        <div :class="listTab === 'called' ? 'flex' : 'hidden md:flex'"
+                             x-data="queueScrollContainer('list-called')"
+                             class="queue-col-card bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col h-[70dvh] max-h-[560px] md:h-[calc(100dvh-16rem)] md:min-h-[420px] md:max-h-[680px]">
+                            <div class="p-4 border-b border-slate-100 flex items-center justify-between bg-red-50/30 shrink-0">
                                 <span class="font-bold text-xs uppercase tracking-wider text-red-700">Sedang Dipanggil</span>
                                 <span id="badge-called" class="text-xs font-bold font-mono px-2 py-0.5 rounded-full bg-red-100 text-[#DA2D3B]">{{ count($calledTickets) }}</span>
                             </div>
-                            <div id="list-called" class="p-3 space-y-2 overflow-y-auto flex-1 bg-white">
-                                @forelse($calledTickets as $ticket)
-                                    <div class="p-3 bg-red-50/20 border border-red-100/50 rounded-xl space-y-1">
-                                        <div class="flex items-center justify-between">
-                                            <span class="font-bold text-red-600 font-mono text-sm">{{ $ticket->code }}</span>
-                                            <div class="flex items-center gap-1.5">
-                                                @if($ticket->counter)
-                                                    <span class="text-[10px] font-bold px-2 py-0.5 rounded bg-red-100/70 text-red-800">{{ $ticket->counter->name }}</span>
-                                                @endif
-                                                <span class="text-[9px] text-slate-400 font-medium">Ambil: {{ $ticket->created_at ? $ticket->created_at->timezone('Asia/Jakarta')->format('H:i') : '-' }}</span>
-                                            </div>
-                                        </div>
-                                        @if($ticket->name)
-                                            <div class="flex items-center justify-between text-xs pt-1 border-t border-red-100/40">
-                                                <span class="font-semibold text-slate-800 truncate max-w-[150px]">{{ $ticket->name }}</span>
-                                                <span class="text-[10px] font-mono text-slate-500">{{ $ticket->nim }}</span>
-                                            </div>
-                                            <div class="flex items-center justify-between text-[11px] text-slate-600">
-                                                <span class="truncate max-w-[140px] text-slate-500">{{ $ticket->study_program }}</span>
-                                                <span class="font-semibold text-[#DA2D3B]">{{ $ticket->service_category }}</span>
-                                            </div>
-                                            @if($ticket->calledByUser)
-                                                <div class="text-[10px] text-slate-500 pt-0.5">
-                                                    Petugas: <span class="font-medium text-slate-700">{{ $ticket->calledByUser->name }}</span>
-                                                </div>
-                                            @endif
-                                            @if($ticket->notes)
-                                                <div class="text-[10px] text-slate-500 italic bg-white p-1.5 rounded border border-slate-100 break-words">
-                                                    {{ $ticket->notes }}
-                                                </div>
-                                            @endif
-                                        @endif
-                                        @if($selectedCounter && (int) $ticket->counter_id === (int) $selectedCounter->id)
-                                            <div class="pt-1.5 flex justify-end">
-                                                <button type="button"
-                                                        onclick="confirmSkip('{{ $ticket->code }}')"
-                                                        class="btn-skip-card inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-bold text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200/80 rounded-lg transition-all active:scale-[0.97]">
-                                                    Lewati
-                                                </button>
-                                            </div>
-                                        @endif
-                                    </div>
-                                @empty
-                                    <div class="text-center py-8 text-slate-400 text-xs">Tidak ada antrian dipanggil</div>
-                                @endforelse
+                            <div class="relative flex-1 min-h-0">
+                                <!-- Top Shadow Indicator -->
+                                <div x-show="canScrollUp" x-transition.opacity.duration.150ms
+                                     class="pointer-events-none absolute top-0 left-0 right-0 h-6 bg-gradient-to-b from-slate-900/10 to-transparent z-10"
+                                     style="display: none;"></div>
+
+                                <div id="list-called"
+                                     @scroll.passive="updateScroll($el)"
+                                     tabindex="0"
+                                     role="region"
+                                     aria-label="Daftar Antrian Sedang Dipanggil"
+                                     class="queue-custom-scroll absolute inset-0 min-h-0 p-3 space-y-2 overflow-y-auto overscroll-contain touch-pan-y [-webkit-overflow-scrolling:touch] bg-white focus:outline-none focus:ring-1 focus:ring-red-300">
+                                    @forelse($calledTickets as $ticket)
+                                        @include('queue-tickets.partials.called-ticket', ['ticket' => $ticket, 'selectedCounter' => $selectedCounter])
+                                    @empty
+                                        <div class="text-center py-8 text-slate-400 text-xs">Tidak ada antrian dipanggil</div>
+                                    @endforelse
+                                </div>
+
+                                <!-- Bottom Shadow Indicator -->
+                                <div x-show="canScrollDown" x-transition.opacity.duration.150ms
+                                     class="pointer-events-none absolute bottom-0 left-0 right-0 h-8 bg-gradient-to-t from-slate-900/10 to-transparent z-10"
+                                     style="display: none;"></div>
+
+                                <!-- Tombol Scroll ke Atas -->
+                                <button type="button"
+                                        x-show="showScrollTop"
+                                        x-transition.opacity.duration.150ms
+                                        @click="scrollToTop()"
+                                        title="Kembali ke atas"
+                                        class="absolute bottom-2.5 right-3 z-20 p-1.5 rounded-full bg-white/95 text-slate-600 shadow-md border border-slate-200 hover:text-slate-900 hover:bg-white active:scale-95 transition-all text-xs flex items-center justify-center focus:outline-none"
+                                        style="display: none;">
+                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 10l7-7m0 0l7 7m-7-7v18"/></svg>
+                                </button>
                             </div>
                         </div>
 
                         <!-- Selesai -->
-                        <div :class="listTab === 'finished' ? 'block' : 'hidden md:block'"
-                             class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col h-[480px]">
-                            <div class="p-4 border-b border-slate-100 flex items-center justify-between bg-emerald-50/30">
-                                <span class="font-bold text-xs uppercase tracking-wider text-emerald-700">Selesai Hari Ini</span>
+                        <div :class="listTab === 'finished' ? 'flex' : 'hidden md:flex'"
+                             x-data="queueScrollContainer('list-finished')"
+                             class="queue-col-card bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col h-[70dvh] max-h-[560px] md:h-[calc(100dvh-16rem)] md:min-h-[420px] md:max-h-[680px]">
+                            <div class="p-4 border-b border-slate-100 flex items-center justify-between bg-emerald-50/30 shrink-0">
+                                <span class="font-bold text-xs uppercase tracking-wider text-emerald-700">Selesai</span>
                                 <span id="badge-finished" class="text-xs font-bold font-mono px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">{{ $todayStats['finishedToday'] }}</span>
                             </div>
-                            <div id="list-finished" class="p-3 space-y-2 overflow-y-auto flex-1 bg-white">
+                            <div class="relative flex-1 min-h-0">
+                                <!-- Top Shadow Indicator -->
+                                <div x-show="canScrollUp" x-transition.opacity.duration.150ms
+                                     class="pointer-events-none absolute top-0 left-0 right-0 h-6 bg-gradient-to-b from-slate-900/10 to-transparent z-10"
+                                     style="display: none;"></div>
+
+                                <div id="list-finished"
+                                     @scroll.passive="updateScroll($el)"
+                                     tabindex="0"
+                                     role="region"
+                                     aria-label="Daftar Antrian Selesai Hari Ini"
+                                     class="queue-custom-scroll absolute inset-0 min-h-0 p-3 space-y-2 overflow-y-auto overscroll-contain touch-pan-y [-webkit-overflow-scrolling:touch] bg-white focus:outline-none focus:ring-1 focus:ring-emerald-300">
                                 @forelse($finishedTickets as $ticket)
-                                    <div class="p-3 bg-emerald-50/10 border border-emerald-100/30 rounded-xl space-y-1">
-                                        <div class="flex items-center justify-between">
-                                            <span class="font-bold {{ $ticket->status === 'skipped' ? 'text-amber-600' : 'text-emerald-600' }} font-mono text-sm">{{ $ticket->code }}</span>
-                                            <div class="flex items-center gap-1.5">
-                                                @if($ticket->status === 'skipped')
-                                                    <span class="text-[10px] font-bold px-2 py-0.5 rounded bg-amber-100 text-amber-800 border border-amber-200">Dilewati</span>
-                                                @elseif($ticket->counter)
-                                                    <span class="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-100/70 text-emerald-800">{{ $ticket->counter->name }}</span>
-                                                @endif
-                                                <span class="text-[9px] text-slate-400 font-medium">Ambil: {{ $ticket->created_at ? $ticket->created_at->timezone('Asia/Jakarta')->format('H:i') : '-' }}</span>
-                                            </div>
-                                        </div>
-                                        @if($ticket->name)
-                                            <div class="flex items-center justify-between text-xs pt-1 border-t border-emerald-100/40">
-                                                <span class="font-semibold text-slate-800 truncate max-w-[150px]">{{ $ticket->name }}</span>
-                                                <span class="text-[10px] font-mono text-slate-500">{{ $ticket->nim }}</span>
-                                            </div>
-                                            <div class="flex items-center justify-between text-[11px] text-slate-600">
-                                                <span class="truncate max-w-[140px] text-slate-500">{{ $ticket->study_program }}</span>
-                                                <span class="font-semibold text-emerald-700">{{ $ticket->service_category }}</span>
-                                            </div>
-                                            @if($ticket->calledByUser)
-                                                <div class="text-[10px] text-slate-500 pt-0.5">
-                                                    Petugas: <span class="font-medium text-slate-700">{{ $ticket->calledByUser->name }}</span>
-                                                </div>
-                                            @endif
-                                            @if($ticket->notes)
-                                                <div class="text-[10px] text-slate-500 italic bg-white p-1.5 rounded border border-slate-100 break-words">
-                                                    {{ $ticket->notes }}
-                                                </div>
-                                            @endif
-                                        @endif
-                                    </div>
+                                    @include('queue-tickets.partials.finished-ticket', ['ticket' => $ticket])
                                 @empty
                                     <div class="text-center py-8 text-slate-400 text-xs">Belum ada antrian selesai</div>
                                 @endforelse
                             </div>
+
+                            <!-- Bottom Shadow Indicator -->
+                            <div x-show="canScrollDown" x-transition.opacity.duration.150ms
+                                 class="pointer-events-none absolute bottom-0 left-0 right-0 h-8 bg-gradient-to-t from-slate-900/10 to-transparent z-10"
+                                 style="display: none;"></div>
+
+                            <!-- Tombol Scroll ke Atas -->
+                            <button type="button"
+                                    x-show="showScrollTop"
+                                    x-transition.opacity.duration.150ms
+                                    @click="scrollToTop()"
+                                    title="Kembali ke atas"
+                                    class="absolute bottom-2.5 right-3 z-20 p-1.5 rounded-full bg-white/95 text-slate-600 shadow-md border border-slate-200 hover:text-slate-900 hover:bg-white active:scale-95 transition-all text-xs flex items-center justify-center focus:outline-none"
+                                    style="display: none;">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 10l7-7m0 0l7 7m-7-7v18"/></svg>
+                            </button>
                         </div>
+                    </div>
 
                     </div>
                 </div>
@@ -394,45 +893,62 @@
                 </div>
 
                 <div class="space-y-3 my-4">
+                    @php
+                        $canForceRelease = auth()->user()->can('queue_ticket_force_release') || auth()->user()->isSuperAdmin() || auth()->user()->hasRole('admin');
+                    @endphp
                     @foreach($counters as $counter)
                         @php
                             $isOccupiedByOther = $counter->active_user_id && (int)$counter->active_user_id !== (int)auth()->id();
                             $isCurrent = (int)$counter->active_user_id === (int)auth()->id();
                         @endphp
-                        <form action="{{ route('admin.queue.claim') }}" method="POST">
-                            @csrf
-                            <input type="hidden" name="counter_id" value="{{ $counter->id }}">
-                            <button type="submit" {{ $isOccupiedByOther ? 'disabled' : '' }}
-                                    class="w-full flex items-center justify-between p-4 rounded-2xl border text-left transition-all duration-200
-                                           {{ $isCurrent ? 'border-[#DA2D3B] bg-red-50/40 ring-2 ring-red-100' : ($isOccupiedByOther ? 'border-slate-200 bg-slate-50 opacity-60 cursor-not-allowed' : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50') }}">
-                                <div>
-                                    <div class="flex items-center gap-2">
-                                        <span class="font-bold text-slate-800 text-sm">{{ $counter->name }}</span>
-                                        @if($isCurrent)
-                                            <span class="text-[9px] font-bold px-2 py-0.5 rounded bg-[#DA2D3B] text-white uppercase tracking-wider">Loket Anda</span>
+                        <div class="flex items-center gap-2">
+                            <form action="{{ route('admin.queue.claim') }}" method="POST" class="flex-1 min-w-0">
+                                @csrf
+                                <input type="hidden" name="counter_id" value="{{ $counter->id }}">
+                                <button type="submit" {{ $isOccupiedByOther ? 'disabled' : '' }}
+                                        class="w-full flex items-center justify-between p-4 rounded-2xl border text-left transition-all duration-200
+                                               {{ $isCurrent ? 'border-[#DA2D3B] bg-red-50/40 ring-2 ring-red-100' : ($isOccupiedByOther ? 'border-slate-200 bg-slate-50 opacity-70 cursor-not-allowed' : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50') }}">
+                                    <div class="min-w-0 pr-2">
+                                        <div class="flex items-center gap-2">
+                                            <span class="font-bold text-slate-800 text-sm">{{ $counter->name }}</span>
+                                            @if($isCurrent)
+                                                <span class="text-[9px] font-bold px-2 py-0.5 rounded bg-[#DA2D3B] text-white uppercase tracking-wider">Loket Anda</span>
+                                            @endif
+                                        </div>
+                                        <span class="text-xs text-slate-500 mt-1 block truncate">
+                                            @if($isOccupiedByOther)
+                                                Dipakai oleh <strong class="text-slate-700">{{ $counter->activeUser?->name ?? 'Petugas lain' }}</strong>
+                                            @elseif($isCurrent)
+                                                Sedang aktif dipegang oleh Anda
+                                            @else
+                                                Tersedia
+                                            @endif
+                                        </span>
+                                    </div>
+                                    <div class="shrink-0">
+                                        @if($isOccupiedByOther)
+                                            <span class="text-[11px] font-semibold text-slate-400 bg-slate-200/60 px-3 py-1 rounded-lg">Dipakai</span>
+                                        @elseif($isCurrent)
+                                            <span class="text-[11px] font-semibold text-[#DA2D3B] bg-red-100 px-3 py-1 rounded-lg">Aktif</span>
+                                        @else
+                                            <span class="text-[11px] font-bold text-white bg-[#DA2D3B] hover:bg-[#b82430] px-3.5 py-1.5 rounded-lg shadow-sm">Pilih</span>
                                         @endif
                                     </div>
-                                    <span class="text-xs text-slate-500 mt-1 block">
-                                        @if($isOccupiedByOther)
-                                            Dipakai oleh {{ $counter->activeUser?->name ?? 'Petugas lain' }}
-                                        @elseif($isCurrent)
-                                            Sedang aktif dipegang oleh Anda
-                                        @else
-                                            Tersedia
-                                        @endif
-                                    </span>
-                                </div>
-                                <div>
-                                    @if($isOccupiedByOther)
-                                        <span class="text-[11px] font-semibold text-slate-400 bg-slate-200/60 px-3 py-1 rounded-lg">Dipakai</span>
-                                    @elseif($isCurrent)
-                                        <span class="text-[11px] font-semibold text-[#DA2D3B] bg-red-100 px-3 py-1 rounded-lg">Aktif</span>
-                                    @else
-                                        <span class="text-[11px] font-bold text-white bg-[#DA2D3B] hover:bg-[#b82430] px-3.5 py-1.5 rounded-lg shadow-sm">Pilih</span>
-                                    @endif
-                                </div>
-                            </button>
-                        </form>
+                                </button>
+                            </form>
+
+                            @if($isOccupiedByOther && $canForceRelease)
+                                <button type="button"
+                                        @click="showCounterModal = false; forceReleaseCounter = { id: {{ $counter->id }}, name: '{{ addslashes($counter->name) }}', user: '{{ addslashes($counter->activeUser?->name ?? 'Petugas') }}' }; showForceReleaseModal = true;"
+                                        title="Keluarkan petugas dari {{ $counter->name }}"
+                                        class="shrink-0 p-3.5 text-red-600 bg-red-50 hover:bg-red-100 hover:text-red-700 border border-red-200 rounded-2xl transition-all duration-200 flex items-center gap-1.5 font-bold text-xs shadow-sm">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
+                                    </svg>
+                                    <span class="hidden sm:inline">Keluarkan</span>
+                                </button>
+                            @endif
+                        </div>
                     @endforeach
                 </div>
 
@@ -477,7 +993,7 @@
                             class="flex-1 px-4 py-2.5 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-xl transition-all">
                         Batal
                     </button>
-                    <form action="{{ route('admin.queue.release') }}" method="POST" class="flex-1">
+                    <form action="{{ route('admin.queue.release') }}" method="POST" class="flex-1" onsubmit="window.flushAllDirtyKeepalive()">
                         @csrf
                         @if(session('queue_release_ticket'))
                             <input type="hidden" name="finish_current" value="1">
@@ -491,8 +1007,44 @@
             </div>
         </div>
 
+        <!-- Modal Konfirmasi Paksa Keluar Loket (Admin & Super Admin) -->
+        <div x-show="showForceReleaseModal" x-cloak
+             class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm"
+             @click.self="showForceReleaseModal = false">
+            <div class="w-full max-w-sm bg-white rounded-3xl p-6 shadow-2xl border border-slate-100 animate-in fade-in zoom-in duration-200 text-center">
+                <div class="w-12 h-12 rounded-full bg-red-100 text-[#DA2D3B] flex items-center justify-center mx-auto mb-3">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
+                    </svg>
+                </div>
+
+                <h3 class="text-base font-bold text-slate-900">
+                    Keluarkan Petugas dari <span x-text="forceReleaseCounter.name"></span>?
+                </h3>
+
+                <p class="text-xs text-slate-600 mt-2 leading-relaxed">
+                    Petugas <strong class="text-slate-900" x-text="forceReleaseCounter.user"></strong> akan dikeluarkan dari loket ini. Jika ada tiket yang sedang dilayani, tiket tersebut akan otomatis diselesaikan dan loket kembali berstatus <strong>Tersedia</strong>.
+                </p>
+
+                <div class="mt-6 flex items-center gap-2">
+                    <button type="button" @click="showForceReleaseModal = false; showCounterModal = true;"
+                            class="flex-1 px-4 py-2.5 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-xl transition-all">
+                        Batal
+                    </button>
+                    <form action="{{ route('admin.queue.force-release') }}" method="POST" class="flex-1">
+                        @csrf
+                        <input type="hidden" name="counter_id" :value="forceReleaseCounter.id">
+                        <button type="submit"
+                                class="w-full px-4 py-2.5 text-xs font-bold text-white bg-red-600 hover:bg-red-700 rounded-xl transition-all shadow-md shadow-red-200">
+                            Ya, Keluarkan
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
         <!-- Confirm Back Modal -->
-        <div x-show="showConfirmBackModal" 
+        <div x-show="showConfirmBackModal"
              x-cloak
              class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm"
              @click.self="showConfirmBackModal = false">
@@ -518,7 +1070,7 @@
         </div>
 
         <!-- QR Code Modal -->
-        <div x-show="showQrModal" 
+        <div x-show="showQrModal"
              x-cloak
              class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm"
              @click.self="showQrModal = false">
@@ -532,7 +1084,7 @@
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
                     </button>
                 </div>
-                
+
                 <div class="py-6 flex flex-col items-center">
                     <div class="p-3 bg-white border border-slate-200 rounded-2xl shadow-sm mb-4">
                         <canvas id="qr-canvas" class="w-48 h-48 object-contain"></canvas>
@@ -556,6 +1108,8 @@
 
     <!-- QRious QR Code library CDN -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrious/4.0.2/qrious.min.js"></script>
+    <!-- Alpine Collapse plugin CDN -->
+    <script defer src="https://cdn.jsdelivr.net/npm/@alpinejs/collapse@3.x.x/dist/cdn.min.js"></script>
 
     <script>
         document.addEventListener('DOMContentLoaded', function () {
@@ -613,6 +1167,440 @@
                 .replace(/'/g, '&#039;');
         }
 
+        function buildCalledTicketHtml(ticket) {
+            const detailsHtml = ticket.name ? `
+                <div class="flex items-center justify-between text-xs pt-1 border-t border-red-100/40">
+                    <span class="font-semibold text-slate-800 truncate max-w-[150px]">${escapeHtml(ticket.name)}</span>
+                    <span class="text-[10px] font-mono text-slate-500">${escapeHtml(ticket.nim || '')}</span>
+                </div>
+                <div class="flex items-center justify-between text-[11px] text-slate-600">
+                    <span class="truncate max-w-[140px] text-slate-500">${escapeHtml(ticket.study_program || '')}</span>
+                    <span class="font-semibold text-[#DA2D3B]">${escapeHtml(ticket.service_category || '')}</span>
+                </div>
+                ${ticket.caller_name && ticket.caller_name !== '-' ? `
+                    <div class="text-[10px] text-slate-500 pt-0.5">
+                        Petugas: <span class="font-medium text-slate-700">${escapeHtml(ticket.caller_name)}</span>
+                    </div>
+                ` : ''}
+                ${ticket.notes ? `<div class="text-[10px] text-slate-500 italic bg-white p-1.5 rounded border border-slate-100 break-words">${escapeHtml(ticket.notes)}</div>` : ''}
+            ` : '';
+
+            const skipBtnHtml = ticket.can_skip ? `
+                <div class="pt-1.5 flex justify-end">
+                    <button type="button"
+                            onclick="confirmSkip('${escapeHtml(ticket.code)}', ${ticket.id})"
+                            class="btn-skip-card inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-bold text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200/80 rounded-lg transition-all active:scale-[0.97]">
+                        Lewati
+                    </button>
+                </div>
+            ` : '';
+
+            const initialStaffNotes = JSON.stringify(ticket.staff_notes || '');
+            const initialSavedAt = JSON.stringify(ticket.staff_notes_updated_at || '');
+
+            return `
+                <div data-called-ticket-id="${ticket.id}" id="called-ticket-${ticket.id}" class="p-3 bg-red-50/10 border border-red-100/30 rounded-xl space-y-1">
+                    <div class="flex items-center justify-between">
+                        <span class="font-bold text-red-600 font-mono text-sm">${escapeHtml(ticket.code)}</span>
+                        <div class="flex items-center gap-1.5">
+                            ${ticket.counter_name && ticket.counter_name !== '-' ? `
+                                <span class="text-[10px] font-bold px-2 py-0.5 rounded bg-red-100/70 text-red-800">${escapeHtml(ticket.counter_name)}</span>
+                            ` : ''}
+                            <span class="text-[9px] text-slate-400 font-medium">Ambil: ${ticket.created_at_formatted || '-'}</span>
+                        </div>
+                    </div>
+                    ${detailsHtml}
+
+                    <!-- Catatan Petugas (Dropdown dengan Auto-Save + Simpan Manual) -->
+                    <div x-data="calledStaffNotes(${ticket.id}, ${initialStaffNotes}, ${initialSavedAt})"
+                         :data-open="open ? 'true' : 'false'"
+                         :data-status="status"
+                         class="pt-1 border-t border-red-100/50 staff-notes-container">
+                        <!-- Header satu baris (Button) -->
+                        <button type="button"
+                                @click="toggle()"
+                                :aria-expanded="open"
+                                class="flex items-center justify-between w-full py-1 text-left select-none text-[10px] font-semibold text-slate-600 hover:text-amber-800 transition-colors focus:outline-none focus:ring-1 focus:ring-amber-400 rounded">
+                            <span class="inline-flex items-center gap-1.5 min-w-0">
+                                <span class="truncate">Catatan Petugas</span>
+                                <span x-show="value || lastSaved" class="w-1.5 h-1.5 rounded-full bg-amber-500 inline-block flex-shrink-0" title="Ada catatan petugas"></span>                                <template x-if="!open && (status === 'dirty' || status === 'saving' || status === 'error')">
+                                    <span class="inline-flex items-center gap-1 text-[9px] font-medium px-1.5 py-0.5 rounded"
+                                          :class="status === 'error' ? 'bg-red-50 text-red-600 border border-red-200' : 'bg-amber-50 text-amber-700 border border-amber-200'">
+                                        <span class="w-1.5 h-1.5 rounded-full animate-pulse" :class="status === 'error' ? 'bg-red-500' : 'bg-amber-500'"></span>
+                                        <span x-text="status === 'error' ? 'Gagal' : (status === 'saving' ? 'Menyimpan...' : 'Belum tersimpan')"></span>
+                                    </span>
+                                </template>
+                            </span>
+                            <svg class="w-3.5 h-3.5 text-slate-400 transition-transform duration-200 flex-shrink-0"
+                                 :class="open ? 'rotate-180 text-amber-600' : ''"
+                                 fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                            </svg>
+                        </button>
+
+                        <!-- Isi Dropdown (Collapsible) -->
+                        <div x-show="open" x-collapse x-cloak class="mt-1.5 space-y-1.5 bg-amber-50/40 p-2 rounded-lg border border-amber-200/60">
+                            <div class="flex items-center justify-between text-[10px]">
+                                <label :for="'called-note-' + ticketId" class="font-bold text-amber-900">Catatan Petugas</label>
+                                <span class="text-slate-400 font-mono text-[9px]" x-text="\`\${(value || '').length}/500\`"></span>
+                            </div>
+                            <textarea :id="'called-note-' + ticketId"
+                                      x-ref="textarea"
+                                      x-model="value"
+                                      @focus="onFocus()"
+                                      @blur="onBlur()"
+                                      data-ticket-id="${ticket.id}"
+                                      maxlength="500"
+                                      aria-label="Catatan Petugas"
+                                      placeholder="Tulis catatan petugas di sini (otomatis tersimpan)..."
+                                      class="w-full h-20 resize-none overflow-y-auto overscroll-contain text-base md:text-[11px] p-2 border border-amber-200 rounded-lg focus:ring-1 focus:ring-amber-500 focus:outline-none bg-white text-slate-800 placeholder:text-slate-300"></textarea>
+                            <div class="flex items-center justify-between text-[10px] pt-0.5">
+                                <div class="min-h-[16px] flex items-center">
+                                    <template x-if="status === 'saving'">
+                                        <span class="inline-flex items-center gap-1 text-slate-500 font-medium">
+                                            <svg class="animate-spin w-3 h-3 text-slate-400" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path></svg>
+                                            <span>Menyimpan...</span>
+                                        </span>
+                                    </template>
+                                    <template x-if="status === 'saved'">
+                                        <span class="inline-flex items-center gap-1 text-emerald-600 font-medium">
+                                            <svg class="w-3 h-3 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                                            <span>Tersimpan <span x-text="savedAt"></span></span>
+                                        </span>
+                                    </template>
+                                    <template x-if="status === 'error'">
+                                        <span class="inline-flex items-center gap-1 text-red-600 font-medium">
+                                            <svg class="w-3 h-3 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                                            <template x-if="retryCount < maxRetries">
+                                                <span>Gagal menyimpan, mencoba lagi (<span x-text="retryCount"></span>/3)...</span>
+                                            </template>
+                                            <template x-if="retryCount >= maxRetries">
+                                                <span>Gagal menyimpan. <button type="button" @click="manualRetry()" class="underline font-bold text-red-700 hover:text-red-800">Coba lagi</button></span>
+                                            </template>
+                                        </span>
+                                    </template>
+                                    <template x-if="status === 'dirty'">
+                                        <span class="text-amber-600 italic">Belum tersimpan</span>
+                                    </template>
+                                </div>
+                                <div class="flex items-center justify-end gap-1.5">
+                                    <button type="button"
+                                            @click="cancel()"
+                                            :disabled="status === 'saving'"
+                                            class="py-1 px-2 text-xs md:text-[10px] font-medium text-slate-600 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 active:scale-95 transition-all">
+                                        Batal
+                                    </button>
+                                    <button type="button"
+                                            @click="saveManual()"
+                                            :disabled="status === 'saving' || (status === 'saved' && value === lastSaved)"
+                                            class="py-1 px-2 text-xs md:text-[10px] font-semibold text-white bg-amber-600 rounded-lg hover:bg-amber-700 disabled:opacity-50 active:scale-95 transition-all inline-flex items-center gap-1">
+                                        <span x-text="status === 'saving' ? 'Menyimpan...' : 'Simpan'"></span>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    ${skipBtnHtml}
+                </div>
+            `;
+        }
+
+        function buildFinishedTicketHtml(ticket) {
+            const isSkipped = ticket.status === 'skipped';
+            const badgeHtml = isSkipped
+                ? `<span class="text-[10px] font-bold px-2 py-0.5 rounded bg-amber-100 text-amber-800 border border-amber-200">Dilewati</span>`
+                : (ticket.counter_name && ticket.counter_name !== '-'
+                    ? `<span class="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-100/70 text-emerald-800">${escapeHtml(ticket.counter_name)}</span>`
+                    : '');
+            const codeColor = isSkipped ? 'text-amber-600' : 'text-emerald-600';
+
+            const detailsHtml = ticket.name ? `
+                <div class="flex items-center justify-between text-xs pt-1 border-t border-emerald-100/40">
+                    <span class="font-semibold text-slate-800 truncate max-w-[150px]">${escapeHtml(ticket.name)}</span>
+                    <span class="text-[10px] font-mono text-slate-500">${escapeHtml(ticket.nim || '')}</span>
+                </div>
+                <div class="flex items-center justify-between text-[11px] text-slate-600">
+                    <span class="truncate max-w-[140px] text-slate-500">${escapeHtml(ticket.study_program || '')}</span>
+                    <span class="font-semibold text-emerald-700">${escapeHtml(ticket.service_category || '')}</span>
+                </div>
+            ` : '';
+
+            const callerHtml = ticket.caller_name && ticket.caller_name !== '-' ? `
+                <div class="text-[10px] text-slate-500 pt-0.5">
+                    Petugas: <span class="font-medium text-slate-700">${escapeHtml(ticket.caller_name)}</span>
+                </div>
+            ` : '';
+
+            const notesHtml = ticket.notes ? `
+                <div class="text-[10px] text-slate-500 italic bg-white p-1.5 rounded border border-slate-100 break-words">
+                    ${escapeHtml(ticket.notes)}
+                </div>
+            ` : '';
+
+            const staffNotesEscapedJson = JSON.stringify(ticket.staff_notes || '');
+            const staffNotesEscaped = escapeHtml(ticket.staff_notes || '');
+
+            const staffNotesHtml = `
+                <div x-data='staffNotesCard(${staffNotesEscapedJson}, ${ticket.id})'
+                     :data-open="open ? 'true' : 'false'"
+                     :data-editing="editing ? 'true' : 'false'"
+                     class="pt-1 border-t border-emerald-100/30 staff-notes-container">
+                    <button type="button"
+                            @click="toggle()"
+                            :aria-expanded="open"
+                            class="flex items-center justify-between w-full py-1 text-left select-none text-[10px] font-semibold text-slate-600 hover:text-amber-800 transition-colors focus:outline-none focus:ring-1 focus:ring-amber-400 rounded">
+                        <span class="inline-flex items-center gap-1.5 min-w-0">
+                            <span class="truncate">Catatan Petugas</span>
+                            <span x-show="saved" class="w-1.5 h-1.5 rounded-full bg-amber-500 inline-block flex-shrink-0" title="Ada catatan petugas"></span>
+                        </span>
+                        <svg class="w-3.5 h-3.5 text-slate-400 transition-transform duration-200 flex-shrink-0"
+                             :class="open ? 'rotate-180 text-amber-600' : ''"
+                             fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                        </svg>
+                    </button>
+                    <div x-show="open" x-collapse x-cloak class="mt-1.5 space-y-1.5">
+                        <div x-show="!editing" class="space-y-1.5">
+                            <template x-if="saved">
+                                <div class="bg-amber-50/70 border border-amber-200/60 rounded-lg p-2 text-amber-950 space-y-1.5">
+                                    <div class="text-[11px] leading-relaxed whitespace-pre-line break-words max-h-32 overflow-y-auto overscroll-contain pr-1"
+                                         x-text="saved">
+                                        ${staffNotesEscaped}
+                                    </div>
+                                    <div class="flex justify-end pt-0.5 border-t border-amber-200/40">
+                                        <button type="button"
+                                                @click="startEdit()"
+                                                class="inline-flex items-center gap-1 text-[10px] font-semibold text-amber-800 hover:text-amber-950 hover:underline py-1 px-2 rounded active:scale-95 transition-all">
+                                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                                            Edit
+                                        </button>
+                                    </div>
+                                </div>
+                            </template>
+                            <template x-if="!saved">
+                                <div class="p-2.5 bg-slate-50 border border-dashed border-slate-200 rounded-lg text-center">
+                                    <p class="text-[10px] text-slate-400 mb-1.5">Belum ada catatan untuk tiket ini</p>
+                                    <button type="button"
+                                            @click="startEdit()"
+                                            class="inline-flex items-center gap-1 text-[11px] font-semibold text-amber-700 hover:text-amber-800 hover:underline py-1.5 px-2.5 rounded bg-amber-50 hover:bg-amber-100 transition-colors">
+                                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                                        + Tambah catatan
+                                    </button>
+                                </div>
+                            </template>
+                        </div>
+                        <div x-show="editing" class="space-y-1.5 bg-amber-50/40 p-2 rounded-lg border border-amber-200/60">
+                            <div class="flex items-center justify-between text-[10px]">
+                                <label :for="'staff-note-' + ticketId" class="font-bold text-amber-900">Catatan Petugas</label>
+                                <span class="text-slate-400 font-mono text-[9px]" x-text="\`\${(value || '').length}/500\`"></span>
+                            </div>
+                            <textarea :id="'staff-note-' + ticketId"
+                                      x-ref="textarea"
+                                      x-model="value"
+                                      maxlength="500"
+                                      aria-label="Catatan Petugas"
+                                      placeholder="Tulis catatan petugas di sini..."
+                                      class="w-full h-20 resize-none overflow-y-auto overscroll-contain text-base md:text-[11px] p-2 border border-amber-200 rounded-lg focus:ring-1 focus:ring-amber-500 focus:outline-none bg-white text-slate-800"></textarea>
+                            <template x-if="error">
+                                <p class="text-[10px] text-red-600 font-medium" x-text="error"></p>
+                            </template>
+                            <div class="flex items-center justify-end gap-1.5 pt-0.5">
+                                <button type="button"
+                                        @click="cancelEdit()"
+                                        :disabled="loading"
+                                        class="py-1.5 px-2.5 text-xs md:text-[10px] font-medium text-slate-600 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 active:scale-95 transition-all">
+                                    Batal
+                                </button>
+                                <button type="button"
+                                        @click="saveNote()"
+                                        :disabled="loading"
+                                        class="py-1.5 px-2.5 text-xs md:text-[10px] font-semibold text-white bg-amber-600 rounded-lg hover:bg-amber-700 disabled:opacity-50 active:scale-95 transition-all inline-flex items-center gap-1">
+                                    <span x-text="loading ? 'Menyimpan...' : 'Simpan'"></span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            return `
+                <div data-finished-ticket-id="${ticket.id}" id="finished-ticket-${ticket.id}" class="p-3 bg-emerald-50/10 border border-emerald-100/30 rounded-xl space-y-1">
+                    <div class="flex items-center justify-between">
+                        <span class="font-bold ${codeColor} font-mono text-sm">${escapeHtml(ticket.code)}</span>
+                        <div class="flex items-center gap-1.5">
+                            ${badgeHtml}
+                            <span class="text-[9px] text-slate-400 font-medium">Ambil: ${ticket.created_at_formatted || '-'}</span>
+                        </div>
+                    </div>
+                    ${detailsHtml}
+                    ${callerHtml}
+                    ${notesHtml}
+                    ${staffNotesHtml}
+                </div>
+            `;
+        }
+
+        function updateFinishedList(listFinished, tickets) {
+            const isBusy = listFinished.querySelector('[data-open="true"]')
+                || listFinished.querySelector('[data-editing="true"]')
+                || (listFinished.querySelector('textarea') && document.activeElement && listFinished.contains(document.activeElement));
+            if (isBusy) {
+                return;
+            }
+
+            const prevScrollFinished = listFinished.scrollTop;
+            if (!tickets || tickets.length === 0) {
+                listFinished.innerHTML = '<div class="text-center py-8 text-slate-400 text-xs">Belum ada antrian selesai</div>';
+                listFinished.scrollTop = prevScrollFinished;
+                listFinished.dispatchEvent(new Event('scroll'));
+                return;
+            }
+
+            const currentCards = Array.from(listFinished.querySelectorAll('[data-finished-ticket-id]'));
+            const currentIds = currentCards.map(c => parseInt(c.getAttribute('data-finished-ticket-id')));
+            const newIds = tickets.map(t => parseInt(t.id));
+
+            const isSameList = currentIds.length === newIds.length && currentIds.every((id, idx) => id === newIds[idx]);
+            if (isSameList) {
+                return;
+            }
+
+            currentCards.forEach(card => {
+                const id = parseInt(card.getAttribute('data-finished-ticket-id'));
+                if (!newIds.includes(id)) {
+                    card.remove();
+                }
+            });
+
+            const emptyDiv = listFinished.querySelector('.text-center');
+            if (emptyDiv) emptyDiv.remove();
+
+            let prevEl = null;
+            tickets.forEach(ticket => {
+                let card = listFinished.querySelector(`[data-finished-ticket-id="${ticket.id}"]`);
+                if (!card) {
+                    const temp = document.createElement('div');
+                    temp.innerHTML = buildFinishedTicketHtml(ticket);
+                    card = temp.firstElementChild;
+                    if (prevEl) {
+                        prevEl.after(card);
+                    } else {
+                        listFinished.prepend(card);
+                    }
+                    if (window.Alpine) {
+                        window.Alpine.initTree(card);
+                    }
+                } else {
+                    if (prevEl) {
+                        if (card.previousElementSibling !== prevEl) {
+                            prevEl.after(card);
+                        }
+                    } else {
+                        if (listFinished.firstElementChild !== card) {
+                            listFinished.prepend(card);
+                        }
+                    }
+                }
+                prevEl = card;
+            });
+
+            listFinished.scrollTop = prevScrollFinished;
+            listFinished.dispatchEvent(new Event('scroll'));
+        }
+
+        function updateCalledList(listCalled, tickets) {
+            const prevScrollCalled = listCalled.scrollTop;
+            if (!tickets || tickets.length === 0) {
+                const hasDirty = Array.from(window.calledStaffNotesRegistry?.values() || []).some(c => c.status === 'dirty' || c.status === 'saving');
+                if (!hasDirty) {
+                    listCalled.innerHTML = '<div class="text-center py-8 text-slate-400 text-xs">Tidak ada antrian dipanggil</div>';
+                }
+                listCalled.scrollTop = prevScrollCalled;
+                listCalled.dispatchEvent(new Event('scroll'));
+                return;
+            }
+
+            const currentCards = Array.from(listCalled.querySelectorAll('[data-called-ticket-id]'));
+            const currentIds = currentCards.map(c => parseInt(c.getAttribute('data-called-ticket-id')));
+            const newIds = tickets.map(t => parseInt(t.id));
+
+            const isSameList = currentIds.length === newIds.length && currentIds.every((id, idx) => id === newIds[idx]);
+
+            if (isSameList) {
+                tickets.forEach(ticket => {
+                    const comp = window.calledStaffNotesRegistry?.get(ticket.id);
+                    if (comp && comp.status !== 'dirty' && comp.status !== 'saving' && !comp.isFocused) {
+                        if (ticket.staff_notes !== comp.lastSaved) {
+                            comp.value = ticket.staff_notes || '';
+                            comp.lastSaved = ticket.staff_notes || '';
+                            if (ticket.staff_notes_updated_at) {
+                                comp.savedAt = ticket.staff_notes_updated_at;
+                                comp.status = 'saved';
+                            } else {
+                                comp.status = comp.value ? 'saved' : 'idle';
+                            }
+                        }
+                    }
+                });
+                return;
+            }
+
+            currentCards.forEach(card => {
+                const id = parseInt(card.getAttribute('data-called-ticket-id'));
+                if (!newIds.includes(id)) {
+                    const comp = window.calledStaffNotesRegistry?.get(id);
+                    if (!comp || (comp.status !== 'dirty' && comp.status !== 'saving')) {
+                        card.remove();
+                        if (window.calledStaffNotesRegistry) window.calledStaffNotesRegistry.delete(id);
+                    }
+                }
+            });
+
+            const emptyDiv = listCalled.querySelector('.text-center');
+            if (emptyDiv) emptyDiv.remove();
+
+            let prevEl = null;
+            tickets.forEach(ticket => {
+                let card = listCalled.querySelector(`[data-called-ticket-id="${ticket.id}"]`);
+                if (!card) {
+                    const temp = document.createElement('div');
+                    temp.innerHTML = buildCalledTicketHtml(ticket);
+                    card = temp.firstElementChild;
+                    if (prevEl) {
+                        prevEl.after(card);
+                    } else {
+                        listCalled.prepend(card);
+                    }
+                    if (window.Alpine) {
+                        window.Alpine.initTree(card);
+                    }
+                } else {
+                    if (prevEl) {
+                        if (card.previousElementSibling !== prevEl) {
+                            prevEl.after(card);
+                        }
+                    } else {
+                        if (listCalled.firstElementChild !== card) {
+                            listCalled.prepend(card);
+                        }
+                    }
+                    const comp = window.calledStaffNotesRegistry?.get(ticket.id);
+                    if (comp && comp.status !== 'dirty' && comp.status !== 'saving' && !comp.isFocused) {
+                        if (ticket.staff_notes !== comp.lastSaved) {
+                            comp.value = ticket.staff_notes || '';
+                            comp.lastSaved = ticket.staff_notes || '';
+                            comp.status = comp.value ? 'saved' : 'idle';
+                        }
+                    }
+                }
+                prevEl = card;
+            });
+
+            listCalled.scrollTop = prevScrollCalled;
+            listCalled.dispatchEvent(new Event('scroll'));
+        }
+
         async function fetchDashboardStats() {
             try {
                 const response = await fetch('{{ route("admin.queue.stats") }}', {
@@ -625,6 +1613,7 @@
                 if (response.ok) {
                     const data = await response.json();
                     if (data.success) {
+                        window.currentCalledTicketId = data.state.current_id;
                         // Update current call
                         if (currentCodeDiv) {
                             currentCodeDiv.innerText = data.state.current_called_code || '-';
@@ -688,6 +1677,7 @@
 
                         // Render lists with student details & counter name
                         if (listWaiting) {
+                            const prevScrollWaiting = listWaiting.scrollTop;
                             if (waitingLen > 0) {
                                 listWaiting.innerHTML = data.tickets.waiting.map(ticket => {
                                     const timeStr = ticket.created_at_formatted || '-';
@@ -715,99 +1705,16 @@
                             } else {
                                 listWaiting.innerHTML = '<div class="text-center py-8 text-slate-400 text-xs">Tidak ada antrian menunggu</div>';
                             }
+                            listWaiting.scrollTop = prevScrollWaiting;
+                            listWaiting.dispatchEvent(new Event('scroll'));
                         }
 
                         if (listCalled) {
-                            if (calledLen > 0) {
-                                listCalled.innerHTML = data.tickets.called.map(ticket => {
-                                    const detailsHtml = ticket.name ? `
-                                        <div class="flex items-center justify-between text-xs pt-1 border-t border-red-100/40">
-                                            <span class="font-semibold text-slate-800 truncate max-w-[150px]">${escapeHtml(ticket.name)}</span>
-                                            <span class="text-[10px] font-mono text-slate-500">${escapeHtml(ticket.nim || '')}</span>
-                                        </div>
-                                        <div class="flex items-center justify-between text-[11px] text-slate-600">
-                                            <span class="truncate max-w-[140px] text-slate-500">${escapeHtml(ticket.study_program || '')}</span>
-                                            <span class="font-semibold text-[#DA2D3B]">${escapeHtml(ticket.service_category || '')}</span>
-                                        </div>
-                                        ${ticket.caller_name && ticket.caller_name !== '-' ? `
-                                            <div class="text-[10px] text-slate-500 pt-0.5">
-                                                Petugas: <span class="font-medium text-slate-700">${escapeHtml(ticket.caller_name)}</span>
-                                            </div>
-                                        ` : ''}
-                                        ${ticket.notes ? `<div class="text-[10px] text-slate-500 italic bg-white p-1.5 rounded border border-slate-100 break-words">${escapeHtml(ticket.notes)}</div>` : ''}
-                                    ` : '';
-                                    const skipBtnHtml = ticket.can_skip ? `
-                                        <div class="pt-1.5 flex justify-end">
-                                            <button type="button"
-                                                    onclick="confirmSkip('${escapeHtml(ticket.code)}')"
-                                                    class="btn-skip-card inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-bold text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200/80 rounded-lg transition-all active:scale-[0.97]">  
-                                                Lewati
-                                            </button>
-                                        </div>
-                                    ` : '';
-                                    return `
-                                        <div class="p-3 bg-red-50/20 border border-red-100/50 rounded-xl space-y-1">
-                                            <div class="flex items-center justify-between">
-                                                <span class="font-bold text-red-600 font-mono text-sm">${escapeHtml(ticket.code)}</span>
-                                                <div class="flex items-center gap-1.5">
-                                                    ${ticket.counter_name && ticket.counter_name !== '-' ? `
-                                                        <span class="text-[10px] font-bold px-2 py-0.5 rounded bg-red-100/70 text-red-800">${escapeHtml(ticket.counter_name)}</span>
-                                                    ` : ''}
-                                                    <span class="text-[9px] text-slate-400 font-medium">Ambil: ${ticket.created_at_formatted || '-'}</span>
-                                                </div>
-                                            </div>
-                                            ${detailsHtml}
-                                            ${skipBtnHtml}
-                                        </div>
-                                    `;
-                                }).join('');
-                            } else {
-                                listCalled.innerHTML = '<div class="text-center py-8 text-slate-400 text-xs">Tidak ada antrian dipanggil</div>';
-                            }
+                            updateCalledList(listCalled, data.tickets.called);
                         }
 
                         if (listFinished) {
-                            if (finishedLen > 0) {
-                                listFinished.innerHTML = data.tickets.finished.map(ticket => {
-                                    const detailsHtml = ticket.name ? `
-                                        <div class="flex items-center justify-between text-xs pt-1 border-t border-emerald-100/40">
-                                            <span class="font-semibold text-slate-800 truncate max-w-[150px]">${escapeHtml(ticket.name)}</span>
-                                            <span class="text-[10px] font-mono text-slate-500">${escapeHtml(ticket.nim || '')}</span>
-                                        </div>
-                                        <div class="flex items-center justify-between text-[11px] text-slate-600">
-                                            <span class="truncate max-w-[140px] text-slate-500">${escapeHtml(ticket.study_program || '')}</span>
-                                            <span class="font-semibold text-emerald-700">${escapeHtml(ticket.service_category || '')}</span>
-                                        </div>
-                                        ${ticket.caller_name && ticket.caller_name !== '-' ? `
-                                            <div class="text-[10px] text-slate-500 pt-0.5">
-                                                Petugas: <span class="font-medium text-slate-700">${escapeHtml(ticket.caller_name)}</span>
-                                            </div>
-                                        ` : ''}
-                                        ${ticket.notes ? `<div class="text-[10px] text-slate-500 italic bg-white p-1.5 rounded border border-slate-100 break-words">${escapeHtml(ticket.notes)}</div>` : ''}
-                                    ` : '';
-                                    const isSkipped = ticket.status === 'skipped';
-                                    const badgeHtml = isSkipped
-                                        ? `<span class="text-[10px] font-bold px-2 py-0.5 rounded bg-amber-100 text-amber-800 border border-amber-200">Dilewati</span>`
-                                        : (ticket.counter_name && ticket.counter_name !== '-'
-                                            ? `<span class="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-100/70 text-emerald-800">${escapeHtml(ticket.counter_name)}</span>`
-                                            : '');
-                                    const codeColor = isSkipped ? 'text-amber-600' : 'text-emerald-600';
-                                    return `
-                                        <div class="p-3 bg-emerald-50/10 border border-emerald-100/30 rounded-xl space-y-1">
-                                            <div class="flex items-center justify-between">
-                                                <span class="font-bold ${codeColor} font-mono text-sm">${escapeHtml(ticket.code)}</span>
-                                                <div class="flex items-center gap-1.5">
-                                                    ${badgeHtml}
-                                                    <span class="text-[9px] text-slate-400 font-medium">Ambil: ${ticket.created_at_formatted || '-'}</span>
-                                                </div>
-                                            </div>
-                                            ${detailsHtml}
-                                        </div>
-                                    `;
-                                }).join('');
-                            } else {
-                                listFinished.innerHTML = '<div class="text-center py-8 text-slate-400 text-xs">Belum ada antrian selesai</div>';
-                            }
+                            updateFinishedList(listFinished, data.tickets.finished);
                         }
                     }
                 }
@@ -816,7 +1723,7 @@
             }
         }
 
-        async function confirmSkip(code) {
+        async function confirmSkip(code, ticketId) {
             if (!confirm(`Lewati nomor ${code}? Nomor ini akan tercatat sebagai Dilewati.`)) {
                 return;
             }
@@ -827,6 +1734,26 @@
                 activeBtn.innerText = 'Memproses...';
             }
 
+            let noteToSend = null;
+            if (ticketId && window.calledStaffNotesRegistry?.has(Number(ticketId))) {
+                const comp = window.calledStaffNotesRegistry.get(Number(ticketId));
+                noteToSend = comp ? comp.value : null;
+            }
+
+            if (ticketId) {
+                const flushOk = await window.flushStaffNotes(ticketId);
+                if (!flushOk) {
+                    const proceed = confirm('Catatan belum tersimpan ke server. Lanjutkan melewati antrian?');
+                    if (!proceed) {
+                        if (activeBtn) {
+                            activeBtn.removeAttribute('disabled');
+                            activeBtn.innerText = 'Lewati';
+                        }
+                        return;
+                    }
+                }
+            }
+
             try {
                 const response = await fetch('{{ route("admin.queue.skip") }}', {
                     method: 'POST',
@@ -835,7 +1762,10 @@
                         'Accept': 'application/json',
                         'X-CSRF-TOKEN': '{{ csrf_token() }}',
                         'X-Requested-With': 'XMLHttpRequest'
-                    }
+                    },
+                    body: JSON.stringify({
+                        staff_notes: noteToSend
+                    })
                 });
 
                 const resData = await response.json();
@@ -856,6 +1786,7 @@
                 }
             }
         }
+        window.confirmSkip = confirmSkip;
 
         setInterval(fetchDashboardStats, 5000);
     </script>

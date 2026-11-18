@@ -74,7 +74,7 @@
                      x-show="status !== 'Ditutup'">@include('sidang_ta_registrations.partials.period-schedule')</div>
             @endforeach
         </div>
-        <div class="grid items-start gap-4 xl:grid-cols-2">
+        <div class="grid items-start gap-4 @if(config('sidang_ta.student_booking_enabled', false) && $bookingRegistrations->isNotEmpty()) xl:grid-cols-2 @endif">
         <section data-testid="drafts-panel" class="campus-card w-full space-y-4 p-5">
             <div>
                 <h3 class="text-base font-bold text-slate-800">Draft tersimpan</h3>
@@ -144,7 +144,9 @@
                 <p class="text-sm text-slate-500">Belum ada draft tersimpan.</p>
             @endforelse
         </section>
-        <div class="space-y-4">@foreach($bookingRegistrations as $bookingRegistration)@include('sidang_ta_registrations.partials.booking-card')@endforeach</div>
+        @if(config('sidang_ta.student_booking_enabled', false) && $bookingRegistrations->isNotEmpty())
+            <div class="space-y-4">@foreach($bookingRegistrations as $bookingRegistration)@include('sidang_ta_registrations.partials.booking-card')@endforeach</div>
+        @endif
         </div>
 
 

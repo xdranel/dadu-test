@@ -4,6 +4,7 @@ namespace Database\Seeders;
 
 use App\Models\User;
 use Illuminate\Database\Seeder;
+use Spatie\Permission\Models\Permission;
 
 class UserSeeder extends Seeder
 {
@@ -71,24 +72,35 @@ class UserSeeder extends Seeder
             ]
         );
 
-        // ─── Petugas Test User — akun SSO ───
+        // ─── Dosen Test User — akun manual khusus local/testing ───
         $dsn = User::where('username', 'krisna_dosen')
             ->orWhere('email', 'krisna@dosen.test')
             ->first();
         if (!$dsn) {
             $dsn = User::create([
                 'username'    => 'krisna_dosen',
-                'name'        => 'Krisna Petugas',
+                'name'        => 'Krisna Dosen',
                 'email'       => 'krisna@dosen.test',
                 'password'    => bcrypt('password'),
                 'status'      => 'active',
-                'auth_source' => 'sso',
-                'sso_role'    => 'Petugas',
+                'auth_source' => 'manual',
+                'sso_role'    => 'Pelaksana',
             ]);
         } else {
-            $dsn->update(['auth_source' => 'sso', 'sso_role' => 'Petugas']);
+            $dsn->update([
+                'name' => 'Krisna Dosen',
+                'password' => bcrypt('password'),
+                'status' => 'active',
+                'auth_source' => 'manual',
+                'sso_role' => 'Pelaksana',
+            ]);
         }
-        $dsn->syncRoles(['Petugas']);
+        $dsn->syncRoles(['Pelaksana']);
+        foreach (['room_booking_read', 'room_booking_create', 'room_booking_update'] as $permission) {
+            Permission::firstOrCreate(['name' => $permission]);
+        }
+        app()[\Spatie\Permission\PermissionRegistrar::class]->forgetCachedPermissions();
+        $dsn->givePermissionTo(['room_booking_read', 'room_booking_create', 'room_booking_update']);
 
         // ─── Pelaksana Test User — akun manual ───
         $ssc = User::where('email', 'staf_ssc@example.test')->first();

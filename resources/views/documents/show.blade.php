@@ -3,47 +3,15 @@
         <h2 class="font-semibold text-xl text-gray-800 leading-tight">Detail Dokumen</h2>
     </x-slot>
 
-    {{-- Breadcrumb: Dokumen > [Folder Induk] > [Subfolder] > Judul Dokumen --}}
+    {{-- Breadcrumb interaktif --}}
     @php
-        $ancestors = $document->category ? $document->category->ancestors : collect();
+        $ancestors = $document->category
+            ? $document->category->ancestorsList()->push($document->category)
+            : collect();
+        $isPdf = strtolower($document->file_type) === 'pdf';
+        $missing = !empty($fileMissing);
     @endphp
-    <div x-data="{ expandedBreadcrumb: false }">
-        <nav class="flex items-center gap-1.5 text-sm mb-5 flex-wrap" aria-label="Breadcrumb">
-            <a href="{{ route('documents.index') }}" class="text-slate-500 hover:text-[#DA2D3B] font-medium" title="Kembali ke daftar folder">Dokumen</a>
-            @if($document->category)
-                @if($ancestors->count() <= 1)
-                    @foreach($ancestors as $ancestor)
-                        <svg class="w-4 h-4 text-slate-300 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
-                        <a href="{{ route('documents.folder', $ancestor) }}" class="text-slate-500 hover:text-[#DA2D3B] font-medium truncate max-w-[140px] sm:max-w-xs">{{ $ancestor->name }}</a>
-                    @endforeach
-                @else
-                    <span x-show="!expandedBreadcrumb" class="inline-flex items-center gap-1.5">
-                        <svg class="w-4 h-4 text-slate-300 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
-                        <button type="button" @click="expandedBreadcrumb = true"
-                                class="px-1.5 py-0.5 rounded bg-slate-100 hover:bg-slate-200 text-slate-500 text-xs font-bold tracking-wider transition-colors"
-                                title="Klik untuk menampilkan seluruh jalur folder">
-                            &hellip;
-                        </button>
-                    </span>
-
-                    <span x-show="expandedBreadcrumb" class="inline-flex items-center gap-1.5 flex-wrap">
-                        @foreach($ancestors->slice(0, -1) as $ancestor)
-                            <svg class="w-4 h-4 text-slate-300 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
-                            <a href="{{ route('documents.folder', $ancestor) }}" class="text-slate-500 hover:text-[#DA2D3B] font-medium truncate max-w-[140px] sm:max-w-xs">{{ $ancestor->name }}</a>
-                        @endforeach
-                    </span>
-
-                    @php $lastAncestor = $ancestors->last(); @endphp
-                    <svg class="w-4 h-4 text-slate-300 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
-                    <a href="{{ route('documents.folder', $lastAncestor) }}" class="text-slate-500 hover:text-[#DA2D3B] font-medium truncate max-w-[140px] sm:max-w-xs">{{ $lastAncestor->name }}</a>
-                @endif
-                <svg class="w-4 h-4 text-slate-300 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
-                <a href="{{ route('documents.folder', $document->category) }}" class="text-slate-500 hover:text-[#DA2D3B] font-medium truncate max-w-[140px] sm:max-w-xs">{{ $document->category->name }}</a>
-            @endif
-            <svg class="w-4 h-4 text-slate-300 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
-            <span class="text-slate-800 font-semibold truncate max-w-xs">{{ $document->title }}</span>
-        </nav>
-    </div>
+    @include('documents.partials.breadcrumb', ['ancestors' => $ancestors, 'current' => $document->title])
 
     <div class="campus-card p-6">
         <!-- Header Dokumen -->
@@ -56,8 +24,8 @@
                     </span>
                 @endif
             </div>
-            <span class="px-3 py-1 text-sm font-semibold rounded-full {{ $document->visibility_badge }}">
-                {{ $document->visibility }}
+            <span class="px-2.5 py-1 text-xs font-semibold rounded-full {{ $document->visibility_badge }}">
+                {{ $document->visibility_label }}
             </span>
         </div>
 
@@ -85,36 +53,51 @@
             </div>
         </div>
 
-        <!-- Preview PDF — simplified toolbar -->
-        @if($document->file_type === 'pdf')
-            <div class="mb-6">
-                <div class="flex items-center justify-between mb-2">
-                    <p class="text-sm font-medium text-gray-700">Preview Dokumen:</p>
-                    <div class="flex items-center gap-2">
-                        <a href="{{ route('documents.download', $document) }}"
-                           class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors"
-                           title="Unduh dokumen">
-                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
-                            Unduh
-                        </a>
-                        <a href="/storage/{{ $document->file_path }}" target="_blank"
-                           class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors"
-                           title="Buka di tab baru untuk print">
-                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
-                            Print
-                        </a>
-                    </div>
+        @if($missing)
+            {{-- Peringatan File Fisik Tidak Ditemukan --}}
+            <div class="rounded-2xl border border-amber-200 bg-amber-50 p-6 text-center mb-6">
+                <div class="w-12 h-12 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center mx-auto mb-3">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
                 </div>
-                {{-- PDF embed with minimal toolbar: page nav + zoom only --}}
-                <iframe src="/storage/{{ $document->file_path }}#toolbar=0&navpanes=0&scrollbar=1"
-                        class="w-full border border-gray-200 rounded-lg"
-                        style="height: 600px;"
-                        title="Preview {{ $document->title }}"></iframe>
+                <h4 class="text-sm font-bold text-amber-800">File fisik tidak ditemukan di penyimpanan</h4>
+                <p class="text-xs text-amber-700 mt-1">File fisik tidak ditemukan di penyimpanan. Hubungi admin sistem atau unggah ulang dokumen.</p>
+                <button type="button" disabled class="btn btn-secondary mt-4 opacity-50 cursor-not-allowed">Unduh dinonaktifkan</button>
             </div>
+        @else
+            {{-- Area Preview Dokumen --}}
+            <div class="flex items-center justify-between mb-3">
+                <h3 class="text-sm font-semibold text-slate-700">Preview Dokumen</h3>
+                <div class="flex items-center gap-2">
+                    <a href="{{ route('documents.download', $document) }}" class="btn btn-secondary inline-flex items-center gap-1.5 !py-1.5 !text-xs" title="Unduh file dokumen">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1M12 4v12m0 0l-4-4m4 4l4-4"/></svg>
+                        Unduh
+                    </a>
+                    @if($isPdf)
+                    <button type="button" onclick="document.getElementById('pdfFrame').contentWindow.print()" class="btn btn-secondary inline-flex items-center gap-1.5 !py-1.5 !text-xs" title="Print file PDF">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4H7v4a2 2 0 002 2zM7 9V5a2 2 0 012-2h6a2 2 0 012 2v4"/></svg>
+                        Print
+                    </button>
+                    @endif
+                </div>
+            </div>
+
+            @if($isPdf)
+                <div class="rounded-2xl border border-slate-200 overflow-hidden bg-slate-50 mb-6">
+                    <iframe id="pdfFrame" src="{{ route('documents.preview', $document) }}#toolbar=1&navpanes=0"
+                            class="w-full h-[75vh]" title="Pratinjau {{ $document->title }}" loading="lazy"></iframe>
+                </div>
+            @else
+                <div class="rounded-2xl border border-slate-200 bg-slate-50 py-14 flex flex-col items-center text-center mb-6">
+                    <x-file-icon :type="$document->file_type" size="lg" />
+                    <p class="mt-4 text-sm font-semibold text-slate-700">Pratinjau tidak tersedia untuk tipe {{ strtoupper($document->file_type) }}</p>
+                    <p class="text-xs text-slate-400 mt-1">Unduh file untuk membukanya.</p>
+                    <a href="{{ route('documents.download', $document) }}" class="btn btn-primary mt-4">Unduh {{ $document->file_size_formatted }}</a>
+                </div>
+            @endif
         @endif
 
         <!-- Tombol Aksi -->
-        <div class="mt-5 flex items-center justify-between border-t pt-5">
+        <div class="mt-5 flex items-center justify-between border-t border-slate-100 pt-5">
             @if($document->category)
                 <a href="{{ route('documents.folder', $document->category) }}"
                    class="btn btn-secondary inline-flex items-center gap-1.5"

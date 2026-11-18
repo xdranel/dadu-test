@@ -162,28 +162,86 @@ class RoleController extends Controller
         $user = null;
 
         if ($request->filled('username')) {
-            $request->validate([
-                'username' => ['required', 'string', 'max:100'],
-                'unit_id'  => ['nullable', 'exists:units,id'],
-                'position' => ['nullable', 'string', 'max:255'],
-            ]);
+            $rawInput = trim($request->username);
 
-            $cleanUsername = explode('@', trim($request->username))[0];
-            $cleanUsername = strtolower($cleanUsername);
+            if (mb_strlen($rawInput) > 100) {
+                return back()->with('error', 'Format username atau email tidak valid (maksimal 100 karakter).');
+            }
 
-            $user = User::where('username', $cleanUsername)->first();
+            $isEmail = str_contains($rawInput, '@');
+
+            if ($isEmail) {
+                if (! filter_var($rawInput, FILTER_VALIDATE_EMAIL)) {
+                    return back()->with('error', 'Format email SSO tidak valid.');
+                }
+
+                $domain = strtolower(substr(strrchr($rawInput, '@'), 1));
+                $allowedBaseDomains = ['telkomuniversity.ac.id', 'student.telkomuniversity.ac.id'];
+                $isAllowedDomain = false;
+                foreach ($allowedBaseDomains as $base) {
+                    if ($domain === $base || str_ends_with($domain, '.' . $base)) {
+                        $isAllowedDomain = true;
+                        break;
+                    }
+                }
+
+                $isTestDomain = str_ends_with($domain, '.test') || str_ends_with($domain, '.local') || $domain === 'example.com';
+                if (! $isAllowedDomain && app()->environment('local', 'testing') && $isTestDomain) {
+                    $isAllowedDomain = true;
+                }
+
+                if (! $isAllowedDomain) {
+                    return back()->with('error', 'Domain email tidak valid. Gunakan akun SSO dengan domain @telkomuniversity.ac.id atau @student.telkomuniversity.ac.id.');
+                }
+            } else {
+                if (! preg_match('/^[a-zA-Z0-9._-]+$/', $rawInput)) {
+                    return back()->with('error', 'Format username SSO atau NIM tidak valid.');
+                }
+            }
+
+            $cleanUsername = strtolower(explode('@', $rawInput)[0]);
+
+            $isStudentDomain = $isEmail && (str_contains(strtolower($rawInput), '@student.') || str_starts_with(strtolower($domain ?? ''), 'student.'));
+            $studentModel = \App\Models\Student::where('student_number', $cleanUsername)
+                ->orWhere('email', strtolower($rawInput))
+                ->first();
+
+            $isStudent = $isStudentDomain || ($studentModel !== null) || ($role->name === 'mahasiswa');
+
+            $user = User::where('username', $cleanUsername)
+                ->orWhere('email', strtolower($rawInput))
+                ->first();
+
+            if ($user && ($user->hasRole('mahasiswa') || str_contains($user->email ?? '', '@student.'))) {
+                $isStudent = true;
+            }
+
+            // Pengecekan akun mahasiswa saat ditugaskan ke role Petugas
+            if ($role->name === 'Petugas' && $isStudent && ! $user && ! $studentModel) {
+                return back()->with('error', 'Akun mahasiswa tidak ditemukan di database. Pastikan NIM atau email mahasiswa telah terdaftar.');
+            }
 
             if ($user) {
                 $this->guardRoleChange($request, $user, $role->name);
             } else {
+                $userName = $studentModel?->name ?? $cleanUsername;
+                $userEmail = $isEmail
+                    ? strtolower($rawInput)
+                    : ($studentModel?->email ?? ($isStudent ? $cleanUsername . '@student.telkomuniversity.ac.id' : $cleanUsername . '@telkomuniversity.ac.id'));
+
                 $user = User::create([
                     'username'    => $cleanUsername,
-                    'name'        => $cleanUsername,
-                    'email'       => $cleanUsername . '@telkomuniversity.ac.id',
+                    'name'        => $userName,
+                    'email'       => $userEmail,
+                    'employee_id' => $studentModel?->student_number ?? ($isStudent ? $cleanUsername : null),
                     'password'    => \Illuminate\Support\Facades\Hash::make(\Illuminate\Support\Str::random(16)),
                     'auth_source' => 'sso',
                     'status'      => 'active',
                 ]);
+
+                if ($isStudent) {
+                    $user->assignRole('mahasiswa');
+                }
             }
 
             if ($request->filled('unit_id')) {
@@ -202,11 +260,7 @@ class RoleController extends Controller
             $this->guardRoleChange($request, $user, $role->name);
         }
 
-        $sidangTaLocalTester = app()->environment('local')
-            && strtolower((string) $user->email) === 'krisna@mahasiswa.test';
-        if ($user->hasRole('mahasiswa') && $role->name === 'Petugas' && ! $sidangTaLocalTester) {
-            return back()->with('error', 'Tidak dapat assign role Petugas ke akun Mahasiswa. Ubah role mahasiswa terlebih dahulu.');
-        }
+        // Mahasiswa diizinkan memiliki role Petugas sebagai multi-role
         $user->assignRole($role->name);
         $user->update(['sso_role' => $role->name]);
 

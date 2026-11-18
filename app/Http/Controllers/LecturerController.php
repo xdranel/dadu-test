@@ -81,6 +81,9 @@ class LecturerController extends Controller
                 'BIDANG KEILMUAN' => $d->academic_interest,
                 'KODE DOSEN' => $d->lecturer_code,
                 'Email Domain' => $d->email_domain,
+                'No HP' => $d->phone,
+                'COE' => $d->coe,
+                'KK' => $d->kk,
             ];
         });
     }
@@ -101,6 +104,9 @@ class LecturerController extends Controller
             'BIDANG KEILMUAN' => 'Kecerdasan Buatan',
             'KODE DOSEN' => 'BDI',
             'Email Domain' => 'budi@telkomuniversity.ac.id',
+            'No HP' => '081234567890',
+            'COE' => 'Artificial Intelligence',
+            'KK' => 'Data Science',
         ]]);
 
         return (new FastExcel($template))->download(
@@ -116,12 +122,17 @@ class LecturerController extends Controller
         ]);
 
         $imported = 0;
-        $skipped = 0;
+        $updated  = 0;
+        $skipped  = 0;
 
         try {
-            (new FastExcel)->import($request->file('file'), function ($row) use (&$imported, &$skipped) {
+            (new FastExcel)->import($request->file('file'), function ($row) use (&$imported, &$updated, &$skipped) {
 
                 $clean = function ($val) {
+                    if ($val instanceof \DateTimeInterface) return $val->format('Y-m-d');
+                    if (is_float($val) && floor($val) == $val) $val = (int) $val;
+                    if (is_int($val)) $val = (string) $val; // NIP/NUPTK/No HP numerik dari Excel
+
                     if (is_string($val)) {
                         $val = preg_replace('/^\p{Z}+|\p{Z}+$/u', '', $val);
                         $val = str_replace("\xC2\xA0", '', $val);
@@ -131,57 +142,104 @@ class LecturerController extends Controller
                     return $val === '' ? null : $val;
                 };
 
-                $nidn = $clean($row['NIDN'] ?? $row['nidn'] ?? null);
-                $kode = $clean($row['Kode Dosen Baru'] ?? $row['KODE DOSEN'] ?? $row['kode_dosen'] ?? null);
-                $nama = $clean($row['NAMA'] ?? $row['nama'] ?? null);
+                // Normalisasi header: huruf besar, spasi/underscore diseragamkan
+                $norm = fn ($k) => strtoupper(trim(preg_replace('/[\s_]+/', ' ', (string) $k)));
+                $map = [];
+                foreach ($row as $k => $v) { $map[$norm($k)] = $v; }
 
-                if (empty($nama) || (empty($nidn) && empty($kode))) {
-                    return null;
-                }
-
-                $query = Lecturer::query();
-                if ($nidn) {
-                    $query->where('nidn', $nidn);
-                } else {
-                    $query->where('lecturer_code', $kode);
-                }
-
-                $matches = Lecturer::query()->where(function ($q) use ($nidn, $kode) {
-                    if ($nidn) {
-                        $q->where('nidn', $nidn);
-                    }if ($kode) {
-                        $q->orWhere('lecturer_code', $kode);
+                // Ambil nilai berdasarkan daftar alias header (toleran format header)
+                $get = function (array $aliases) use ($map, $norm, $clean) {
+                    foreach ($aliases as $a) {
+                        $key = $norm($a);
+                        if (array_key_exists($key, $map) && $clean($map[$key]) !== null) return $clean($map[$key]);
                     }
+                    // fallback: header yang diawali alias (mis. "BIDANG KEILMUAN JAFA TERAKHIR LLDIKTI")
+                    foreach ($aliases as $a) {
+                        $key = $norm($a);
+                        foreach ($map as $h => $v) {
+                            if (str_starts_with($h, $key . ' ') && $clean($v) !== null) return $clean($v);
+                        }
+                    }
+                    return null;
+                };
+
+                // No HP: pastikan diawali 0 (Excel sering menghapus 0 di depan)
+                $normalizePhone = function ($p) {
+                    if ($p === null) return null;
+                    $digits = preg_replace('/[^\d+]/', '', $p);
+                    if ($digits === '') return null;
+                    if (str_starts_with($digits, '+62')) return '0' . substr($digits, 3);
+                    if (str_starts_with($digits, '62'))  return '0' . substr($digits, 2);
+                    if (str_starts_with($digits, '8'))   return '0' . $digits;
+                    return $digits;
+                };
+
+                $nidn   = $get(['NIDN']);
+                $kode   = $get(['Kode Dosen Baru', 'KODE DOSEN', 'Kode Dosen']);
+                $nama   = $get(['NAMA']);
+                $nipYpt = $get(['NIP YPT']);
+                $nuptk  = $get(['NUPTK']);
+
+                // Syarat baris valid: nama terisi dan minimal salah satu identitas terisi (NIDN, NIP YPT, NUPTK, atau Kode Dosen)
+                if (empty($nama) || (empty($nidn) && empty($nipYpt) && empty($nuptk) && empty($kode))) return null;
+
+                $matches = Lecturer::query()->where(function ($q) use ($nidn, $nipYpt, $nuptk, $kode) {
+                    if ($nidn) $q->where('nidn', $nidn);
+                    if ($nipYpt) $q->orWhere('nip_ypt', $nipYpt);
+                    if ($nuptk) $q->orWhere('nuptk', $nuptk);
+                    if ($kode) $q->orWhere('lecturer_code', $kode);
                 })->limit(2)->get();
+
                 if ($matches->count() > 1) {
                     $skipped++;
-
-                    return null;
-                }
-                if ($existing = $matches->first()) {
-                    $patch = array_filter(['name' => $nama, 'nidn' => $nidn, 'lecturer_code' => $kode, 'email_domain' => $clean($row['Email Domain Telkom University'] ?? $row['Email Domain'] ?? $row['email_domain'] ?? null), 'active_status' => $clean($row['STATUS'] ?? $row['Status Aktif'] ?? $row['status_aktif'] ?? null)], fn ($v) => $v !== null && $v !== '');
-                    $existing->fill($patch)->save();
-                    $imported++;
-
                     return null;
                 }
 
-                Lecturer::create([
-                    'name' => $nama,
-                    'active_status' => $clean($row['STATUS'] ?? $row['Status Aktif'] ?? $row['status_aktif'] ?? null),
-                    'study_program' => $clean($row['PRODI'] ?? $row['prodi'] ?? null),
-                    'nip_ypt' => $clean($row['NIP YPT'] ?? $row['nip_ypt'] ?? null),
-                    'nidn' => $nidn,
-                    'nuptk' => $clean($row['NUPTK'] ?? $row['nuptk'] ?? null),
-                    'employment_status' => $clean($row['STATUS Kepegawaian'] ?? $row['status_kepegawaian'] ?? null),
-                    'front_title' => $clean($row['GELAR DEPAN'] ?? $row['gelar_depan'] ?? null),
-                    'back_title' => $clean($row['GELAR BELAKANG'] ?? $row['gelar_belakang'] ?? null),
-                    'jfa' => $clean($row['JFA'] ?? $row['jfa'] ?? null),
-                    'academic_interest' => $clean($row['BIDANG KEILMUAN'] ?? $row['bidang_keilmuan'] ?? null),
-                    'lecturer_code' => $kode,
-                    'email_domain' => $clean($row['Email Domain Telkom University'] ?? $row['Email Domain'] ?? $row['email_domain'] ?? null),
-                ]);
+                $existing = $matches->first();
 
+                // Kode dosen unik: jika sudah dipakai dosen lain, jangan diubah/ditambah agar tidak error
+                if ($kode && Lecturer::where('lecturer_code', $kode)
+                        ->when($existing, fn ($q) => $q->where('id', '!=', $existing->id))
+                        ->exists()) {
+                    $kode = null;
+                }
+
+                if (!$existing && empty($kode)) return null; // dosen baru wajib punya kode dosen
+
+                $payload = [
+                    'name'              => $nama,
+                    'active_status'     => $get(['Status Aktif', 'STATUS', 'Status']),
+                    'study_program'     => $get(['PRODI', 'Program Studi']),
+                    'nip_ypt'           => $nipYpt,
+                    'nidn'              => $nidn,
+                    'nuptk'             => $nuptk,
+                    'employment_status' => $get(['STATUS Kepegawaian', 'Status Kepegawaian']),
+                    'front_title'       => $get(['GELAR DEPAN']),
+                    'back_title'        => $get(['GELAR BELAKANG']),
+                    'jfa'               => $get(['JFA']),
+                    'academic_interest' => $get(['BIDANG KEILMUAN']),
+                    'lecturer_code'     => $kode,
+                    'email_domain'      => $get(['Email Domain Telkom University', 'Email Domain', 'Email']),
+                    'phone'             => $normalizePhone($get(['No HP', 'HP', 'No Telepon'])),
+                    'coe'               => $get(['COE']),
+                    'kk'                => $get(['KK']),
+                ];
+
+                if ($existing) {
+                    // Update: hanya kolom yang terisi di file (sel kosong tidak menimpa data lama)
+                    $changes = array_filter($payload, fn ($v) => $v !== null && $v !== '');
+                    $existing->fill($changes);
+
+                    if ($existing->isDirty()) {
+                        $existing->save();
+                        $updated++;
+                    } else {
+                        $skipped++;
+                    }
+                    return null;
+                }
+
+                Lecturer::create($payload);
                 $imported++;
             });
         } catch (\Exception $e) {
@@ -189,7 +247,7 @@ class LecturerController extends Controller
         }
 
         return redirect()->route('lecturers.index')
-            ->with('success', "Import selesai: {$imported} berhasil, {$skipped} dilewati.");
+            ->with('success', "Import selesai: {$imported} ditambahkan, {$updated} diperbarui, {$skipped} tanpa perubahan.");
     }
 
     public function create()

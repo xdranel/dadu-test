@@ -14,6 +14,7 @@ use App\Http\Controllers\CourseController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DocumentCategoryController;
 use App\Http\Controllers\DocumentController;
+use App\Http\Controllers\DocumentImportController;
 use App\Http\Controllers\ExamScheduleController;
 use App\Http\Controllers\GradeAppealController;
 use App\Http\Controllers\GraduationRegistrationController;
@@ -37,6 +38,7 @@ use App\Http\Controllers\StudentController;
 use App\Http\Controllers\StudentCourseController;
 use App\Http\Controllers\SyncController;
 use App\Http\Controllers\UserRoleController;
+use App\Http\Middleware\EnsurePublicDocumentAccess;
 use App\Models\Document;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
@@ -98,14 +100,18 @@ Route::middleware('auth')->group(function () {
         ->name('password.force-change.update');
 });
 
-// Public documents / Portal Dokumen (accessible by Guest and all authenticated users)
-Route::prefix('public-documents')->name('public_documents.')->group(function () {
-    Route::get('/', [PublicDocumentController::class, 'index'])->name('index');
-    Route::get('/{document}', [PublicDocumentController::class, 'show'])->name('show');
-    Route::get('/{document}/download', [PublicDocumentController::class, 'download'])
-        ->middleware('throttle:30,1')
-        ->name('download');
-});
+// Public documents / Portal Dokumen (accessible by Guest and authenticated users with public_document_read permission)
+Route::prefix('public-documents')
+    ->name('public_documents.')
+    ->middleware(EnsurePublicDocumentAccess::class)
+    ->group(function () {
+        Route::get('/', [PublicDocumentController::class, 'index'])->name('index');
+        Route::get('/{document}/preview', [PublicDocumentController::class, 'preview'])->name('preview');
+        Route::get('/{document}', [PublicDocumentController::class, 'show'])->name('show');
+        Route::get('/{document}/download', [PublicDocumentController::class, 'download'])
+            ->middleware('throttle:30,1')
+            ->name('download');
+    });
 
 // Protected routes (auth required, not under /dashboard)
 Route::middleware(['auth', 'password.changed'])->group(function () {
@@ -206,21 +212,81 @@ Route::middleware(['auth', 'password.changed'])->group(function () {
         Route::group([], function () {
             // Kategori Dokumen
             registerResourceWithPermissions('document_categories', DocumentCategoryController::class, 'document_category');
-            Route::post('document_categories/{document_category}/move', [DocumentCategoryController::class, 'move'])
+            Route::match(['post', 'patch'], 'document_categories/{document_category}/move', [DocumentCategoryController::class, 'move'])
                 ->middleware(['permission:document_category_update', 'throttle:15,1'])
                 ->name('document_categories.move');
+            Route::match(['post', 'patch'], 'document-categories/{documentCategory}/move', [DocumentCategoryController::class, 'move'])
+                ->middleware(['permission:document_category_update', 'throttle:15,1']);
+            Route::patch('document-categories/{documentCategory}/pin', [DocumentCategoryController::class, 'togglePin'])
+                ->middleware('permission:document_category_update')
+                ->name('document_categories.pin');
+            Route::patch('document-categories/{documentCategory}/visibility', [DocumentCategoryController::class, 'setVisibility'])
+                ->middleware('permission:document_category_update')
+                ->name('document_categories.visibility');
+            Route::post('document-categories/{id}/restore', [DocumentCategoryController::class, 'restore'])
+                ->middleware('permission:document_category_delete')
+                ->name('document_categories.restore');
             // Throttle folder creation
             Route::post('document_categories', [DocumentCategoryController::class, 'store'])
                 ->middleware(['permission:document_category_create', 'throttle:15,1'])
                 ->name('document_categories.store');
 
+            // Dokumen Import Massal
+            Route::prefix('documents/import')->name('documents.import.')->group(function () {
+                Route::get('/', [DocumentImportController::class, 'create'])
+                    ->middleware('permission:document_create|document_update')
+                    ->name('create');
+                Route::get('/template', [DocumentImportController::class, 'template'])
+                    ->middleware('permission:document_create|document_update')
+                    ->name('template');
+                Route::post('/', [DocumentImportController::class, 'store'])
+                    ->middleware(['permission:document_create|document_update', 'throttle:10,1'])
+                    ->name('store');
+                Route::get('/{batch}', [DocumentImportController::class, 'preview'])
+                    ->middleware('permission:document_create|document_update')
+                    ->name('preview');
+                Route::patch('/{batch}/row/{row}', [DocumentImportController::class, 'updateRow'])
+                    ->middleware('permission:document_create|document_update')
+                    ->name('row.update');
+                Route::post('/{batch}/row/{row}/toggle-skip', [DocumentImportController::class, 'toggleSkip'])
+                    ->middleware('permission:document_create|document_update')
+                    ->name('row.toggle-skip');
+                Route::get('/{batch}/errors-csv', [DocumentImportController::class, 'exportErrors'])
+                    ->middleware('permission:document_create|document_update')
+                    ->name('errors-csv');
+                Route::post('/{batch}/confirm', [DocumentImportController::class, 'confirm'])
+                    ->middleware(['permission:document_create|document_update', 'throttle:10,1'])
+                    ->name('confirm');
+                Route::delete('/{batch}', [DocumentImportController::class, 'cancel'])
+                    ->middleware('permission:document_create|document_update')
+                    ->name('cancel');
+                Route::get('/{batch}/status', [DocumentImportController::class, 'status'])
+                    ->middleware('permission:document_create|document_update')
+                    ->name('status');
+            });
+
             // Dokumen
+            Route::get('documents/{document}/preview', [DocumentController::class, 'preview'])
+                ->middleware('permission:document_read')
+                ->name('documents.preview');
             Route::get('documents/{document}/download', [DocumentController::class, 'download'])
                 ->middleware(['permission:document_read', 'throttle:60,1'])
                 ->name('documents.download');
+            Route::get('documents/move-targets', [DocumentController::class, 'moveTargets'])
+                ->middleware('permission:document_read')
+                ->name('documents.move-targets');
             Route::get('documents/folder/{documentCategory}', [DocumentController::class, 'folder'])
                 ->middleware('permission:document_read')
                 ->name('documents.folder');
+            Route::patch('documents/{document}/visibility', [DocumentController::class, 'setVisibility'])
+                ->middleware('permission:document_update')
+                ->name('documents.visibility');
+            Route::post('documents/{id}/restore', [DocumentController::class, 'restore'])
+                ->middleware('permission:document_delete')
+                ->name('documents.restore');
+            Route::post('documents/bulk-restore', [DocumentController::class, 'bulkRestore'])
+                ->middleware('permission:document_delete')
+                ->name('documents.bulk-restore');
             // Bulk actions
             Route::post('documents/bulk-delete', [DocumentController::class, 'bulkDelete'])
                 ->middleware(['permission:document_delete', 'throttle:30,1'])
@@ -679,9 +745,13 @@ Route::middleware(['auth'])->prefix('admin/queue')->name('admin.queue.')->group(
     Route::get('/stats', [App\Http\Controllers\Admin\QueueController::class, 'stats'])->middleware('permission:queue_ticket_read')->name('stats');
     Route::post('/claim', [App\Http\Controllers\Admin\QueueController::class, 'claim'])->middleware('permission:queue_ticket_update')->name('claim');
     Route::post('/release', [App\Http\Controllers\Admin\QueueController::class, 'release'])->middleware('permission:queue_ticket_update')->name('release');
+    Route::post('/force-release', [App\Http\Controllers\Admin\QueueController::class, 'forceRelease'])->name('force-release');
     Route::post('/next', [App\Http\Controllers\Admin\QueueController::class, 'next'])->middleware('permission:queue_ticket_update')->name('next');
     Route::post('/skip', [App\Http\Controllers\Admin\QueueController::class, 'skip'])->middleware('permission:queue_ticket_update')->name('skip');
     Route::post('/back', [App\Http\Controllers\Admin\QueueController::class, 'back'])->middleware('permission:queue_ticket_update')->name('back');
+    Route::match(['patch', 'post'], '/tickets/{ticket}/staff-notes', [App\Http\Controllers\Admin\QueueController::class, 'updateStaffNotes'])
+        ->middleware(['permission:queue_ticket_update', 'throttle:60,1'])
+        ->name('tickets.staff-notes');
 
     // Riwayat, Detail, dan Export Antrian
     Route::get('/history', [QueueHistoryController::class, 'index'])->middleware('permission:queue_ticket_read')->name('history');
@@ -701,5 +771,11 @@ Route::get('/dashboard/admin/queue/history/exports/{filename}', [QueueHistoryCon
     ->middleware(['auth', 'permission:queue_ticket_read']);
 Route::get('/dashboard/admin/queue/history/{id}', [QueueHistoryController::class, 'show'])
     ->middleware(['auth', 'permission:queue_ticket_read']);
+
+Route::match(['patch', 'post'], '/queue/tickets/{ticket}/staff-notes', [App\Http\Controllers\Admin\QueueController::class, 'updateStaffNotes'])
+    ->middleware(['auth', 'permission:queue_ticket_update', 'throttle:60,1'])
+    ->name('queue.tickets.staff-notes');
+Route::match(['patch', 'post'], '/dashboard/admin/queue/tickets/{ticket}/staff-notes', [App\Http\Controllers\Admin\QueueController::class, 'updateStaffNotes'])
+    ->middleware(['auth', 'permission:queue_ticket_update', 'throttle:60,1']);
 
 require __DIR__.'/auth.php';

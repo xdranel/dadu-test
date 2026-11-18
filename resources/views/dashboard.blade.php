@@ -27,6 +27,7 @@
 
                 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 items-start">
                     {{-- Card: Pendaftaran Yudisium --}}
+                    @canany(['graduation_registration_read', 'graduation_registration_create'])
                     <div
                         class="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden hover:shadow-md transition-shadow duration-300 flex flex-col">
                         {{-- Area Ilustrasi Atas (merah ala iBasila) --}}
@@ -115,6 +116,7 @@
                         </div>
 
                     </div>
+                    @endcanany
 
                     {{-- Card: Pendaftaran Sidang TA --}}
                     @can('sidang_ta_registration_read')

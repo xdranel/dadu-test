@@ -30,7 +30,7 @@ class UpdateDocumentCategoryRequest extends FormRequest
             ],
             'slug'            => ['nullable', 'string', Rule::unique('document_categories', 'slug')->ignore($id)],
             'description'     => ['nullable', 'string', 'max:1000'],
-            'visibility'      => ['nullable', 'in:publik,internal'],
+            'visibility'      => ['nullable', Rule::in(array_keys(config('documents.visibility')))],
             'is_pinned'       => ['boolean'],
             'show_when_empty' => ['boolean'],
         ];

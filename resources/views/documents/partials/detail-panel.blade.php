@@ -93,8 +93,9 @@
                     <div>
                         <label class="campus-label">Visibilitas <span class="text-red-500">*</span></label>
                         <select name="visibility" class="campus-select w-full" x-model="detailItem.visibility" required>
-                            <option value="publik">Publik dan Mahasiswa</option>
-                            <option value="internal">Pegawai dan Dosen</option>
+                            @foreach(config('documents.visibility', []) as $key => $meta)
+                                <option value="{{ $key }}">{{ $meta['label'] }}</option>
+                            @endforeach
                         </select>
                     </div>
 
@@ -202,8 +203,9 @@
                     <div>
                         <label class="campus-label">Visibilitas <span class="text-red-500">*</span></label>
                         <select name="visibility" class="campus-select w-full" x-model="detailItem.visibility" required>
-                            <option value="publik">Publik dan Mahasiswa</option>
-                            <option value="internal">Pegawai dan Dosen</option>
+                            @foreach(config('documents.visibility', []) as $key => $meta)
+                                <option value="{{ $key }}">{{ $meta['label'] }}</option>
+                            @endforeach
                         </select>
                     </div>
 

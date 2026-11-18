@@ -38,10 +38,12 @@
                 <button type="submit" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm rounded-md">Filter</button>
                 <a href="{{ route('document_categories.show', $documentCategory) }}"
                    class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm rounded-md">Reset</a>
+                @can('create', App\Models\Document::class)
                 <a href="{{ route('documents.create') }}"
                    class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold rounded-md shadow whitespace-nowrap">
                     Tambah Dokumen
                 </a>
+                @endcan
             </form>
 
             <!-- Daftar Dokumen -->

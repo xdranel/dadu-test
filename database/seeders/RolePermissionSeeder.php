@@ -23,11 +23,12 @@ class RolePermissionSeeder extends Seeder
             'document'          => ['create', 'read', 'update', 'delete'],
             'public_document'   => ['read'],
             'jadwal'            => ['create', 'read', 'update', 'delete'],
-            'queue_ticket'      => ['read', 'update'],
+            'queue_ticket'      => ['read', 'update', 'force_release'],
             'graduation_registration' => ['create', 'read', 'update', 'delete', 'review'],
             'sidang_ta_registration' => ['create', 'read', 'update', 'review', 'view_program'],
             'sidang_ta_period' => ['create', 'read', 'update', 'delete'],
             'grade_appeal'      => ['create', 'read', 'update', 'delete', 'review'],
+            'room_booking'      => ['create', 'read', 'update', 'review'],
         ];
 
         $allPermissions = [];
@@ -49,39 +50,40 @@ class RolePermissionSeeder extends Seeder
 
         // ─── admin (Administrator Operasional) ─────────────────────────────────
         $adminPermissions = array_values(array_filter($allPermissions, function ($p) {
-            return !str_ends_with($p, '_review') && $p !== 'sidang_ta_registration_view_program';
+            return !str_ends_with($p, '_review') && !str_starts_with($p, 'room_booking_')
+                && $p !== 'sidang_ta_registration_view_program';
         }));
         $admin = Role::findByName('admin');
         $admin->syncPermissions($adminPermissions);
 
         // ─── Pelaksana (Staf unit teknis — Role ID 103) ────────────────────────
+        // Staging defaults retain lecturer-scoped TA reading; do not seed deployed roles on update.
+        $pelaksanaPermissions = array_values(array_filter($allPermissions, function ($p) {
+            return !str_ends_with($p, '_force_release') && !str_starts_with($p, 'room_booking_')
+                && ((!str_starts_with($p, 'sidang_ta_registration_') && !str_starts_with($p, 'sidang_ta_period_'))
+                    || in_array($p, ['sidang_ta_registration_read', 'sidang_ta_registration_view_program'], true));
+        }));
         $pelaksana = Role::findByName('Pelaksana');
-        // Fresh-install defaults only. Do not run this seeder to update deployed roles.
-        $pelaksanaPermissions = array_filter($allPermissions, fn ($permission) =>
-            (!str_starts_with($permission, 'sidang_ta_registration_')
-                && !str_starts_with($permission, 'sidang_ta_period_'))
-            || in_array($permission, ['sidang_ta_registration_read', 'sidang_ta_registration_view_program'], true)
-        );
-        $pelaksana->syncPermissions(array_values($pelaksanaPermissions));
+        $pelaksana->syncPermissions($pelaksanaPermissions);
 
         // ─── Pemimpin (Kepala unit — Role ID 104) ──────────────────────────────
         $pemimpinPermissions = array_filter($allPermissions, function ($p) {
-            return str_ends_with($p, '_read') || str_ends_with($p, '_review');
+            return !str_starts_with($p, 'room_booking_') && (str_ends_with($p, '_read') || str_ends_with($p, '_review'));
         });
         $pemimpin = Role::findByName('Pemimpin');
         $pemimpin->syncPermissions(array_values($pemimpinPermissions));
 
         // ─── Pengamat (Rektorat / monitoring — Role ID 105) ───────────────────
-        $pengamatPermissions = array_filter($allPermissions, fn($p) => str_ends_with($p, '_read'));
+        $pengamatPermissions = array_filter($allPermissions, fn($p) => !str_starts_with($p, 'room_booking_') && str_ends_with($p, '_read'));
         $pengamat = Role::findByName('Pengamat');
         $pengamat->syncPermissions($pengamatPermissions);
 
         // ─── Petugas (Front Desk — Role ID 102) ────────────────────────────────
         $petugasPermissions = [];
         foreach ($allPermissions as $perm) {
-            if (str_ends_with($perm, '_read')) {
+            if (str_ends_with($perm, '_read') && !str_starts_with($perm, 'room_booking_')) {
                 $petugasPermissions[] = $perm;
-            } elseif (str_starts_with($perm, 'queue_ticket_') || str_starts_with($perm, 'jadwal_')) {
+            } elseif (in_array($perm, ['queue_ticket_read', 'queue_ticket_update'], true) || str_starts_with($perm, 'jadwal_')) {
                 $petugasPermissions[] = $perm;
             } elseif (str_starts_with($perm, 'graduation_registration_') && !str_ends_with($perm, '_delete')) {
                 $petugasPermissions[] = $perm;
@@ -100,7 +102,7 @@ class RolePermissionSeeder extends Seeder
         // ─── Mahasiswa (Pengguna — Role ID 101) ───────────────────────────────
         $mahasiswaPermissions = [];
         foreach ($allPermissions as $perm) {
-            if (str_ends_with($perm, '_read')) {
+            if (str_ends_with($perm, '_read') && !str_starts_with($perm, 'room_booking_')) {
                 if (
                     str_starts_with($perm, 'document_') ||
                     $perm === 'document_read' ||

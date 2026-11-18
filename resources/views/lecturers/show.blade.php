@@ -56,6 +56,7 @@
                     'NIDN' => $lecturer->nidn ?? '-',
                     'NUPTK' => $lecturer->nuptk ?? '-',
                     'Email Domain' => $lecturer->email_domain ?? '-',
+                    'No HP' => $lecturer->phone ?? '-',
                 ];
             @endphp
             @foreach ($fields as $label => $value)
@@ -75,6 +76,8 @@
                     'Program Studi' => $lecturer->study_program ?? '-',
                     'JFA (Jabatan Fungsional)' => $lecturer->jfa ?? '-',
                     'Bidang Keilmuan' => $lecturer->academic_interest ?? '-',
+                    'COE (Center of Excellence)' => $lecturer->coe ?? '-',
+                    'KK (Kelompok Keahlian)' => $lecturer->kk ?? '-',
                 ];
             @endphp
             @foreach ($academic as $label => $value)

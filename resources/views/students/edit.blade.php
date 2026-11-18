@@ -90,7 +90,7 @@
                                       file:bg-indigo-50 file:text-[#DA2D3B]
                                       hover:file:bg-indigo-100">
                     </div>
-                    <p class="text-xs text-slate-400 mt-1">Format: JPG, PNG. Maks 2MB.</p>
+                    <p class="text-xs text-slate-400 mt-1">Format: JPG, PNG. Maks 20MB.</p>
                 </div>
 
                 <!-- Akademik -->

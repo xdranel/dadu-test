@@ -159,7 +159,7 @@ class StudentCourseController extends Controller
     public function import(Request $request)
     {
         $request->validate([
-            'file' => ['required', 'file', 'mimes:xlsx,xls,csv', 'max:2048'],
+            'file' => ['required', 'file', 'mimes:xlsx,xls,csv', 'max:20480'],
         ]);
 
         $imported = 0;

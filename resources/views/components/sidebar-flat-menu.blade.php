@@ -12,7 +12,12 @@
         $isPlaceholder = is_null($routeName);
 
         $skip = false;
-        if ($perm && ! auth()->user()->can($perm)) {
+        if (array_key_exists('permissions_any', $item)) {
+            $any = $item['permissions_any'];
+            if (! (is_array($any) && $any !== [] && auth()->user()->canAny($any))) {
+                $skip = true;
+            }
+        } elseif ($perm && ! auth()->user()->can($perm)) {
             $skip = true;
         }
         if (! $isPlaceholder && ! \Illuminate\Support\Facades\Route::has($routeName)) {
@@ -41,16 +46,18 @@
                 @endforeach
             </svg>
 
-            <span x-show="sidebarOpen" class="truncate flex-1">{{ $item['label'] }}</span>
+            <span x-show="sidebarOpen" x-cloak class="truncate flex-1">{{ $item['label'] }}</span>
 
             @if($badge > 0)
                 <span x-show="sidebarOpen"
+                      x-cloak
                       class="ml-auto text-[10px] font-bold bg-[#DA2D3B] text-white rounded-full px-1.5 py-0.5 leading-none">{{ $badge }}</span>
             @endif
         </a>
 
         {{-- Tooltip saat sidebar collapsed --}}
         <div x-show="!sidebarOpen"
+             x-cloak
              class="absolute left-full top-1/2 -translate-y-1/2 ml-2 hidden group-hover:block bg-slate-800 text-white text-xs px-2.5 py-1.5 rounded shadow-lg whitespace-nowrap z-50">
             {{ $item['label'] }}@if($badge > 0) ({{ $badge }})@endif
         </div>

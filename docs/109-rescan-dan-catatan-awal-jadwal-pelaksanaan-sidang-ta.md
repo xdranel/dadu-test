@@ -382,9 +382,9 @@ NomorP berikut melacak bahan pertanyaan kepada pengguna/divisi. Pertanyaan yang 
 
 #### P01 — Aturan resmi durasi, jeda, hari, dan jam
 
-**Pertanyaan untuk divisi:** Apakah satu booking mencakup120 menit termasuk persiapan/pergantian mahasiswa, atau ada jeda tambahan? Apakah Senin–Jumat08.00–16.00, istirahat12.00–13.00 berlaku untuk semua prodi, termasuk Jumat? Bagaimana hari libur dan perubahan jam khusus?
+**Pertanyaan untuk divisi:** Apakah satu booking mencakup 120 menit termasuk persiapan/pergantian mahasiswa, atau ada jeda tambahan? Apakah Senin–Jumat08.00–16.00, istirahat12.00–13.00 berlaku untuk semua prodi, termasuk Jumat? Bagaimana hari libur dan perubahan jam khusus?
 
-**Contoh untuk dikonfirmasi:** Sidang A selesai10.00. Apakah B boleh langsung mulai10.00 atau harus10.15? Apakah Jumat11.00–13.00 harus ditutup lebih panjang? Angka15 menit dan rentang Jumat tersebut hanya contoh pertanyaan.
+**Contoh untuk dikonfirmasi:** Sidang A selesai 10.00. Apakah B boleh langsung mulai10.00 atau harus10.15? Apakah Jumat11.00–13.00 harus ditutup lebih panjang? Angka15 menit dan rentang Jumat tersebut hanya contoh pertanyaan.
 
 **Jawaban saat ini:** Pengaturan T07 disetujui sementara; aturan resmi divisi belum ada. Usulan konfigurasi tidak otomatis membuat kalender hari libur tersedia.
 

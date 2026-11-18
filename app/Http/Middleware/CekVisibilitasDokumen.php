@@ -16,8 +16,13 @@ class CekVisibilitasDokumen
         $user         = auth()->user();
         $visibilitas  = strtolower($dokumen->visibility ?? $dokumen->visibilitas ?? 'publik');
 
-        // Visibilitas publik dapat diakses siapapun (guest & mahasiswa)
-        if ($visibilitas === 'publik') return $next($request);
+        // Visibilitas publik: jika login, harus memiliki permission public_document_read
+        if ($visibilitas === 'publik') {
+            if ($user && ! $user->can('public_document_read')) {
+                abort(403, 'Anda tidak memiliki hak akses untuk mengakses Dokumen Publik.');
+            }
+            return $next($request);
+        }
 
         // Visibilitas internal mewajibkan login
         if (!$user) {
@@ -25,12 +30,12 @@ class CekVisibilitasDokumen
                 ->with('error', 'Silakan login untuk mengakses dokumen ini.');
         }
 
-        // Superadmin, Admin, Staf SSC, Dosen berhak mengakses dokumen internal
-        if ($user->hasRole(['Akademik', 'admin', 'Staf SSC', 'dosen'])) {
+        // Pengguna dengan permission document_read berhak mengakses dokumen internal
+        if ($user->can('document_read')) {
             return $next($request);
         }
 
-        // Mahasiswa atau role lain yang tidak diizinkan
-        abort(403, 'Dokumen ini hanya dapat diakses oleh Pegawai dan Dosen.');
+        // Role atau user tanpa permission document_read
+        abort(403, 'Dokumen ini hanya dapat diakses oleh pengguna yang memiliki hak akses Dokumen Internal.');
     }
 }

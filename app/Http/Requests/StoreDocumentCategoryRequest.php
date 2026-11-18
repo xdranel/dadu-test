@@ -2,13 +2,47 @@
 
 namespace App\Http\Requests;
 
+use App\Enums\AccessGroup;
 use App\Models\DocumentCategory;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
 class StoreDocumentCategoryRequest extends FormRequest
 {
-    public function authorize(): bool { return true; }
+    public function authorize(): bool
+    {
+        $user = $this->user();
+        if (! $user) {
+            return false;
+        }
+
+        $parentId = $this->input('parent_id');
+        $parent = $parentId ? DocumentCategory::find($parentId) : null;
+
+        if (! $user->can('create', [DocumentCategory::class, $parent])) {
+            return false;
+        }
+
+        // Petugas hanya diizinkan membuat folder publik (root atau subfolder di parent publik)
+        if ($user->hasRole(['Petugas', 'petugas']) && ! $user->hasRole(['admin', 'Admin', 'Akademik', 'superadmin', 'Superadmin'])) {
+            if ($parent) {
+                $ag = $parent->access_group instanceof AccessGroup ? $parent->access_group->value : $parent->access_group;
+                if ($ag !== null && $ag !== AccessGroup::PUBLIK->value) {
+                    return false;
+                }
+                if ($ag === null && strtolower($parent->visibility ?? '') !== 'publik') {
+                    return false;
+                }
+            }
+
+            $visibility = strtolower($this->input('visibility', 'publik'));
+            if ($visibility !== 'publik') {
+                return false;
+            }
+        }
+
+        return true;
+    }
 
     public function rules(): array
     {
@@ -23,7 +57,7 @@ class StoreDocumentCategoryRequest extends FormRequest
                     }),
             ],
             'description'     => ['nullable', 'string', 'max:1000'],
-            'visibility'      => ['nullable', 'in:publik,internal'],
+            'visibility'      => ['nullable', Rule::in(array_keys(config('documents.visibility')))],
             'parent_id'       => ['nullable', 'integer', 'exists:document_categories,id'],
             'is_pinned'       => ['boolean'],
             'show_when_empty' => ['boolean'],
@@ -41,13 +75,14 @@ class StoreDocumentCategoryRequest extends FormRequest
     }
 
     /**
-     * Validate max depth & pinned limit after standard rules pass.
+     * Validate pinned limit and optional anti-abuse max depth ceiling.
      */
     public function withValidator($validator): void
     {
         $validator->after(function ($validator) {
-            // Validasi batas kedalaman (maksimal 5 level)
-            if ($this->parent_id) {
+            // Validasi batas langit-langit keamanan kedalaman folder (opsional via config)
+            $maxDepth = config('documents.max_depth');
+            if ($maxDepth !== null && $this->parent_id) {
                 $parent = DocumentCategory::find($this->parent_id);
 
                 if (!$parent) {
@@ -55,9 +90,8 @@ class StoreDocumentCategoryRequest extends FormRequest
                     return;
                 }
 
-                if (!$parent->canHaveChildren()) {
-                    $validator->errors()->add('parent_id',
-                        'Kedalaman folder maksimal 5 level telah tercapai.');
+                if (($parent->depth + 1) > $maxDepth) {
+                    $validator->errors()->add('parent_id', 'Batas kedalaman folder telah tercapai.');
                 }
             }
 

@@ -2,16 +2,21 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Document;
 use App\Models\DocumentCategory;
 use App\Http\Requests\StoreDocumentCategoryRequest;
 use App\Http\Requests\UpdateDocumentCategoryRequest;
 use App\Http\Requests\MoveDocumentCategoryRequest;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 
 class DocumentCategoryController extends Controller
 {
+    use AuthorizesRequests;
     public function index(Request $request)
     {
         $categories = DocumentCategory::search($request->search)
@@ -26,11 +31,15 @@ class DocumentCategoryController extends Controller
 
     public function create()
     {
+        $this->authorize('create', DocumentCategory::class);
+
         return view('document_categories.create');
     }
 
     public function store(StoreDocumentCategoryRequest $request)
     {
+        $this->authorize('create', DocumentCategory::class);
+
         $data = $request->validated();
         $data['slug'] = Str::slug($data['name']);
 
@@ -48,7 +57,6 @@ class DocumentCategoryController extends Controller
             return redirect($request->redirect_to)->with('success', $msg);
         }
 
-        // Redirect back to the parent folder if creating a subfolder
         if (!empty($data['parent_id'])) {
             return redirect()->route('documents.folder', $data['parent_id'])
                 ->with('success', $msg);
@@ -107,21 +115,25 @@ class DocumentCategoryController extends Controller
 
     /**
      * Move a folder to a new parent (or to root).
+     * Menghitung ulang depth kategori dan seluruh turunannya dalam satu transaksi DB.
      */
     public function move(MoveDocumentCategoryRequest $request, DocumentCategory $documentCategory)
     {
-        $documentCategory->update([
-            'parent_id' => $request->new_parent_id,
-        ]);
+        $newParentId = $request->has('parent_id')
+            ? ($request->parent_id ? (int) $request->parent_id : null)
+            : ($request->new_parent_id ? (int) $request->new_parent_id : null);
 
-        // If moved to a parent, recalculate depth of children too
-        $this->recalculateChildrenDepth($documentCategory);
+        $documentCategory->moveTo($newParentId);
 
-        $destination = $request->new_parent_id
-            ? DocumentCategory::find($request->new_parent_id)->name
-            : 'Root (level utama)';
+        $destination = $newParentId
+            ? DocumentCategory::find($newParentId)?->name
+            : 'Root (direktori utama)';
 
         $msg = "Folder \"{$documentCategory->name}\" berhasil dipindahkan ke {$destination}.";
+
+        if ($request->wantsJson()) {
+            return response()->json(['ok' => true, 'message' => $msg]);
+        }
 
         if ($request->filled('redirect_to')) {
             return redirect($request->redirect_to)->with('success', $msg);
@@ -129,55 +141,115 @@ class DocumentCategoryController extends Controller
 
         return redirect()->route('documents.index')
             ->with('success', $msg);
+    }
+
+    public function togglePin(DocumentCategory $documentCategory)
+    {
+        $this->authorize('update', $documentCategory);
+
+        if (! $documentCategory->is_pinned && DocumentCategory::where('is_pinned', true)->count() >= 5) {
+            return response()->json([
+                'message' => 'Maksimal 5 folder yang bisa disematkan. Lepas sematan folder lain terlebih dahulu.'
+            ], 422);
+        }
+
+        $documentCategory->update(['is_pinned' => ! $documentCategory->is_pinned]);
+
+        return response()->json(['ok' => true]);
+    }
+
+    public function setVisibility(Request $request, DocumentCategory $documentCategory)
+    {
+        $this->authorize('update', $documentCategory);
+
+        $data = $request->validate([
+            'visibility' => ['required', Rule::in(array_keys(config('documents.visibility')))],
+        ]);
+
+        $documentCategory->update($data);
+
+        return response()->json(['ok' => true]);
     }
 
     public function destroy(DocumentCategory $documentCategory, Request $request)
     {
         $parentId = $documentCategory->parent_id;
         $name = $documentCategory->name;
+        $categoryId = $documentCategory->id;
 
-        // Cascade soft-delete: subfolder dan dokumennya
         $this->cascadeSoftDelete($documentCategory);
 
         $msg = "Folder \"{$name}\" beserta isinya berhasil dihapus (dapat dipulihkan).";
+        $undo = [
+            'url' => route('document_categories.restore', $categoryId),
+            'label' => 'Urungkan',
+        ];
 
         if ($request->filled('redirect_to')) {
-            return redirect($request->redirect_to)->with('success', $msg);
+            return redirect($request->redirect_to)->with('success', $msg)->with('undo', $undo);
         }
 
         if ($parentId) {
-            return redirect()->route('documents.folder', $parentId)->with('success', $msg);
+            return redirect()->route('documents.folder', $parentId)->with('success', $msg)->with('undo', $undo);
         }
 
         return redirect()->route('documents.index')
-            ->with('success', $msg);
+            ->with('success', $msg)
+            ->with('undo', $undo);
+    }
+
+    public function restore($id)
+    {
+        $category = DocumentCategory::onlyTrashed()->findOrFail($id);
+        $this->authorize('restore', $category);
+
+        $deletedAt = $category->deleted_at;
+
+        DB::transaction(function () use ($category, $deletedAt) {
+            $category->restore();
+
+            if ($deletedAt) {
+                $descendantIds = $category->descendantIds();
+                if ($descendantIds->isNotEmpty()) {
+                    DocumentCategory::onlyTrashed()
+                        ->whereIn('id', $descendantIds)
+                        ->where('deleted_at', $deletedAt)
+                        ->restore();
+                }
+
+                // Restore dokumen yang berada di folder ini atau turunannya dengan deleted_at yang sama
+                $allCategoryIds = $category->descendantIds()->push($category->id);
+                Document::onlyTrashed()
+                    ->whereIn('document_category_id', $allCategoryIds)
+                    ->where('deleted_at', $deletedAt)
+                    ->chunkById(200, function ($docs) {
+                        $docs->each->restore();
+                    });
+            }
+        });
+
+        return back()->with('success', "Folder \"{$category->name}\" berhasil dipulihkan.");
     }
 
     /**
-     * Cascade soft-delete to children and their documents.
+     * Cascade soft-delete to children and their documents secara iteratif dalam satu transaksi.
+     * Menggunakan timestamp deleted_at yang sama untuk mempermudah fitur undo/restore,
+     * sambil tetap memicu event Eloquent DocumentObserver (chunkById).
      */
     private function cascadeSoftDelete(DocumentCategory $category): void
     {
-        // Soft-delete all documents in this folder
-        $category->documents()->each(fn ($doc) => $doc->delete());
+        DB::transaction(function () use ($category) {
+            $descendantIds = $category->descendantIds();
+            $allCategoryIds = $descendantIds->push($category->id);
+            $now = now();
 
-        // Recursively soft-delete children
-        $category->children()->each(function ($child) {
-            $this->cascadeSoftDelete($child);
-        });
+            Document::whereIn('document_category_id', $allCategoryIds)
+                ->chunkById(200, function ($docs) {
+                    $docs->each->delete();
+                });
 
-        // Finally soft-delete the folder itself
-        $category->delete();
-    }
-
-    /**
-     * Recalculate depth for all children after a move operation.
-     */
-    private function recalculateChildrenDepth(DocumentCategory $category): void
-    {
-        $category->children()->each(function ($child) use ($category) {
-            $child->update(['depth' => $category->depth + 1]);
-            $this->recalculateChildrenDepth($child);
+            Document::whereIn('document_category_id', $allCategoryIds)->update(['deleted_at' => $now]);
+            DocumentCategory::whereIn('id', $allCategoryIds)->update(['deleted_at' => $now]);
         });
     }
 }

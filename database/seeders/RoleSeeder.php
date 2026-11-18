@@ -14,8 +14,8 @@ class RoleSeeder extends Seeder
      *
      * Mapping Role ID SSC → Nama Role Spatie (dadu):
      *   101 → mahasiswa  (SSO auto-assign: pengguna / pengaju layanan)
-     *   102 → Petugas    (SSO auto-assign: pegawai / front desk)
-     *   103 → Pelaksana  (Manual: staf unit kerja teknis)
+     *   102 → Petugas    (Pre-assigned / manual: operator front desk)
+     *   103 → Pelaksana  (SSO auto-assign default pegawai: staf unit kerja teknis)
      *   104 → Pemimpin   (Manual: kepala unit / pimpinan struktural)
      *   105 → Pengamat   (Manual: rektorat / monitoring read-only)
      *   106 → Akademik   (Manual: superadmin / full access)

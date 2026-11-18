@@ -102,12 +102,26 @@ class UserRoleController extends Controller
             ]);
         }
 
-        $cleanUsername = explode('@', trim($request->username))[0];
-        $cleanUsername = strtolower($cleanUsername);
+        $rawUsername = trim($request->username);
+        $cleanUsername = strtolower(explode('@', $rawUsername)[0]);
+
+        $isStudentInput = str_contains(strtolower($rawUsername), '@student.')
+            || \App\Models\Student::where('student_number', $cleanUsername)->exists()
+            || in_array('101', $inputRoles, true)
+            || in_array('mahasiswa', $inputRoles, true);
+
+        $studentData = \App\Models\Student::where('student_number', $cleanUsername)
+            ->orWhere('email', strtolower($rawUsername))
+            ->first();
+
+        $userName = $studentData?->name ?? $cleanUsername;
+        $defaultEmail = $isStudentInput
+            ? (str_contains($rawUsername, '@') ? strtolower($rawUsername) : ($studentData?->email ?? ($cleanUsername . '@student.telkomuniversity.ac.id')))
+            : (str_contains($rawUsername, '@') ? strtolower($rawUsername) : ($cleanUsername . '@telkomuniversity.ac.id'));
 
         $actor = $request->user();
         if (! $actor->hasRole('Akademik')) {
-            $existing = User::where('username', $cleanUsername)->first();
+            $existing = User::where('username', $cleanUsername)->orWhere('email', strtolower($rawUsername))->first();
 
             if ($existing && $existing->id === $actor->id) {
                 abort(403, 'Anda tidak dapat mengubah role akun Anda sendiri.');
@@ -128,8 +142,9 @@ class UserRoleController extends Controller
         $user = User::firstOrCreate(
             ['username' => $cleanUsername],
             [
-                'name'        => $cleanUsername,
-                'email'       => $cleanUsername . '@telkomuniversity.ac.id',
+                'name'        => $userName,
+                'email'       => $defaultEmail,
+                'employee_id' => $studentData?->student_number ?? ($isStudentInput ? $cleanUsername : null),
                 'password'    => Hash::make(Str::random(16)),
                 'auth_source' => 'sso',
                 'status'      => 'active',

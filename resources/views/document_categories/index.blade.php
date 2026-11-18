@@ -36,7 +36,7 @@
         </form>
 
         <!-- Tombol Tambah -->
-        @can('document_category_create')
+        @can('create', App\Models\DocumentCategory::class)
         <a href="{{ route('document_categories.create') }}" class="btn btn-success">
             Tambah Kategori
         </a>

@@ -1,18 +1,21 @@
 <!-- SIDEBAR Component (Optimized with cached permissions) -->
 <aside :class="{
            'translate-x-0 w-[260px] lg:w-[260px] lg:min-w-[260px]': sidebarOpen,
-           '-translate-x-full lg:translate-x-0 lg:w-[72px] lg:min-w-[72px]': !sidebarOpen
+           '-translate-x-full lg:translate-x-0 lg:w-[72px] lg:min-w-[72px]': !sidebarOpen,
+           'transition-all duration-300 ease-in-out': ready
        }"
-       class="fixed inset-y-0 left-0 z-50 lg:static bg-white border-r border-slate-200 text-slate-700 flex flex-col flex-shrink-0 transition-all duration-300 ease-in-out h-full">
+       class="fixed inset-y-0 left-0 z-50 lg:static bg-white border-r border-slate-200 text-slate-700 flex flex-col flex-shrink-0 h-full">
 
 
     <!-- Logo -->
-    <div class="flex items-center justify-between px-5 py-5 border-b border-slate-200">
-        <div x-show="sidebarOpen" class="flex items-center">
-            <img src="{{ asset('assets/images/dadu-sidebar.svg') }}" alt="Logo" width="77" height="20" class="h-5 w-auto object-contain shrink-0">
+    <div class="flex items-center shrink-0 box-border px-5 border-b border-slate-200"
+         style="height: var(--header-height);"
+         :class="sidebarOpen ? 'justify-start' : 'justify-center px-0'">
+        <div x-show="sidebarOpen" x-cloak class="flex items-center">
+            <img src="{{ asset('assets/images/dadu-sidebar.svg') }}" alt="Logo" width="77" height="20" class="h-6 w-auto object-contain shrink-0">
         </div>
-        <div x-show="!sidebarOpen" class="w-8 h-5 flex items-center justify-center mx-auto">
-            <img src="{{ asset('assets/images/dadu-sidebar-minimize.svg') }}" alt="Logo" width="20" height="20" class="h-5 w-5 object-contain shrink-0">
+        <div x-show="!sidebarOpen" x-cloak class="flex items-center justify-center">
+            <img src="{{ asset('assets/images/dadu-sidebar-minimize.svg') }}" alt="Logo" width="20" height="20" class="h-6 w-6 object-contain shrink-0">
         </div>
     </div>
 
@@ -68,7 +71,7 @@
                         </span>
                     @endif
                 </div>
-                <div x-show="sidebarOpen" class="flex-1 min-w-0">
+                <div x-show="sidebarOpen" x-cloak class="flex-1 min-w-0">
                     <p class="text-sm font-semibold text-slate-800 truncate">{{ auth()->user()->name }}</p>
                     <p class="text-[11px] text-slate-500 truncate">
                         {{ \App\Models\User::ROLE_LABEL_MAP[$activeRole] ?? ucfirst($activeRole ?? $userRole) }}
@@ -78,6 +81,7 @@
                 @if($hasMultipleRoles)
                     <button type="button"
                             x-show="sidebarOpen"
+                            x-cloak
                             @click="roleMenuOpen = !roleMenuOpen"
                             title="Ganti role"
                             class="flex-shrink-0 p-1.5 rounded-lg text-slate-400 hover:text-[#DA2D3B] hover:bg-[#DA2D3B]/10 transition-colors">
@@ -125,7 +129,7 @@
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                           d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
                 </svg>
-                <span x-show="sidebarOpen">Logout</span>
+                <span x-show="sidebarOpen" x-cloak>Logout</span>
             </button>
         </form>
     </div>

@@ -13,10 +13,16 @@
 
     $filterItems = function (array $items) use ($user) {
         return array_values(array_filter($items, function ($item) use ($user) {
-            $perm = $item['permission'] ?? null;
-            $roles = $item['roles'] ?? null;
-            $route = $item['route'] ?? null;
+            $perm         = $item['permission'] ?? null;
+            $roles        = $item['roles'] ?? null;
+            $excludeRoles = $item['exclude_roles'] ?? null;
+            $route        = $item['route'] ?? null;
+
             if ($route && ! \Illuminate\Support\Facades\Route::has($route)) return false;
+
+            // Sembunyikan jika user memiliki salah satu role yang dikecualikan
+            if ($excludeRoles && $user->hasAnyRole((array) $excludeRoles)) return false;
+
             if (array_key_exists('permissions_any', $item)) {
                 $any = $item['permissions_any'];
                 return is_array($any) && $any !== [] && $user->canAny($any);
@@ -72,13 +78,15 @@
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="{{ $d }}"/>
                 @endforeach
             </svg>
-            <span x-show="sidebarOpen" class="truncate flex-1">{{ $item['label'] }}</span>
+            <span x-show="sidebarOpen" x-cloak class="truncate flex-1">{{ $item['label'] }}</span>
             @if($badge > 0)
                 <span x-show="sidebarOpen"
+                      x-cloak
                       class="ml-auto text-[10px] font-bold bg-[#DA2D3B] text-white rounded-full px-1.5 py-0.5 leading-none">{{ $badge }}</span>
             @endif
         </a>
         <div x-show="!sidebarOpen"
+             x-cloak
              class="absolute left-full top-1/2 -translate-y-1/2 ml-2 hidden group-hover:block bg-slate-800 text-white text-xs px-2.5 py-1.5 rounded shadow-lg whitespace-nowrap z-50">
             {{ $item['label'] }}@if($badge > 0) ({{ $badge }})@endif
         </div>
@@ -103,10 +111,10 @@
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="{{ $d }}"/>
                         @endforeach
                     </svg>
-                    <span x-show="sidebarOpen" class="text-sm font-medium text-slate-700">{{ $group['label'] }}</span>
+                    <span x-show="sidebarOpen" x-cloak class="text-sm font-medium text-slate-700">{{ $group['label'] }}</span>
                 </span>
                 {{-- Chevron: menghadap kanan saat tertutup, rotasi ke bawah saat grup terbuka --}}
-                <svg x-show="sidebarOpen" class="w-3 h-3 shrink-0 text-slate-400 transition-transform duration-200" :class="openGroup === '{{ $key }}' ? 'rotate-90' : ''" width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg x-show="sidebarOpen" x-cloak class="w-3 h-3 shrink-0 text-slate-400 transition-transform duration-200" :class="openGroup === '{{ $key }}' ? 'rotate-90' : ''" width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7"/>
                 </svg>
             </button>
@@ -123,9 +131,10 @@
                    @if($isActive) aria-current="page" @endif
                    class="flex items-center pl-8 pr-3 py-2.5 rounded-lg text-sm font-medium
                           {{ $isActive ? 'bg-[#DA2D3B]/10 text-[#DA2D3B] font-semibold' : 'text-slate-500 hover:bg-slate-50 hover:text-[#DA2D3B]' }}">
-                    <span x-show="sidebarOpen" class="truncate flex-1">{{ $item['label'] }}</span>
+                    <span x-show="sidebarOpen" x-cloak class="truncate flex-1">{{ $item['label'] }}</span>
                     @if($badge > 0)
                         <span x-show="sidebarOpen"
+                              x-cloak
                               class="ml-auto text-[10px] font-bold bg-[#DA2D3B] text-white rounded-full px-1.5 py-0.5 leading-none">{{ $badge }}</span>
                     @endif
                 </a>

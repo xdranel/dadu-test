@@ -13,11 +13,12 @@ class MoveDocumentCategoryRequest extends FormRequest
     {
         return [
             'new_parent_id' => ['nullable', 'integer', 'exists:document_categories,id'],
+            'parent_id'     => ['nullable', 'integer', 'exists:document_categories,id'],
         ];
     }
 
     /**
-     * Validate anti-circular reference and max depth after standard rules pass.
+     * Validate anti-circular reference and unique name after standard rules pass.
      */
     public function withValidator($validator): void
     {
@@ -28,31 +29,27 @@ class MoveDocumentCategoryRequest extends FormRequest
                 $category = DocumentCategory::findOrFail($category);
             }
 
-            $newParentId = $this->new_parent_id;
+            $rawParentId = $this->has('parent_id') ? $this->input('parent_id') : $this->input('new_parent_id');
+            $newParentId = (!is_null($rawParentId) && $rawParentId !== '') ? (int) $rawParentId : null;
 
             // Allow moving to root (null parent)
             if (is_null($newParentId)) {
                 return;
             }
 
-            // Cannot move to self
-            if ($category->id == $newParentId) {
-                $validator->errors()->add('new_parent_id',
-                    'Folder tidak bisa dipindahkan ke dalam dirinya sendiri.');
+            // Cannot move to self or descendants (anti-circular reference)
+            if ($category->id == $newParentId || $category->wouldCreateCycle($newParentId)) {
+                $errorField = $this->has('parent_id') ? 'parent_id' : 'new_parent_id';
+                $validator->errors()->add($errorField,
+                    'Folder tidak bisa dipindah ke dalam dirinya sendiri atau subfoldernya.');
                 return;
             }
 
-            // Anti-circular reference
-            if ($category->wouldCreateCycle($newParentId)) {
-                $validator->errors()->add('new_parent_id',
-                    'Pemindahan ini akan membuat referensi melingkar (circular reference).');
-                return;
-            }
-
-            // Max depth validation
-            if ($category->wouldExceedMaxDepth($newParentId)) {
-                $validator->errors()->add('new_parent_id',
-                    'Pemindahan ini akan melebihi batas kedalaman maksimal folder (5 level).');
+            // Optional anti-abuse max depth ceiling
+            if (config('documents.max_depth') !== null && $category->wouldExceedMaxDepth($newParentId)) {
+                $errorField = $this->has('parent_id') ? 'parent_id' : 'new_parent_id';
+                $validator->errors()->add($errorField,
+                    'Pemindahan ini akan melebihi batas kedalaman folder.');
                 return;
             }
 
@@ -63,7 +60,8 @@ class MoveDocumentCategoryRequest extends FormRequest
                 ->exists();
 
             if ($exists) {
-                $validator->errors()->add('new_parent_id',
+                $errorField = $this->has('parent_id') ? 'parent_id' : 'new_parent_id';
+                $validator->errors()->add($errorField,
                     "Sudah ada folder bernama \"{$category->name}\" di dalam folder tujuan.");
             }
         });
@@ -72,6 +70,7 @@ class MoveDocumentCategoryRequest extends FormRequest
     public function messages(): array
     {
         return [
+            'parent_id.exists'     => 'Folder tujuan tidak ditemukan.',
             'new_parent_id.exists' => 'Folder tujuan tidak ditemukan.',
         ];
     }

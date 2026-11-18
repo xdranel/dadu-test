@@ -54,18 +54,18 @@
                 {{-- 1. Input Username SSO Pegawai --}}
                 <div class="form-group">
                     <label for="username" class="form-label block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                        Username SSO / NIP Pegawai <span class="text-rose-500">*</span>
+                        Username SSO <span class="text-rose-500">*</span>
                     </label>
                     <input type="text"
                            name="username"
                            id="username"
                            value="{{ old('username') }}"
                            class="form-control campus-input w-full text-sm @error('username') border-rose-400 @enderror"
-                           placeholder="Username"
+                           placeholder="Username SSO"
                            required
                            autofocus>
                     <p class="text-[11px] text-slate-500 mt-1">
-                        Masukan username SSO pegawai tanpa <code>@telkomuniversity.ac.id</code>
+                        Masukkan username SSO
                     </p>
                     @error('username')
                         <p class="text-xs text-rose-500 mt-1">{{ $message }}</p>

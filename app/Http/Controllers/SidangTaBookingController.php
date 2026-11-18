@@ -7,10 +7,21 @@ use App\Models\SidangTaRegistration;
 use App\Services\SidangTaBookingAccess;
 use App\Services\SidangTaBookingIdentity;
 use App\Services\SidangTaBookingService;
+use Closure;
 use Illuminate\Http\Request;
+use Illuminate\Routing\Controllers\HasMiddleware;
 
-class SidangTaBookingController extends Controller
+class SidangTaBookingController extends Controller implements HasMiddleware
 {
+    public static function middleware(): array
+    {
+        return [function (Request $request, Closure $next) {
+            abort_unless(config('sidang_ta.student_booking_enabled', false), 404);
+
+            return $next($request);
+        }];
+    }
+
     public function show(Request $request, SidangTaRegistration $sidang_ta_registration)
     {
         $registration = $sidang_ta_registration;

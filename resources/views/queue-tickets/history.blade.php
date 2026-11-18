@@ -1,6 +1,32 @@
 <x-app-layout>
     <x-slot name="header">Riwayat Antrian Mahasiswa</x-slot>
 
+    <style>
+        [x-cloak] { display: none !important; }
+
+        .queue-custom-scroll {
+            scrollbar-width: thin;
+            scrollbar-color: #cbd5e1 transparent;
+        }
+        .queue-custom-scroll::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        .queue-custom-scroll::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .queue-custom-scroll::-webkit-scrollbar-thumb {
+            background-color: #cbd5e1;
+            border-radius: 9999px;
+        }
+        .queue-custom-scroll::-webkit-scrollbar-thumb:hover {
+            background-color: #94a3b8;
+        }
+        .overscroll-contain {
+            overscroll-behavior: contain;
+        }
+    </style>
+
     <div class="space-y-6">
 
         <!-- Navigation & Header Actions -->
@@ -158,7 +184,8 @@
         </div>
 
         <!-- Table Data -->
-        <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+        <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden"
+             x-data="{ openRow: null }">
             <div class="overflow-x-auto">
                 <table class="w-full text-left border-collapse text-xs">
                     <thead>
@@ -170,11 +197,16 @@
                             <th class="py-3 px-4">Status</th>
                             <th class="py-3 px-4">Loket</th>
                             <th class="py-3 px-4">Jam Ambil</th>
+                            <th class="py-3 px-4">Catatan Petugas</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-100 text-slate-700">
                         @forelse($tickets as $ticket)
-                            <tr class="hover:bg-slate-50/70 transition-colors">
+                            @php
+                                $hasStaffNote = !empty($ticket->staff_notes);
+                                $rowKey = ($ticket->source_type ?? 't') . '-' . $ticket->id;
+                            @endphp
+                            <tr class="hover:bg-slate-50/70 transition-colors {{ $hasStaffNote ? 'group' : '' }}">
                                 <td class="py-3 px-4 font-mono font-medium whitespace-nowrap">
                                     {{ \Carbon\Carbon::parse($ticket->queue_date)->translatedFormat('d M Y') }}
                                 </td>
@@ -224,10 +256,59 @@
                                 <td class="py-3 px-4 font-mono text-slate-500 whitespace-nowrap">
                                     {{ $ticket->created_at ? \Carbon\Carbon::parse($ticket->created_at)->timezone('Asia/Jakarta')->format('H:i') : '-' }}
                                 </td>
+                                <td class="py-3 px-4 whitespace-nowrap">
+                                    @if($hasStaffNote)
+                                        <button type="button"
+                                                @click="openRow = openRow === '{{ $rowKey }}' ? null : '{{ $rowKey }}'"
+                                                :aria-expanded="openRow === '{{ $rowKey }}'"
+                                                aria-controls="note-row-{{ $rowKey }}"
+                                                title="Lihat catatan petugas"
+                                                class="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold text-slate-700 bg-slate-50 hover:bg-slate-100 active:scale-95 border border-slate-200 rounded-lg transition-all focus:outline-none focus:ring-1 focus:ring-slate-400">
+                                            <!-- Icon Read -->
+                                            <svg class="w-3.5 h-3.5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                                            </svg>
+                                            <span x-text="openRow === '{{ $rowKey }}' ? 'Tutup' : 'Lihat'">Lihat</span>
+                                            <svg class="w-3 h-3 text-slate-500 transition-transform duration-200 shrink-0"
+                                                 :class="openRow === '{{ $rowKey }}' ? 'rotate-180' : ''"
+                                                 fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                                            </svg>
+                                        </button>
+                                    @else
+                                        <span class="text-slate-400">-</span>
+                                    @endif
+                                </td>
                             </tr>
+                            @if($hasStaffNote)
+                                <tr x-show="openRow === '{{ $rowKey }}'"
+                                    x-cloak
+                                    id="note-row-{{ $rowKey }}"
+                                    class="bg-slate-50/50 border-b border-slate-100">
+                                    <td colspan="8" class="p-3 px-6">
+                                        <div x-show="openRow === '{{ $rowKey }}'" x-collapse>
+                                            <div class="bg-slate-50 border border-slate-200 rounded-xl p-3.5 text-slate-800 space-y-1.5 shadow-sm">
+                                                <div class="flex items-center justify-between border-b border-slate-200 pb-1.5">
+                                                    <div class="flex items-center gap-1.5 text-[11px] font-bold text-slate-700 uppercase tracking-wider">
+                                                        <span>Catatan Petugas</span>
+                                                    </div>
+                                                    <button type="button"
+                                                            @click="openRow = null"
+                                                            class="inline-flex items-center gap-1 text-[10px] font-semibold text-slate-600 hover:text-slate-900 hover:underline py-0.5 px-2 rounded hover:bg-slate-100 transition-colors">
+                                                        Tutup
+                                                    </button>
+                                                </div>
+                                                <div class="text-xs leading-relaxed whitespace-pre-line break-words max-h-40 overflow-y-auto overscroll-contain queue-custom-scroll text-slate-800 pr-1">
+                                                    {{ $ticket->staff_notes }}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </td>
+                                </tr>
+                            @endif
                         @empty
                             <tr>
-                                <td colspan="7" class="py-12 text-center text-slate-400">
+                                <td colspan="8" class="py-12 text-center text-slate-400">
                                     <div class="max-w-sm mx-auto space-y-2">
                                         <svg class="w-10 h-10 mx-auto text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>

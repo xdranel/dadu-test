@@ -14,7 +14,7 @@
     </div>
 
     <!-- Filter & Actions -->
-    <div x-data="docSelection('{{ route('documents.bulk-delete') }}')" x-init="init()">
+    <div x-data="docSelection('{{ route('documents.bulk-delete') }}')" @keydown.window="handleKey($event)">
 
     {{-- Filter & Actions --}}
     <div class="filter-card mb-4">
@@ -203,15 +203,34 @@
     <div class="mt-5">{{ $documents->links() }}</div>
     </div>{{-- end mode list --}}
 
-    </div>{{-- end x-data docViewToggle --}}
+        {{-- Floating Toast untuk error AJAX/patch --}}
+        <div x-show="toast" x-cloak x-transition
+             class="fixed bottom-6 right-6 z-50 flex items-center gap-3 bg-rose-600 text-white text-sm rounded-xl shadow-xl px-4 py-3 max-w-md">
+            <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            <span x-text="toast?.message"></span>
+            <button type="button" @click="toast = null" class="text-white/80 hover:text-white ml-auto" aria-label="Tutup">&times;</button>
+        </div>
 
-    @include('documents.partials.bulk-delete-modal')
-    @include('documents.partials.rename-modal')
-    @include('documents.partials.detail-panel')
+        @include('documents.partials.bulk-delete-modal')
+        @include('documents.partials.rename-modal')
+        @include('documents.partials.detail-panel')
+        @include('documents.partials.move-modal')
+
+    </div>{{-- end x-data docSelection --}}
 
     <script>
         function docSelection(bulkDeleteUrl) {
             return {
+                // ============ Modal buat/edit folder (tetap dipertahankan) ============
+                show: false,
+                isEdit: false,
+                action: '{{ route('document_categories.store') }}',
+                form: { name: '', description: '', isPinned: false, showWhenEmpty: false },
+                parentId: null,
+                parentName: '',
+                modalTitle: 'Buat Folder Baru',
+
+                // ============ Selection state ============
                 selected: [],
                 showBulkDelete: false,
                 showRename: false,
@@ -220,40 +239,273 @@
                 renameItem: { type: '', id: null, name: '', updateUrl: '' },
                 detailItem: {},
 
+                // ============ Computed ============
                 get selectionActive() { return this.selected.length > 0; },
                 get isSingle() { return this.selected.length === 1; },
                 get selectedDocs() { return this.selected.filter(i => i.type === 'doc'); },
                 get selectedFolders() { return this.selected.filter(i => i.type === 'folder'); },
 
-                isSelected(type, id) { return this.selected.some(i => i.type === type && i.id === id); },
+                // ============ Toast state ============
+                toast: null,
+
+                // ============ Methods ============
+                isSelected(type, id) {
+                    return this.selected.some(i => i.type === type && i.id === id);
+                },
                 toggleItem(item) {
                     const idx = this.selected.findIndex(i => i.type === item.type && i.id === item.id);
-                    if (idx >= 0) { this.selected.splice(idx, 1); }
-                    else { this.selected.push(item); }
+                    if (idx >= 0) {
+                        this.selected.splice(idx, 1);
+                    } else {
+                        this.selected.push(item);
+                    }
                 },
-                clearSelection() { this.selected = []; },
-                openBulkDelete() { this.showBulkDelete = true; },
+                clearSelection() {
+                    this.selected = [];
+                },
+                openBulkDelete() {
+                    this.showBulkDelete = true;
+                },
                 openRename() {
                     if (!this.isSingle) return;
                     const item = this.selected[0];
-                    this.renameItem = { type: item.type, id: item.id, name: item.name, updateUrl: item.updateUrl };
-                    this.showRename = true;
+                    this.openRenameFor(item);
                 },
                 openDetail() {
                     if (!this.isSingle) return;
                     this.detailItem = { ...this.selected[0] };
                     this.showDetail = true;
                 },
-                mode: 'grid',
-                init() {
-                    const saved = localStorage.getItem('docViewMode');
-                    if (saved === 'list' || saved === 'grid') { this.mode = saved; }
+
+                // ============ State Move Modal ============
+                showMove: false,
+                moveItems: [],
+                childrenOf: {},
+                expanded: new Set(),
+                rootDisabled: false,
+                moveTarget: undefined,
+                moveQuery: '',
+                searchResults: [],
+                moveError: '',
+                moveLoading: false,
+
+                get rows() {
+                    const out = [];
+                    const walk = (key, depth) => {
+                        (this.childrenOf[key] || []).forEach(n => {
+                            out.push({ ...n, depth });
+                            if (this.expanded.has(n.id)) {
+                                walk(n.id, depth + 1);
+                            }
+                        });
+                    };
+                    walk('root', 0);
+                    return out;
                 },
+                targetsUrl(extra = '') {
+                    const it = this.moveItems[0] || {};
+                    return `{{ route('documents.move-targets') }}?type=${it.type || ''}&id=${it.id || ''}${extra}`;
+                },
+                async loadChildren(key) {
+                    if (this.childrenOf[key]) return;
+                    const r = await fetch(this.targetsUrl(`&parent_id=${key === 'root' ? '' : key}`), {
+                        headers: { Accept: 'application/json' }
+                    });
+                    const j = await r.json().catch(() => ({ nodes: [] }));
+                    this.childrenOf = { ...this.childrenOf, [key]: j.nodes || [] };
+                    if (key === 'root') {
+                        this.rootDisabled = (this.moveItems[0]?.type === 'doc') || Boolean(j.rootDisabled);
+                    }
+                },
+                async toggleExpand(id) {
+                    if (this.expanded.has(id)) {
+                        this.expanded.delete(id);
+                    } else {
+                        await this.loadChildren(id);
+                        this.expanded.add(id);
+                    }
+                    this.expanded = new Set(this.expanded);
+                },
+                async searchTargets() {
+                    const q = this.moveQuery.trim();
+                    if (!q) return;
+                    const r = await fetch(this.targetsUrl(`&q=${encodeURIComponent(q)}`), {
+                        headers: { Accept: 'application/json' }
+                    });
+                    const j = await r.json().catch(() => ({ nodes: [] }));
+                    this.searchResults = j.nodes || [];
+                },
+                async openMove() {
+                    if (!this.selectionActive) return;
+                    const hasFolder = this.selectedFolders.length > 0;
+                    const hasDoc = this.selectedDocs.length > 0;
+                    if (hasFolder && hasDoc) {
+                        this.toast = { type: 'error', message: 'Tidak dapat memindahkan folder dan dokumen secara bersamaan. Pilih salah satu jenis item.' };
+                        setTimeout(() => { if (this.toast) this.toast = null; }, 5000);
+                        return;
+                    }
+                    this.moveItems = [...this.selected];
+                    this.moveTarget = undefined;
+                    this.moveError = '';
+                    this.moveQuery = '';
+                    this.childrenOf = {};
+                    this.expanded = new Set();
+                    this.showMove = true;
+                    await this.loadChildren('root');
+                },
+                async submitMove() {
+                    this.moveLoading = true;
+                    this.moveError = '';
+                    try {
+                        for (const it of this.moveItems) {
+                            const url = it.type === 'folder' ? it.moveUrl : it.updateUrl;
+                            const body = it.type === 'folder'
+                                ? { parent_id: this.moveTarget }
+                                : { document_category_id: this.moveTarget };
+                            const r = await fetch(url, {
+                                method: it.type === 'folder' ? 'PATCH' : 'PUT',
+                                headers: {
+                                    'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content,
+                                    Accept: 'application/json',
+                                    'Content-Type': 'application/json'
+                                },
+                                body: JSON.stringify(body)
+                            });
+                            if (!r.ok) {
+                                const j = await r.json().catch(() => ({}));
+                                this.moveError = j.message || (j.errors ? Object.values(j.errors).flat().join(' ') : 'Gagal memindahkan.');
+                                return;
+                            }
+                        }
+                        window.location.reload();
+                    } catch (e) {
+                        this.moveError = 'Terjadi kesalahan saat memindahkan item.';
+                    } finally {
+                        this.moveLoading = false;
+                    }
+                },
+
+                // ============ Aksi Cepat Item Menu ============
+                openRenameFor(item) {
+                    this.renameItem = { type: item.type, id: item.id, name: item.name, updateUrl: item.updateUrl };
+                    this.showRename = true;
+                },
+                openMoveFor(item) {
+                    this.selected = [item];
+                    this.openMove();
+                },
+                confirmDeleteFor(item) {
+                    this.selected = [item];
+                    this.showBulkDelete = true;
+                },
+                async togglePin(item) {
+                    await this.patch(item.pinUrl, {});
+                },
+                async toggleVisibility(item) {
+                    await this.patch(item.visibilityUrl, {
+                        visibility: item.visibility === 'publik' ? 'internal' : 'publik'
+                    });
+                },
+                async setItemVisibility(item, visibility) {
+                    await this.patch(item.visibilityUrl, { visibility });
+                },
+                async patch(url, body) {
+                    const token = document.querySelector('meta[name="csrf-token"]')?.content;
+                    try {
+                        const r = await fetch(url, {
+                            method: 'PATCH',
+                            headers: {
+                                'X-CSRF-TOKEN': token,
+                                'Accept': 'application/json',
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify(body)
+                        });
+                        const j = await r.json().catch(() => ({}));
+                        if (!r.ok) {
+                            this.toast = { type: 'error', message: j.message || 'Aksi gagal.' };
+                            setTimeout(() => { if (this.toast) this.toast = null; }, 5000);
+                            return;
+                        }
+                        window.location.reload();
+                    } catch (err) {
+                        this.toast = { type: 'error', message: 'Terjadi kesalahan jaringan.' };
+                        setTimeout(() => { if (this.toast) this.toast = null; }, 5000);
+                    }
+                },
+                handleKey(e) {
+                    const typing = ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName);
+                    if (e.key === 'Escape') {
+                        this.clearSelection();
+                    }
+                    if (e.key === 'Delete' && !typing && this.selectionActive && @json(auth()->user()->can('document_delete'))) {
+                        this.showBulkDelete = true;
+                    }
+                },
+
+                // ============ View toggle (grid/list) ============
+                mode: 'grid',
                 setMode(m) {
                     this.mode = m;
                     localStorage.setItem('docViewMode', m);
                 },
+
+                // ============ Folder create/edit modal (existing) ============
+                openCreate(parentId = null, parentName = '') {
+                    this.isEdit = false;
+                    this.action = '{{ route('document_categories.store') }}';
+                    this.form = { name: '', description: '', visibility: 'publik', isPinned: false, showWhenEmpty: false };
+                    this.parentId = parentId;
+                    this.parentName = parentName;
+                    this.modalTitle = parentId ? 'Buat Subfolder' : 'Buat Folder Baru';
+                    this.show = true;
+                },
+                init() {
+                    const savedMode = localStorage.getItem('docViewMode');
+                    if (savedMode === 'list' || savedMode === 'grid') { this.mode = savedMode; }
+
+                    window.addEventListener('open-folder-modal', (e) => {
+                        this.isEdit = true;
+                        this.action = e.detail.action;
+                        this.parentId = null;
+                        this.parentName = '';
+                        this.modalTitle = 'Edit Folder';
+                        this.form = {
+                            name: e.detail.name || '',
+                            description: e.detail.description || '',
+                            visibility: e.detail.visibility || 'publik',
+                            isPinned: !!e.detail.isPinned,
+                            showWhenEmpty: !!e.detail.showWhenEmpty,
+                        };
+                        this.show = true;
+                    });
+
+                    @if($errors->has('name') || $errors->has('parent_id') || $errors->has('is_pinned') || $errors->has('visibility'))
+                        this.openCreate();
+                        this.form.name = @js(old('name', ''));
+                        this.form.description = @js(old('description', ''));
+                        this.form.visibility = @js(old('visibility', 'publik'));
+                        this.form.isPinned = {{ old('is_pinned') ? 'true' : 'false' }};
+                        this.form.showWhenEmpty = {{ old('show_when_empty') ? 'true' : 'false' }};
+                    @endif
+                },
             }
+        }
+
+        if (typeof window.viewMode !== 'function') {
+            window.viewMode = function(key = 'docViewMode') {
+                return {
+                    mode: 'grid',
+                    init() {
+                        const s = localStorage.getItem(key);
+                        if (s === 'grid' || s === 'list') this.mode = s;
+                    },
+                    setMode(m) {
+                        this.mode = m;
+                        localStorage.setItem(key, m);
+                    },
+                };
+            };
         }
     </script>
 </x-app-layout>

@@ -81,6 +81,16 @@
                                     class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-[#DA2D3B] focus:ring focus:ring-[#DA2D3B]/20">
                             </div>
 
+                            <!-- No HP, COE, KK -->
+                            @foreach (['phone' => 'No HP', 'coe' => 'COE (Center of Excellence)', 'kk' => 'KK (Kelompok Keahlian)'] as $f => $lbl)
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700">{{ $lbl }}</label>
+                                <input type="text" name="{{ $f }}" value="{{ old($f, $lecturer->$f) }}"
+                                    class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-[#DA2D3B] focus:ring focus:ring-[#DA2D3B]/20">
+                                @error($f)<p class="text-xs text-red-600 mt-1">{{ $message }}</p>@enderror
+                            </div>
+                            @endforeach
+
                             <!-- JFA -->
                             <div>
                                 <label class="block text-sm font-medium text-gray-700">JFA</label>

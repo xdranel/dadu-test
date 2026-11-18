@@ -44,7 +44,15 @@ return [
         'public_document' => ['label' => 'Dokumen Publik',   'group' => 'Dokumen', 'actions' => ['read' => []]],
 
         // ── Layanan & Form ──────────────────────────────────────────────
-        'queue_ticket' => ['label' => 'Antrian Layanan',      'group' => 'Layanan & Form', 'actions' => ['read' => [], 'update' => []]],
+        'queue_ticket' => [
+            'label' => 'Antrian Layanan',
+            'group' => 'Layanan & Form',
+            'actions' => [
+                'read' => [],
+                'update' => [],
+                'force_release' => ['label' => 'Paksa Keluar / Ambil Alih Loket', 'permission' => 'queue_ticket_force_release'],
+            ],
+        ],
         'graduation_registration' => ['label' => 'Pendaftaran Yudisium', 'group' => 'Layanan & Form', 'actions' => ['create' => [], 'read' => [], 'update' => [], 'delete' => [], 'review' => []]],
         'sidang_ta_registration' => ['label' => 'Pendaftaran Sidang TA', 'group' => 'Layanan & Form', 'actions' => [
             'create' => [], 'read' => [], 'update' => [], 'review' => [],
@@ -52,8 +60,9 @@ return [
         ]],
         'sidang_ta_period' => ['label' => 'Periode Sidang TA', 'group' => 'Layanan & Form', 'actions' => ['create' => [], 'read' => [], 'update' => [], 'delete' => []]],
         'grade_appeal' => ['label' => 'Form Banding Nilai',   'group' => 'Layanan & Form', 'actions' => ['create' => [], 'read' => [], 'update' => [], 'review' => []]],
-
         'room_booking' => ['label' => 'Peminjaman Ruangan', 'group' => 'Layanan & Form', 'actions' => ['create' => [], 'read' => [], 'update' => [], 'review' => []]],
+
+
 
         // ── IT PANEL (hanya Akademik yang boleh mendelegasikan) ──────────
         'sidang_ta_form_guide' => [

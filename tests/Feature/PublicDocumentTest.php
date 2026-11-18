@@ -2,9 +2,14 @@
 
 use App\Models\Document;
 use App\Models\DocumentCategory;
+use App\Models\User;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
 
 beforeEach(function () {
+    Queue::fake();
+    Http::fake();
     // Clean up existing documents/categories
     Document::query()->delete();
     DocumentCategory::query()->delete();
@@ -53,6 +58,27 @@ beforeEach(function () {
         'visibility' => 'Publik',
         'download_count' => 2
     ]);
+
+    // Dokumen non-publik untuk pengujian isolasi kebocoran
+    $this->categoryInternal = DocumentCategory::create([
+        'name' => 'Kategori Rahasia',
+        'visibility' => 'Internal',
+        'access_group' => 'dosen_staf',
+    ]);
+
+    $this->docInternal = Document::create([
+        'document_category_id' => $this->categoryInternal->id,
+        'title' => 'Dokumen Rahasia Rapat Internal',
+        'abbreviation' => 'DR-INT',
+        'description' => 'Khusus internal dosen dan staf.',
+        'file_name' => 'internal_secret.pdf',
+        'file_path' => 'docs/internal_secret.pdf',
+        'file_type' => 'pdf',
+        'file_size' => 1024 * 10,
+        'visibility' => 'Internal',
+        'access_group' => 'dosen_staf',
+        'storage_disk' => 'private',
+    ]);
 });
 
 it('displays categories as folders on initial page load', function () {
@@ -60,18 +86,16 @@ it('displays categories as folders on initial page load', function () {
 
     $response->assertStatus(200);
     $response->assertSee('Yudisium');
-    $response->assertSee('Dokumen terkait persyaratan yudisium.');
     $response->assertSee('1 dokumen');
 
     $response->assertSee('Tugas Akhir');
-    $response->assertSee('Template dan panduan penulisan tugas akhir.');
     $response->assertSee('1 dokumen');
 
     // Document cards should be shown under "Dokumen Terbaru"
     $response->assertSee('Dokumen Terbaru');
     $response->assertSee('Syarat Yudisium 2026');
     $response->assertSee('Template Proposal Tugas Akhir');
-    $response->assertDontSee('← Kembali ke Kategori');
+    $response->assertDontSee('title="Kembali ke Kategori"', false);
 });
 
 it('displays documents of a specific category folder when filtered', function () {
@@ -79,7 +103,7 @@ it('displays documents of a specific category folder when filtered', function ()
 
     $response->assertStatus(200);
     // Should show back navigation button and folder title
-    $response->assertSee('← Kembali ke Kategori');
+    $response->assertSee('title="Kembali ke Kategori"', false);
     $response->assertSee('Folder:');
     $response->assertSee('Yudisium');
 
@@ -94,7 +118,7 @@ it('displays search results across categories and allows searching within a fold
     $response = $this->get(route('public_documents.index', ['search' => 'Proposal']));
 
     $response->assertStatus(200);
-    $response->assertSee('← Kembali ke Kategori');
+    $response->assertSee('title="Kembali ke Kategori"', false);
     $response->assertSee('Kata Kunci:');
     $response->assertSee('"Proposal"', false);
     $response->assertSee('Template Proposal Tugas Akhir');
@@ -121,9 +145,39 @@ it('allows downloading a public document and increments download count', functio
     $response = $this->get(route('public_documents.download', $this->doc1));
 
     $response->assertStatus(200);
-    $response->assertHeader('content-disposition', 'attachment; filename=yudisium_requirements.pdf');
+    $response->assertHeader('content-disposition', 'attachment; filename="' . $this->doc1->getDownloadFilename() . '"');
 
     // Check database incremented count
     $this->doc1->refresh();
     expect($this->doc1->download_count)->toBe($initialDownloads + 1);
+});
+
+it('memastikan dokumen non-publik tidak pernah muncul di portal publik dan mengembalikan 404 identik', function () {
+    // Portal publik tidak menampilkan dokumen atau folder internal
+    $response = $this->get(route('public_documents.index'));
+    $response->assertStatus(200);
+    $response->assertDontSee('Dokumen Rahasia Rapat Internal');
+    $response->assertDontSee('Kategori Rahasia');
+
+    // Pencarian portal publik tidak membocorkan dokumen internal
+    $searchResponse = $this->get(route('public_documents.index', ['search' => 'Rahasia']));
+    $searchResponse->assertStatus(200);
+    $searchResponse->assertDontSee('Dokumen Rahasia Rapat Internal');
+
+    // Akses folder non-publik via parameter ?kategori mengembalikan 404 identik
+    $this->get(route('public_documents.index', ['kategori' => $this->categoryInternal->id]))->assertStatus(404);
+
+    // Akses ID non-existent mengembalikan 404
+    $this->get(route('public_documents.show', 999999))->assertStatus(404);
+
+    // Akses langsung show/download/preview dokumen non-publik oleh guest mengembalikan 404 (bukan 403)
+    $this->get(route('public_documents.show', $this->docInternal))->assertStatus(404);
+    $this->get(route('public_documents.download', $this->docInternal))->assertStatus(404);
+    $this->get(route('public_documents.preview', $this->docInternal))->assertStatus(404);
+
+    // Akses dokumen non-publik oleh user login lewat route portal publik juga mengembalikan 404
+    $user = User::factory()->create(['status' => 'active']);
+    $this->actingAs($user)->get(route('public_documents.show', $this->docInternal))->assertStatus(404);
+    $this->actingAs($user)->get(route('public_documents.download', $this->docInternal))->assertStatus(404);
+    $this->actingAs($user)->get(route('public_documents.preview', $this->docInternal))->assertStatus(404);
 });
