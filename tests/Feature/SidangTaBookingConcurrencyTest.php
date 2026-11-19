@@ -32,7 +32,10 @@ class SidangTaBookingConcurrencyTest extends TaRoomCommittedTestCase
     private function scenario(): array
     {
         $s = TaRoomScenario::make();
-        $s['rooms']['b']->update(['is_classroom' => false]);
+        // This race deliberately offers one usable room; production statuses are never rewritten.
+        foreach (['b', 'lab', 'unknown'] as $name) {
+            $s['rooms'][$name]->update(['status' => 'Tidak Dapat Dipakai']);
+        }
 
         return $s;
     }

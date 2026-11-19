@@ -28,4 +28,4 @@ Pertanyaan divisi dan aturan yang belum final tetap disimpan pada [catatan91](..
 
 ## Identitas ruang dari master dan jadwal (127)
 
-JSON jadwal sudah tersedia dan valid; yang belum pasti ialah pemetaan label iGracias ke master fisik, terutama B-CLS, KTT dengan suffix, aula dan lab yang belum ada pada XLSX master. Lihat [tabel konfirmasi127](127-pemetaan-label-ruangan.md). Jangan otomatis menggabungkan ruang berbeda. Klasifikasi ruang kelas di VPS juga belum diisi.
+JSON jadwal sudah tersedia dan valid; yang belum pasti ialah pemetaan label iGracias ke master fisik, terutama B-CLS, KTT dengan suffix, aula dan lab yang belum ada pada XLSX master. Lihat [tabel konfirmasi127](127-pemetaan-label-ruangan.md). Jangan otomatis menggabungkan ruang berbeda. Progres128 menghapus klasifikasi karena seluruh master XLSX sudah dikonfirmasi kelas. Status aktif/nonaktif tetap dipertahankan; kebutuhan pemetaan alias belum diselesaikan otomatis.

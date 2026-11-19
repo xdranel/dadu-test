@@ -52,7 +52,7 @@ class SidangTaExecutionController extends Controller
     {
         $registration->load('period.executionSetting', 'roomSchedule.booking.occurrences', 'roomSchedule.executionLogs.actor');
         $info = $service->forRegistration($registration);
-        $rooms = Room::where('is_classroom', true)->where('status', 'Dapat Dipakai')->orderBy('room_code')->get();
+        $rooms = Room::where('status', 'Dapat Dipakai')->orderBy('room_code')->get();
 
         return view('sidang_ta_execution.admin.show', compact('registration', 'info', 'preview', 'rooms'));
     }

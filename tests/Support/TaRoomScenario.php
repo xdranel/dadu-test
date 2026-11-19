@@ -33,8 +33,8 @@ final class TaRoomScenario
             'break_start_time' => '12:00:00', 'break_end_time' => '13:00:00']);
         $source = RoomScheduleSource::create(['academic_period_id' => $academic->id, 'is_complete' => true, 'scope' => 'semester', 'fingerprint' => 'dummy-initial', 'version' => 1]);
         $rooms = [];
-        foreach (['a' => true, 'b' => true, 'lab' => false, 'unknown' => null] as $name => $classroom) {
-            $rooms[$name] = Room::create(['room_code' => strtoupper($name), 'name' => ($classroom ? 'KELAS ' : 'RUANG ').strtoupper($name), 'building' => 'Dummy', 'capacity' => 20, 'status' => 'Dapat Dipakai', 'is_classroom' => $classroom]);
+        foreach (['a' => 'KELAS A', 'b' => 'KELAS B', 'lab' => 'RUANG LAB', 'unknown' => 'RUANG UNKNOWN'] as $name => $roomName) {
+            $rooms[$name] = Room::create(['room_code' => strtoupper($name), 'name' => $roomName, 'building' => 'Dummy', 'capacity' => 20, 'status' => 'Dapat Dipakai']);
         }
 
         return compact('owner', 'reviewer', 'student', 'academic', 'period', 'registration', 'settings', 'source', 'rooms');

@@ -59,7 +59,7 @@ class SidangTaStaffScheduling
         $notBefore = $date === today('Asia/Jakarta')->toDateString() ? W::minutes(now('Asia/Jakarta')->format('H:i:s'), true) + 1 : 0;
         $preferred = $c?->preferred_date?->format('Y-m-d') === $date ? $c?->preferred_start_time : null;
         $slots = [];
-        foreach (Room::where('is_classroom', true)->where('status', 'Dapat Dipakai')->orderBy('room_code')->orderBy('id')->get() as $room) {
+        foreach (Room::where('status', 'Dapat Dipakai')->orderBy('room_code')->orderBy('id')->get() as $room) {
             $occupied = $busy[$date][$room->id] ?? [];
             $seeds = array_merge(range($start, $end, 30), array_column($occupied, 'end'), [$start, $notBefore]);
             if ($preferred) {
@@ -122,10 +122,8 @@ class SidangTaStaffScheduling
     {
         $reasons = [];
         $rooms = Room::where('status', 'Dapat Dipakai');
-        if (! (clone $rooms)->where('is_classroom', true)->exists()) {
-            $reasons[] = $rooms->exists()
-                ? 'Belum ada ruang kelas aktif untuk Sidang TA. Buka Data Akademik → Ruangan → Edit, lalu pilih Klasifikasi ruang: Ruang kelas untuk ruangan yang memang kelas. Impor master XLSX saja belum menetapkan klasifikasi ini.'
-                : 'Tidak ada ruangan berstatus Dapat Dipakai. Periksa status dan Klasifikasi ruang pada Data Akademik → Ruangan.';
+        if (! $rooms->exists()) {
+            $reasons[] = 'Tidak ada ruangan berstatus Dapat Dipakai. Periksa status ruangan pada Data Akademik → Ruangan.';
         }
         if (! app(RoomAvailabilityService::class)->coverage($date, $date)['ready']) {
             $periods = AcademicPeriod::with('roomSource')->whereDate('start_date', '<=', $date)

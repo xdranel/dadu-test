@@ -42,13 +42,14 @@ test('execution111_academic_identity_in_use_cannot_be_rewritten', function () {
     $this->actingAs($this->s['reviewer'])->put(route('academic_periods.update', $p), $data)->assertSessionHasErrors('year');
     expect($p->fresh()->semester)->toBe(1);
 });
-test('execution111_room_classification_and_explicit_alias_are_saved_atomically', function () {
+test('execution111_room_fields_and_explicit_alias_are_saved_atomically', function () {
     $r = $this->s['rooms']['a'];
-    $data = $r->only(['room_code', 'name', 'building', 'capacity', 'status']) + ['is_classroom' => '1', 'igracias_aliases' => 'KTT1.02'];
+    $data = $r->only(['room_code', 'name', 'building', 'capacity', 'status']) + ['igracias_aliases' => 'KTT1.02'];
     $this->actingAs($this->s['reviewer'])->put(route('rooms.update', $r), $data)->assertSessionHasNoErrors();
     expect(DB::table('room_schedule_aliases')->where('alias_key', 'KTT102')->value('room_id'))->toBe($r->id);
     $other = $this->s['rooms']['unknown'];
-    $data = array_replace($other->only(['room_code', 'name', 'building', 'capacity', 'status']), ['is_classroom' => '1', 'igracias_aliases' => 'KTT1.02']);
+    $before = $other->fresh()->getRawOriginal();
+    $data = array_replace($other->only(['room_code', 'name', 'building', 'capacity', 'status']), ['igracias_aliases' => 'KTT1.02']);
     $this->put(route('rooms.update',$other), $data)->assertSessionHasErrors('igracias_aliases');
-    expect($other->fresh()->is_classroom)->toBeNull();
+    expect($other->fresh()->getRawOriginal())->toBe($before);
 });

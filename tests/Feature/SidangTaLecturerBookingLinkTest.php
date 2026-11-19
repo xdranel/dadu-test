@@ -44,7 +44,8 @@ test('link111_invalid_booking_and_double_binding_are_rejected', function ($chang
     $service = app(SidangTaBookingAdministration::class);
     $c = $service->markLecturer($s['reviewer'], $s['registration'], 0, 'Dosen');
     $b = lecturerBooking111($s);
-    if ($change === 'lab') {
+    if ($change === 'inactive') {
+        $s['rooms']['lab']->update(['status' => 'Tidak Dapat Dipakai']);
         $b->update(['room_id' => $s['rooms']['lab']->id]);
     }
     if ($change === 'rejected') {
@@ -58,7 +59,7 @@ test('link111_invalid_booking_and_double_binding_are_rejected', function ($chang
     }
     expect(fn () => $service->linkLecturerBooking($s['reviewer'], $s['registration'], $b, $c->lock_version, 'Tautkan'))->toThrow(ValidationException::class);
     expect($b->fresh()->sidang_ta_registration_id)->toBeNull();
-})->with(['lab', 'rejected', 'duration', 'multiple']);
+})->with(['inactive', 'rejected', 'duration', 'multiple']);
 test('link111_active_automatic_requires_explicit_cancellation_first', function () {
     $s = $this->s;
     $p = app(SidangTaBookingService::class)->preview($s['owner'], $s['registration'], '2026-11-23');

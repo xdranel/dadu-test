@@ -71,7 +71,7 @@ test('domain plotting rejects conflicting duplicates invalid rooms wrong periods
         unlink($path);
     }
     expect($result['processed'])->toBeEmpty()->and($result['errors'])->toHaveCount(2);
-    foreach ([[13 => 'LAB'], [0 => 'Other period'], [1 => '00009999']] as $override) {
+    foreach ([[13 => 'NOT-REGISTERED-128'], [0 => 'Other period'], [1 => '00009999']] as $override) {
         $path = executionDomainFile([executionDomainRow($s, $override)]);
         try {
             $result = app(SidangTaPlottingImportService::class)->import($s['reviewer'], $s['period'], $path);

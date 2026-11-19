@@ -31,6 +31,7 @@ test('lifecycle111_admin_move_is_atomic_and_student_cannot_mutate', function () 
     $slot = ['date' => '2026-11-24', 'room_id' => $s['rooms']['b']->id, 'start_time' => '09:00', 'end_time' => '11:00'];
     expect(fn () => $admin->reschedule($s['owner'], $s['registration'], $slot, $this->c->lock_version, 'Ganti'))->toThrow(HttpException::class);
     $before = $this->c->booking->getRawOriginal();
+    $s['rooms']['lab']->update(['status' => 'Tidak Dapat Dipakai']);
     expect(fn () => $admin->reschedule($s['reviewer'], $s['registration'], array_replace($slot, ['room_id' => $s['rooms']['lab']->id]), $this->c->lock_version, 'Ganti'))->toThrow(ValidationException::class);
     expect($this->c->booking->fresh()->getRawOriginal())->toBe($before);
     $c = $admin->reschedule($s['reviewer'], $s['registration'], $slot, $this->c->lock_version, 'Permintaan SSC');

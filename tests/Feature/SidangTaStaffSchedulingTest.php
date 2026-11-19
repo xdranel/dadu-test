@@ -34,7 +34,7 @@ test('staff options prefer imported room and time but offer other free classroom
         ->and(substr($p['options'][0]['candidate']['start_time'], 0, 5))->toBe('12:00')
         ->and($p['options'][0]['recommended'])->toBeTrue();
     expect(collect($p['options'])->pluck('candidate.room_id')->unique()->sort()->values()->all())
-        ->toBe(collect([$s['rooms']['a']->id, $s['rooms']['b']->id])->sort()->values()->all());
+        ->toBe(collect($s['rooms'])->pluck('id')->sort()->values()->all());
     foreach ($p['options'] as $option) {
         expect($option['candidate']['duration_minutes'])->toBe(90);
     }

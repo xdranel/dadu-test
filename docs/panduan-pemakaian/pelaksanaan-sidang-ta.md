@@ -4,7 +4,7 @@ Panduan saat ini untuk admin/petugas, dosen pembaca dan mahasiswa. Penjadwalan d
 
 ## Alur admin/petugas
 
-1. Pastikan Data Akademik → Ruangan berisi ruang kelas aktif dan semester sumber pada Pengaturan Periode Akademik sesuai. Impor jadwal ruang iGracias melalui Sinkronisasi `room_schedule` agar okupansi semester lengkap. Excel plotting peserta tidak menggantikan sumber okupansi tersebut.
+1. Seluruh master Data Akademik → Ruangan dianggap kelas; pastikan ada yang berstatus Dapat Dipakai dan semester sumber pada Pengaturan Periode Akademik sesuai. Impor jadwal ruang iGracias melalui Sinkronisasi `room_schedule` agar okupansi semester lengkap. Tidak ada lagi penandaan Klasifikasi TA setelah pembaruan128. Excel plotting peserta tidak menggantikan sumber okupansi tersebut.
 2. Buka Form → **Pelaksanaan Sidang TA**, tepat di bawah Review Sidang TA. Kartu/ringkasan/filter/daftar ada pada halaman ini; kontrol pelaksanaan tidak lagi menumpuk di Review.
 3. Tekan **Kelola Pelaksanaan**. Nama periode mengikuti Kelola Periode Sidang TA. Pilih semester sumber jadwal, tanggal/jam mulai–selesai, hari pelaksanaan dan aktivasi. Durasi resmi 90 menit. Ruang yang kosong saat istirahat boleh ditawarkan. Simpan; periode lewat dapat dilipat dan dibuka/diaktifkan kembali tanpa mengganti identitas periode.
 4. Pilih salah satu jalur peserta. **Dari sistem:** peserta berasal dari pengajuan TA approved yang sudah ada. **Impor:** pilih periode lalu unggah XLSX dengan 16 kolom dan dua baris header seperti file pengguna. Cek jumlah diproses/dilewati serta NIM/baris/alasan. NIM tanpa pengajuan approved pada periode itu tidak dibuatkan approval baru.

@@ -12,10 +12,7 @@ class Room extends Model
         'building',
         'capacity',
         'status',
-        'is_classroom',
     ];
-
-    protected $casts = ['is_classroom' => 'boolean'];
 
     public function scopeSearch($query, ?string $search)
     {

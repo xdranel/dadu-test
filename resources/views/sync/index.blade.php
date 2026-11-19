@@ -79,7 +79,7 @@
                     <div x-show="importType === 'room_schedule'" x-cloak class="rounded-lg border border-sky-200 bg-sky-50 p-3 text-xs text-sky-800 space-y-2">
                         <p class="font-semibold">Jadwal Ruangan iGracias — pola mingguan</p>
                         <p>Unggah snapshot lengkap semester dengan <code>jenis_jadwal: TETAP</code>, periode seperti <code>2627/1</code>, serta metadata/filter ekspor. Pola diperbarui untuk semester yang sama dan digunakan setiap minggu dalam batas semester tersebut.</p>
-                        <p>Daftarkan periode akademik dan cocokkan nama/kode atau alias ruangan terlebih dahulu di Data Akademik. Ruang kelas untuk Sidang TA perlu ditandai oleh petugas.</p>
+                        <p>Daftarkan periode akademik dan cocokkan nama/kode atau alias ruangan terlebih dahulu di Data Akademik. Seluruh master ruangan dianggap ruang kelas. Pencarian Sidang TA hanya memakai status Dapat Dipakai dan tetap memeriksa jadwal/bentrok.</p>
                         <p>Format lama <code>aaData</code> tetap dibaca sebagai jadwal tanggal tertentu; tidak otomatis menjadi sumber pola semester. Lihat rincian kesalahan apabila impor belum berhasil.</p>
                     </div>
 

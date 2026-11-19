@@ -9,7 +9,7 @@ Pertanyaan penting untuk divisi:
 - Apakah `KTT1.02` benar-benar ruang yang sama dengan master `1.02`? Jika benar, tambahkan alias pada master tersebut.
 - `B-CLS-105` dan `KTT B-1.05` apakah sama atau ruangan berbeda? Jangan otomatis menggabungkannya.
 - Ke mana `KTT 1.27 B`, `KTT A-1.06`, `KTT A-1.07`, dan `KTT AULA` ditautkan? Beberapa tidak mempunyai master yang sesuai pada XLSX ini.
-- Adakah master ruangan yang lebih lengkap untuk label laboratorium? Jika ruang berbeda, lengkapi master dan klasifikasinya sebagai Bukan kelas untuk TA; jangan membuat alias lab ke kelas lain.
+- Adakah master ruangan yang lebih lengkap untuk label laboratorium? Setelah128 seluruh master dianggap kelas; jangan menambahkan lab ke master atau membuat alias lab ke kelas lain hanya agar impor lolos. Label di luar master XLSX perlu konfirmasi penanganan sumber tersendiri.
 
 Dari 69 label, ada 44 calon kode berbasis pola teks;25 label belum mempunyai pasangan pola tersebut. Semua masih perlu verifikasi identitas.
 

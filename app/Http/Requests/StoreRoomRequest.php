@@ -25,7 +25,6 @@ class StoreRoomRequest extends FormRequest
             'name' => ['required', 'string', 'max:255'],
             'building' => ['required', 'string', 'max:100'],
             'capacity' => ['required', 'integer', 'min:1', 'max:1000'],
-            'is_classroom' => ['nullable', 'boolean'],
             'igracias_aliases' => ['nullable', 'string', 'max:5000'],
             'status' => ['required', Rule::in(['Dapat Dipakai', 'Tidak Dapat Dipakai'])],
         ];

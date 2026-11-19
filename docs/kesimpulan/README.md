@@ -130,3 +130,5 @@ Satu ringkasan per nomor progres; sub-checkpoint huruf digabung pada nomor utama
 - [126 — perapian tampilan dokumentasi dan batas tanggal](126-perapian-tampilan-dokumentasi-dan-batas-tanggal.md)
 
 - [127 — Diagnosis dan akses peminjaman ruangan](127-diagnosis-dan-akses-peminjaman-ruangan.md)
+
+- [128 — Semua master kelas, status tetap](128-semua-master-kelas-status-tetap.md)

@@ -10,3 +10,5 @@ Rancangan/rencana bernomor lama tetap berada pada [arsip progres](../arsip-progr
 
 - [127 — Rencana diagnosis dan akses admin](127-rencana-pencarian-dan-akses-ruangan.md)
 - [127 — Label ruang yang perlu konfirmasi](127-pemetaan-label-ruangan.md)
+
+- [128 — Rencana penghapusan klasifikasi](128-rencana-penghapusan-klasifikasi-ta.md)

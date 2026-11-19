@@ -141,3 +141,5 @@ Dokumen asli bernomor dipertahankan sebagai jejak pekerjaan. Perintah yang berga
 - [126 — Perapian tampilan, batas tanggal dan dokumentasi](126-hasil-perapian-tampilan-dan-dokumentasi.md)
 
 - [127 — Diagnosis dan akses peminjaman ruangan](127-hasil-diagnosis-dan-akses-peminjaman-ruangan.md)
+
+- [128 — Penghapusan Klasifikasi TA dan perlindungan status](128-hasil-penghapusan-klasifikasi-ta.md)

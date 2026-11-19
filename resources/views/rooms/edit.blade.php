@@ -106,10 +106,6 @@
                         @enderror
                     </div>
 
-                    <div class="mb-4"><label for="is_classroom">Klasifikasi ruang untuk Sidang TA</label>
-<select id="is_classroom" name="is_classroom" class="w-full rounded border-gray-300">
-@foreach([''=>'Belum dipastikan','1'=>'Ruang kelas','0'=>'Bukan ruang kelas'] as $value=>$label)<option value="{{ $value }}" @selected((string)old('is_classroom',isset($room) ? ($room->is_classroom===null?'':(int)$room->is_classroom) : '')===(string)$value)>{{ $label }}</option>@endforeach</select>
-<p class="text-sm text-slate-500">Pastikan secara manual. Laboratorium dan ruang yang belum dipastikan tidak dipilih otomatis.</p></div>
 <div class="mb-4"><label for="igracias_aliases">Tambahkan alias nama ruangan iGracias (satu per baris)</label><textarea id="igracias_aliases" name="igracias_aliases" class="w-full rounded border-gray-300">{{ old('igracias_aliases') }}</textarea>
 @isset($aliases)<p class="text-sm">Alias tersimpan: {{ implode(', ',$aliases) ?: '-' }}</p>@endisset
 <p class="text-sm text-slate-500">Pastikan setiap alias menunjuk ruang fisik yang sama. Alias tersimpan tetap dipertahankan.</p></div>

@@ -1,5 +1,7 @@
 # 127 — Diagnosis sumber jadwal dan akses peminjaman admin
 
+> Pembaruan128: penandaan klasifikasi dihapus karena seluruh master XLSX adalah kelas. Status tidak diubah. Diagnosis di bawah mencatat kondisi saat127; untuk kebijakan terkini lihat [hasil128](../arsip-progres/128-hasil-penghapusan-klasifikasi-ta.md).
+
 Status: implementasi, reproduksi, pengujian dan penyelarasan source selesai; belum commit/push/deploy. Data VPS belum diubah. Rencana: [127](../catatan/127-rencana-pencarian-dan-akses-ruangan.md).
 
 ## Penyebab yang terkonfirmasi di VPS

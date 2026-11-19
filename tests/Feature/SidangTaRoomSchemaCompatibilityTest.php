@@ -8,16 +8,20 @@ use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
-it('creates additive TA scheduling tables with unknown room classification by default', function () {
+it('keeps TA scheduling schema without an extra room classification requirement', function () {
     foreach (['room_weekly_patterns', 'room_schedule_sources', 'sidang_ta_execution_settings', 'sidang_ta_schedules'] as $table) {
         expect(Schema::hasTable($table))->toBeTrue($table);
     }
     $room = Room::create(['room_code' => 'SCHEMA-A', 'name' => 'KELAS A', 'building' => 'Test', 'capacity' => 20, 'status' => 'Dapat Dipakai']);
-    expect($room->fresh()->is_classroom)->toBeNull();
+    expect(Schema::hasColumn('rooms', 'is_classroom'))->toBeFalse();
     expect(Schema::hasColumns('room_booking_requests', ['booking_origin', 'sidang_ta_registration_id']))->toBeTrue();
 });
 
 it('upgrades existing room bookings and histories without changing their original fields', function (string $status) {
+    $classification = require database_path('migrations/2026_11_19_128000_remove_room_ta_classification.php');
+    $classification->down();
+    $execution = require database_path('migrations/2026_11_19_124000_extend_sidang_ta_execution_admin.php');
+    $execution->down();
     $names = ['2026_11_15_110001_create_room_weekly_patterns.php', '2026_11_15_110002_create_sidang_ta_scheduling_tables.php', '2026_11_15_110003_extend_room_booking_for_sidang_ta.php'];
     foreach (array_reverse($names) as $name) {
         (require database_path('migrations/'.$name))->down();
@@ -33,6 +37,8 @@ it('upgrades existing room bookings and histories without changing their origina
     foreach ($names as $name) {
         (require database_path('migrations/'.$name))->up();
     }
+    $execution->up();
+    $classification->up();
     expect(array_intersect_key($booking->fresh()->getRawOriginal(), $before))->toBe($before)
         ->and($booking->fresh()->booking_origin)->toBe('ordinary')
         ->and($booking->fresh()->sidang_ta_registration_id)->toBeNull()
