@@ -5,7 +5,6 @@ namespace App\Http\Controllers;
 use App\Http\Requests\ConfirmSidangTaBookingRequest;
 use App\Models\SidangTaRegistration;
 use App\Services\SidangTaBookingAccess;
-use App\Services\SidangTaBookingIdentity;
 use App\Services\SidangTaBookingService;
 use Closure;
 use Illuminate\Http\Request;
@@ -17,6 +16,7 @@ class SidangTaBookingController extends Controller implements HasMiddleware
     {
         return [function (Request $request, Closure $next) {
             abort_unless(config('sidang_ta.student_booking_enabled', false), 404);
+            abort_unless(in_array($request->method(), ['GET', 'HEAD'], true), 403, 'Penjadwalan Sidang TA dilakukan oleh admin.');
 
             return $next($request);
         }];
@@ -27,7 +27,7 @@ class SidangTaBookingController extends Controller implements HasMiddleware
         $registration = $sidang_ta_registration;
         app(SidangTaBookingAccess::class)->authorizeStudent($request->user(), $registration);
 
-        return view('sidang_ta_registrations.booking.index', ['registration' => $registration->load('roomSchedule.booking.room', 'roomSchedule.booking.occurrences', 'period.executionSetting'), 'identity' => app(SidangTaBookingIdentity::class)->forRegistration($registration), 'isLatestApproved' => app(SidangTaBookingService::class)->isLatestApproved($registration), 'preview' => null]);
+        return redirect()->route('sidang-ta-execution.show', $registration);
     }
 
     public function preview(Request $request, SidangTaRegistration $sidang_ta_registration, SidangTaBookingService $service)

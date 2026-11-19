@@ -43,13 +43,7 @@
                             @endforelse
                         </div>
                     </section>
-                    @can('sidang_ta_period_read')
-                        <section class="campus-card space-y-3 p-4">
-                            <h3 class="font-bold">Pelaksanaan Sidang TA</h3>
-                            <p class="text-sm text-slate-500">Atur tanggal, hari, jam dan durasi untuk pencarian ruang kelas.</p>
-                            <a data-manage-ta-execution href="{{ route('admin.sidang-ta-execution.index') }}" class="btn btn-secondary">Kelola Pelaksanaan</a>
-                        </section>
-                    @endcan
+
                 </div>
                 <section class="space-y-3">
                     <h3 class="text-sm font-bold text-slate-800">

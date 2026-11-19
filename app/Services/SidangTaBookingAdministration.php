@@ -26,7 +26,16 @@ class SidangTaBookingAdministration
             if ($r->status !== 'approved') {
                 throw ValidationException::withMessages(['schedule' => 'Pengajuan belum disetujui.']);
             }
+            if ($c->result_status !== 'pending') {
+                throw ValidationException::withMessages(['schedule' => 'Batalkan hasil sidang dahulu sebelum mengubah jadwal.']);
+            }
             $result = $action($r, $c, $s);
+            if ($result->lock_version === $version) {
+                $result->increment('lock_version');
+            }
+            if ($result->booking?->status === 'approved' && $result->state === 'confirmed') {
+                app(SidangTaExecutionInfoService::class)->capture($r);
+            }
             $r->logAction('schedule_updated', $r->status, $r->status, $reason, $actor->id);
 
             return $result->fresh('booking.occurrences', 'booking.room');
@@ -76,7 +85,7 @@ class SidangTaBookingAdministration
     {
         $v = Validator::make($slot, ['date' => ['required', 'date_format:Y-m-d'], 'room_id' => ['required', 'integer', 'exists:rooms,id'], 'start_time' => ['required', 'date_format:H:i'], 'end_time' => ['required', 'date_format:H:i', 'after:start_time']])->validate();
         $room = Room::findOrFail($v['room_id']);
-        if (! $s || ! $room->is_classroom || $room->status !== 'Dapat Dipakai') {
+        if (! $s || ! $s->is_active || ! $room->is_classroom || $room->status !== 'Dapat Dipakai') {
             throw ValidationException::withMessages(['room_id' => 'Ruang kelas aktif dan jadwal pelaksanaan diperlukan.']);
         }
         app(SidangTaExecutionWindowService::class)->assertSlot($s, $v['date'], $v['start_time'], $v['end_time']);
@@ -146,12 +155,12 @@ class SidangTaBookingAdministration
                     return $c;
                 }throw ValidationException::withMessages(['schedule' => 'Tidak ada booking aktif.']);
             }
-            app(SidangTaBookingAccess::class)->authorizeStaff($actor,$b);
+            app(SidangTaBookingAccess::class)->authorizeStaff($actor, $b);
             $this->futureBooking($b);
             $before = $b->getRawOriginal();
             $from = $b->status;
             $b->fill(['status' => 'cancelled', 'cancellation_reason' => $reason, 'cancelled_by' => $actor->id, 'cancelled_at' => now()])->save();
-            app(RoomBookingTransitionService::class)->record($actor,$b,$from,$reason,$before);
+            app(RoomBookingTransitionService::class)->record($actor, $b, $from, $reason, $before);
 
             return $c->fresh();
         });

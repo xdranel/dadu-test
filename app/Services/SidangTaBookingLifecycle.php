@@ -22,6 +22,9 @@ class SidangTaBookingLifecycle
             return;
         }
         $active = in_array($lockedBooking->status, ['pending', 'approved'], true);
+        if (! $active && ($context->result_status ?? 'pending') !== 'pending') {
+            throw ValidationException::withMessages(['schedule' => 'Batalkan hasil sidang dahulu sebelum membatalkan jadwal.']);
+        }
         $context->fill(['state' => match ($lockedBooking->status) {
             'pending' => 'pending_lecturer','approved' => 'confirmed','rejected' => 'rejected',default => 'cancelled'
         }, 'active_student_number' => $active ? $context->student_number : null, 'was_confirmed' => $context->was_confirmed || $lockedBooking->status === 'approved', 'lock_version' => $context->lock_version + 1])->save();

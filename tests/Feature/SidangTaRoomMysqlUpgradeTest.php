@@ -12,6 +12,8 @@ class SidangTaRoomMysqlUpgradeTest extends TaRoomCommittedTestCase
 {
     public function test_native_mysql_upgrade_preserves_existing_pending_and_approved_bookings(): void
     {
+        $execution = require database_path('migrations/2026_11_19_124000_extend_sidang_ta_execution_admin.php');
+        $execution->down();
         $names = ['2026_11_15_110001_create_room_weekly_patterns.php', '2026_11_15_110002_create_sidang_ta_scheduling_tables.php', '2026_11_15_110003_extend_room_booking_for_sidang_ta.php'];
         foreach (array_reverse($names) as $name) {
             (require database_path('migrations/'.$name))->down();
@@ -28,6 +30,7 @@ class SidangTaRoomMysqlUpgradeTest extends TaRoomCommittedTestCase
         foreach ($names as $name) {
             (require database_path('migrations/'.$name))->up();
         }
+        $execution->up();
         foreach ($before as [$raw,$occ,$history]) {
             $b = RoomBookingRequest::findOrFail($raw['id']);
             $this->assertSame($raw, array_intersect_key($b->getRawOriginal(), $raw));

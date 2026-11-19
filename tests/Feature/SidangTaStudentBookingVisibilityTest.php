@@ -68,7 +68,7 @@ test('visibility117_hiding_student_access_preserves_existing_booking_and_history
 test('visibility117_staff_can_still_manage_execution_and_existing_bookings', function () {
     $s = $this->s117;
     $this->actingAs($s['reviewer'])->get(route('admin.sidang-ta-registrations.index'))->assertOk()
-        ->assertSee('data-manage-ta-execution', false);
+        ->assertDontSee('data-manage-ta-execution', false);
     $this->get(route('admin.sidang-ta-execution.index'))->assertOk()->assertSee('Pelaksanaan Sidang TA');
     $this->get(route('admin.sidang-ta-bookings.show', $s['registration']))->assertOk();
 });

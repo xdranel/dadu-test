@@ -22,7 +22,7 @@ class SidangTaExecutionWindowService
         $start = W::minutes($s->start_time);
         $end = W::minutes($s->end_time);
 
-        return $s->break_start_time ? [['start' => $start, 'end' => W::minutes($s->break_start_time)], ['start' => W::minutes($s->break_end_time), 'end' => $end]] : [['start' => $start, 'end' => $end]];
+        return $s->duration_minutes !== 90 && $s->break_start_time ? [['start' => $start, 'end' => W::minutes($s->break_start_time)], ['start' => W::minutes($s->break_end_time), 'end' => $end]] : [['start' => $start, 'end' => $end]];
     }
 
     public function assertSlot(SidangTaExecutionSetting $s, string $date, string $start, string $end, bool $enforceDuration = true): void

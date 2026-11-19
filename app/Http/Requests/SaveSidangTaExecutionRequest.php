@@ -14,6 +14,7 @@ class SaveSidangTaExecutionRequest extends FormRequest
     public static function windowRules(): array
     {
         return [
+            'is_active' => ['sometimes', 'boolean'],
             'academic_period_id' => ['required', 'integer', 'exists:academic_periods,id'],
             'start_date' => ['required', 'date_format:Y-m-d'], 'end_date' => ['required', 'date_format:Y-m-d', 'after_or_equal:start_date'],
             'allowed_weekdays' => ['required', 'array', 'min:1', 'max:7'], 'allowed_weekdays.*' => ['required', 'integer', 'between:1,7', 'distinct'],

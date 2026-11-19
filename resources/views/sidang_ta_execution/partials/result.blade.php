@@ -1,0 +1,2 @@
+@php($executionCancelled = in_array($info['scheduling_state'] ?? null, ['cancelled', 'rejected'], true))
+<span class="inline-flex rounded-full px-3 py-1 text-xs font-semibold {{ match($executionCancelled ? 'pending' : ($info['result_status'] ?? 'pending')) { 'passed' => 'bg-emerald-100 text-emerald-800', 'failed' => 'bg-rose-100 text-rose-800', default => 'bg-slate-100 text-slate-600' } }}">{{ $executionCancelled ? 'Dibatalkan' : ($info['result_label'] ?? 'Belum ada hasil') }}</span>

@@ -93,6 +93,9 @@ class RoomBookingTransitionService
                 }
             }
             abort_unless(in_array($locked->status, ['pending', 'approved'], true), 422, 'Peminjaman sudah tidak aktif.');
+            if ($locked->sidang_ta_registration_id && ($locked->registration?->roomSchedule?->result_status ?? 'pending') !== 'pending') {
+                throw ValidationException::withMessages(['schedule' => 'Batalkan hasil sidang dahulu sebelum membatalkan jadwal.']);
+            }
             if ($locked->sidang_ta_registration_id && $locked->status === 'approved') {
                 $first = $locked->occurrences->sortBy(fn ($o) => $o->usage_date->toDateString().' '.$o->start_time)->first();
                 if (! $first || $first->usage_date->toDateString().' '.$first->start_time <= now('Asia/Jakarta')->format('Y-m-d H:i:s')) {

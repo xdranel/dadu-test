@@ -8,9 +8,10 @@ class SidangTaExecutionSetting extends Model
 {
     protected $guarded = [];
 
-    protected $attributes = ['allowed_weekdays' => '[1,2,3,4,5]', 'start_time' => '08:00:00', 'end_time' => '16:00:00', 'break_start_time' => '12:00:00', 'break_end_time' => '13:00:00', 'duration_minutes' => 120, 'lock_version' => 1];
+    protected $attributes = ['allowed_weekdays' => '[1,2,3,4,5]', 'start_time' => '08:00:00', 'end_time' => '16:00:00',
+        'break_start_time' => null, 'break_end_time' => null, 'duration_minutes' => 90, 'is_active' => true, 'lock_version' => 1];
 
-    protected $casts = ['start_date' => 'date', 'end_date' => 'date', 'allowed_weekdays' => 'array', 'duration_minutes' => 'integer', 'lock_version' => 'integer'];
+    protected $casts = ['start_date' => 'date', 'end_date' => 'date', 'allowed_weekdays' => 'array', 'duration_minutes' => 'integer', 'lock_version' => 'integer', 'is_active' => 'boolean'];
 
     public function period()
     {

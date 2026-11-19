@@ -1,0 +1,478 @@
+{
+  "source_head": "b70cb93be0d129e2f286e3f69db151cc72336028",
+  "target_head": "6fa5626c012eb79bcd6164e7daf7d9648a59795b",
+  "source_application_test_files_checked": 750,
+  "source_files_matching_target": 745,
+  "files_copied_count": 40,
+  "deliberate_source_differences": [
+    "app/Policies/DocumentCategoryPolicy.php",
+    "app/Policies/DocumentPolicy.php",
+    "database/seeders/RolePermissionSeeder.php",
+    "resources/css/app.css",
+    "resources/views/queue-tickets/admin.blade.php"
+  ],
+  "retained_target_only_files": [
+    "resources/views/documents/all.blade.php"
+  ],
+  "missing_source_application_files": [],
+  "source_docs_docker_absent": true,
+  "protected_files_unchanged": true,
+  "indexes_unchanged": true,
+  "database_scope": "Tests only: MySQL dadu_testing. No application migration/seed/reset/deployment.",
+  "tests": {
+    "full": {
+      "total": 1322,
+      "passed": 1275,
+      "failed": 45,
+      "skipped": 2,
+      "failures": [
+        {
+          "class": "Tests\\Feature\\Auth\\PasswordResetTest",
+          "name": "reset password link can be requested"
+        },
+        {
+          "class": "Tests\\Feature\\Auth\\PasswordResetTest",
+          "name": "reset password screen can be rendered"
+        },
+        {
+          "class": "Tests\\Feature\\Auth\\PasswordResetTest",
+          "name": "password can be reset with valid token"
+        },
+        {
+          "class": "Tests\\Feature\\Auth\\PasswordUpdateTest",
+          "name": "password can be updated"
+        },
+        {
+          "class": "Tests\\Feature\\ExamScheduleTest",
+          "name": "guest cannot access autocomplete search endpoints"
+        },
+        {
+          "class": "Tests\\Feature\\ExamScheduleTest",
+          "name": "authenticated user gets empty json if autocomplete query is empty or less than 2 characters"
+        },
+        {
+          "class": "Tests\\Feature\\ExamScheduleTest",
+          "name": "autocomplete search returns matching distinct courses"
+        },
+        {
+          "class": "Tests\\Feature\\ExamScheduleTest",
+          "name": "autocomplete search returns matching lecturers with name validation"
+        },
+        {
+          "class": "Tests\\Feature\\GraduationRegistrationTest",
+          "name": "admin can see active period countdown banner on graduation registration index"
+        },
+        {
+          "class": "Tests\\Feature\\GraduationRegistrationTest",
+          "name": "countdown banner is not visible if there is no active period"
+        },
+        {
+          "class": "Tests\\Feature\\GraduationRegistrationTest",
+          "name": "countdown banner shows expired status when active period is closed"
+        },
+        {
+          "class": "Tests\\Feature\\GraduationRegistrationTest",
+          "name": "student can submit graduation registration with student email and conditional title change"
+        },
+        {
+          "class": "Tests\\Feature\\GraduationRegistrationTest",
+          "name": "admin can delete graduation registration submission"
+        },
+        {
+          "class": "Tests\\Feature\\GraduationRegistrationTest",
+          "name": "student can submit graduation registration with honors predicate cumlaude and criteria hki"
+        },
+        {
+          "class": "Tests\\Feature\\GraduationRegistrationTest",
+          "name": "admin can change review status of graduation registration"
+        },
+        {
+          "class": "Tests\\Feature\\GraduationRegistrationTest",
+          "name": "backend blocks submission if student is ineligible due to failed courses or tak score"
+        },
+        {
+          "class": "Tests\\Feature\\PreAssignRoleTest",
+          "name": "superadmin can access pre-assign role page"
+        },
+        {
+          "class": "Tests\\Feature\\PreAssignRoleTest",
+          "name": "pre-assigned role and unit are preserved when user authenticates via SSO login"
+        },
+        {
+          "class": "Tests\\Feature\\PublicDocumentTest",
+          "name": "it memastikan dokumen non-publik tidak pernah muncul di portal publik dan mengembalikan 404 identik"
+        },
+        {
+          "class": "Tests\\Feature\\QueueHistoryAndLogTest",
+          "name": "event called and finished are logged during next call cycle"
+        },
+        {
+          "class": "Tests\\Feature\\QueueHistoryAndLogTest",
+          "name": "event skipped is logged when officer skips ticket"
+        },
+        {
+          "class": "Tests\\Feature\\QueueHistoryAndLogTest",
+          "name": "event undo_call is logged when officer cancels call"
+        },
+        {
+          "class": "Tests\\Feature\\QueueHistoryAndLogTest",
+          "name": "history page lists records from both active tickets and archived histories"
+        },
+        {
+          "class": "Tests\\Feature\\QueueHistoryAndLogTest",
+          "name": "filtering by nim searches across all months ignoring date filters"
+        },
+        {
+          "class": "Tests\\Feature\\QueueHistoryAndLogTest",
+          "name": "month filter strictly respects month boundaries"
+        },
+        {
+          "class": "Tests\\Feature\\QueueHistoryAndLogTest",
+          "name": "queue:export-month exports full month to storage/app/queue-exports and overwrites cleanly"
+        },
+        {
+          "class": "Tests\\Feature\\QueueHistoryAndLogTest",
+          "name": "queue:prune-history strictly rejects deletion if export file does not exist"
+        },
+        {
+          "class": "Tests\\Feature\\QueueHistoryAndLogTest",
+          "name": "queue:prune-history strictly rejects deletion if export file is empty 0 bytes"
+        },
+        {
+          "class": "Tests\\Feature\\QueueHistoryAndLogTest",
+          "name": "queue:prune-history strictly rejects deletion if export row count does not match database count"
+        },
+        {
+          "class": "Tests\\Feature\\QueueHistoryAndLogTest",
+          "name": "queue:prune-history dry-run previews deletion count without modifying database"
+        },
+        {
+          "class": "Tests\\Feature\\QueueHistoryAndLogTest",
+          "name": "queue:prune-history successfully prunes data older than retention limit when all safeguards pass"
+        },
+        {
+          "class": "Tests\\Feature\\QueueHistoryStaffNotesTest",
+          "name": "5. data dari tabel arsip queue_ticket_histories juga menampilkan staff_notes"
+        },
+        {
+          "class": "Tests\\Feature\\QueueTicketTest",
+          "name": "visitor get take page displays form when queue is open"
+        },
+        {
+          "class": "Tests\\Feature\\QueueTicketTest",
+          "name": "ambil tiket sukses via POST /queue/take saves details and sets device_token cookie"
+        },
+        {
+          "class": "Tests\\Feature\\QueueTicketTest",
+          "name": "ambil tiket saat tutup ditolak dan menampilkan view closed"
+        },
+        {
+          "class": "Tests\\Feature\\QueueTicketTest",
+          "name": "dua request berurutan/bersamaan tidak menghasilkan kode kembar"
+        },
+        {
+          "class": "Tests\\Feature\\SidangTaMeetFinalizationTest",
+          "name": "meet_final_staff_can_read_export_and_verify_while_revision_requires_document_feedback"
+        },
+        {
+          "class": "Tests\\Feature\\SyncTest",
+          "name": "admin can import valid student JSON"
+        },
+        {
+          "class": "Tests\\Feature\\SyncTest",
+          "name": "admin can import flat array Course JSON"
+        },
+        {
+          "class": "Tests\\Feature\\SyncTest",
+          "name": "admin can import associative Course JSON"
+        },
+        {
+          "class": "Tests\\Feature\\SyncTest",
+          "name": "admin can import valid KRS JSON when student exists"
+        },
+        {
+          "class": "Tests\\Feature\\SyncTest",
+          "name": "admin can import flat array KRS JSON and automatically create or update student profile"
+        },
+        {
+          "class": "Tests\\Feature\\SyncTest",
+          "name": "admin can import valid Attendance JSON when student exists"
+        },
+        {
+          "class": "Tests\\Feature\\SyncTest",
+          "name": "sync import skips rows if student does not exist for KRS and Attendance"
+        },
+        {
+          "class": "Tests\\Feature\\SyncTest",
+          "name": "admin can import graduation JSON payload"
+        }
+      ],
+      "additional_failures_compared_with_118": [],
+      "baseline_failures_resolved": [],
+      "assertions": 10266,
+      "duration_seconds": 274.38
+    },
+    "targeted": {
+      "passed": 79,
+      "failed": 0,
+      "assertions": 374,
+      "duration_seconds": 51.4
+    },
+    "final_ui_after_label_changes": {
+      "passed": 16,
+      "failed": 0,
+      "assertions": 94,
+      "duration_seconds": 16.88
+    }
+  },
+  "review": "Independent re-review: no remaining important findings.",
+  "files": [
+    {
+      "path": "app/Http/Controllers/Admin/SidangTaExecutionController.php",
+      "source_before_sha256": "3d6606ad93d54978e07592a47c2227170bdbc6f987c52ec7cdd302d993af61a1",
+      "target_sha256": "5ff1ca8f1af8a546541667a8715aacd572cd4a0f6f63876abab133745443808c",
+      "source_after_sha256": "5ff1ca8f1af8a546541667a8715aacd572cd4a0f6f63876abab133745443808c"
+    },
+    {
+      "path": "app/Http/Controllers/SidangTaBookingController.php",
+      "source_before_sha256": "0a74fe5bcf4ecfacfe02cfd468352f3a6a783e493e2319931abd083c7b684389",
+      "target_sha256": "4d81842e33544a5078c1df290ef59c24b1837344902659d62ef12ff58ed871f9",
+      "source_after_sha256": "4d81842e33544a5078c1df290ef59c24b1837344902659d62ef12ff58ed871f9"
+    },
+    {
+      "path": "app/Http/Controllers/SidangTaExecutionController.php",
+      "source_before_sha256": null,
+      "target_sha256": "b52297d04948ca8f0d690f8416b5561aefc1b1e461ffb5531b09a775d87670c9",
+      "source_after_sha256": "b52297d04948ca8f0d690f8416b5561aefc1b1e461ffb5531b09a775d87670c9"
+    },
+    {
+      "path": "app/Http/Requests/SaveSidangTaExecutionRequest.php",
+      "source_before_sha256": "c59ba9885a3838480c66187b66f782aeabe56a781fdfa41601aff9822544d140",
+      "target_sha256": "270fc83faa7c1d3b6d62f33ca39de1e33ef74be4cac2a84f02f90321591d7a49",
+      "source_after_sha256": "270fc83faa7c1d3b6d62f33ca39de1e33ef74be4cac2a84f02f90321591d7a49"
+    },
+    {
+      "path": "app/Models/SidangTaExecutionLog.php",
+      "source_before_sha256": null,
+      "target_sha256": "271766c8d5310c4cfe23f3818d1b80b031dff3ee1065b9280d1aad9cbaac9171",
+      "source_after_sha256": "271766c8d5310c4cfe23f3818d1b80b031dff3ee1065b9280d1aad9cbaac9171"
+    },
+    {
+      "path": "app/Models/SidangTaExecutionSetting.php",
+      "source_before_sha256": "b6df76da6e1576b0418609f5f76c5330002723488d4c215ed732508464bbe50c",
+      "target_sha256": "6eca20919e9706cb3f66002af42e72c870fed17e7c071b0b3fd5c4c3551c4174",
+      "source_after_sha256": "6eca20919e9706cb3f66002af42e72c870fed17e7c071b0b3fd5c4c3551c4174"
+    },
+    {
+      "path": "app/Models/SidangTaSchedule.php",
+      "source_before_sha256": "acac286575e98264623ab6c6c6e286fcbeffabefdbfbc2681558fdb6c3d34108",
+      "target_sha256": "c32b7c86c24ab6c84ea72341c2367d59b87354e2509a9b2709cac9bc93eac93a",
+      "source_after_sha256": "c32b7c86c24ab6c84ea72341c2367d59b87354e2509a9b2709cac9bc93eac93a"
+    },
+    {
+      "path": "app/Services/RoomBookingTransitionService.php",
+      "source_before_sha256": "5e4de64c95b373b0524b272bd6373e2060fc70cf874981ce052ad04260f2ca18",
+      "target_sha256": "a4f75362e42a2d8c2a51e4fd07804c699ae320f4056e6a0115a1b7b575cdc7bd",
+      "source_after_sha256": "a4f75362e42a2d8c2a51e4fd07804c699ae320f4056e6a0115a1b7b575cdc7bd"
+    },
+    {
+      "path": "app/Services/SidangTaBookingAdministration.php",
+      "source_before_sha256": "8ff780a941bf2602fbed8336b5e19e9d3b3aa489441f1f44c9c73896dd5bee98",
+      "target_sha256": "af53a1fe0e36db8a0f74da1f1fc4daf75d38cf7923d757418f6d48f96a2f04f2",
+      "source_after_sha256": "af53a1fe0e36db8a0f74da1f1fc4daf75d38cf7923d757418f6d48f96a2f04f2"
+    },
+    {
+      "path": "app/Services/SidangTaBookingLifecycle.php",
+      "source_before_sha256": "bebec976ee4a4393cf30fafd65cbcfae69f2b7cd23c83bdf2ea4afbcf5cb2532",
+      "target_sha256": "f89b66d8c3bf002e9631aa1d03793894fbf7cefb8286cb8103030673e597e1b3",
+      "source_after_sha256": "f89b66d8c3bf002e9631aa1d03793894fbf7cefb8286cb8103030673e597e1b3"
+    },
+    {
+      "path": "app/Services/SidangTaExecutionExport.php",
+      "source_before_sha256": null,
+      "target_sha256": "54fae16e67565a00c5247b962a1fd2c72ed5f3034ab77d790ca16bf80b9d2b0a",
+      "source_after_sha256": "54fae16e67565a00c5247b962a1fd2c72ed5f3034ab77d790ca16bf80b9d2b0a"
+    },
+    {
+      "path": "app/Services/SidangTaExecutionInfoService.php",
+      "source_before_sha256": null,
+      "target_sha256": "eda3a93b74d44da73e3f746cd8bba7f7661e6cdef945c7a906881a88a48d675d",
+      "source_after_sha256": "eda3a93b74d44da73e3f746cd8bba7f7661e6cdef945c7a906881a88a48d675d"
+    },
+    {
+      "path": "app/Services/SidangTaExecutionOutcomeService.php",
+      "source_before_sha256": null,
+      "target_sha256": "37d4a3e1b12d521bce5f11208105fc8c22b38e0b0fe8ab77f96b687e32f98e83",
+      "source_after_sha256": "37d4a3e1b12d521bce5f11208105fc8c22b38e0b0fe8ab77f96b687e32f98e83"
+    },
+    {
+      "path": "app/Services/SidangTaExecutionQuery.php",
+      "source_before_sha256": null,
+      "target_sha256": "b54354f4006ff8a2ccb8d8a1e7abcbe142cd1b0ef0b864a00652e4dbada9d50b",
+      "source_after_sha256": "b54354f4006ff8a2ccb8d8a1e7abcbe142cd1b0ef0b864a00652e4dbada9d50b"
+    },
+    {
+      "path": "app/Services/SidangTaExecutionWindowService.php",
+      "source_before_sha256": "6c390a7842c50903db05ddab393e5096667772b9572fbe8787606b02c261fe0b",
+      "target_sha256": "661479851310b56847f2aa5aff1c21644da8922691632f0e5776ad2d482b1370",
+      "source_after_sha256": "661479851310b56847f2aa5aff1c21644da8922691632f0e5776ad2d482b1370"
+    },
+    {
+      "path": "app/Services/SidangTaPlottingImportService.php",
+      "source_before_sha256": null,
+      "target_sha256": "ab30e442d826e1e67e988639c3c492e9086ad1848a93185e588f26094315bf86",
+      "source_after_sha256": "ab30e442d826e1e67e988639c3c492e9086ad1848a93185e588f26094315bf86"
+    },
+    {
+      "path": "app/Services/SidangTaStaffScheduling.php",
+      "source_before_sha256": null,
+      "target_sha256": "1d7a797f9a927518dad0c10d53dc1528fc0901bce4600a7d65e63dc4339a949b",
+      "source_after_sha256": "1d7a797f9a927518dad0c10d53dc1528fc0901bce4600a7d65e63dc4339a949b"
+    },
+    {
+      "path": "config/sidebar.php",
+      "source_before_sha256": "14b8849ba6e0364a3453a47cb059a04c5805f7aa92af6274c435978b5dd252bc",
+      "target_sha256": "027e796b4de822bcdc09bfb7f10090b4ae4e0ac317b85cec154eee96cbeae07f",
+      "source_after_sha256": "027e796b4de822bcdc09bfb7f10090b4ae4e0ac317b85cec154eee96cbeae07f"
+    },
+    {
+      "path": "database/migrations/2026_11_19_124000_extend_sidang_ta_execution_admin.php",
+      "source_before_sha256": null,
+      "target_sha256": "3e58907d5f1212f06887cde71f200c41f3dfe4d7c8aad5fa6f5b7557cc8bb436",
+      "source_after_sha256": "3e58907d5f1212f06887cde71f200c41f3dfe4d7c8aad5fa6f5b7557cc8bb436"
+    },
+    {
+      "path": "resources/views/sidang_ta_execution/admin/index.blade.php",
+      "source_before_sha256": null,
+      "target_sha256": "ee01ee39b792228cf75c4f183344c7937af0e26b9aa010188c73644216e515a8",
+      "source_after_sha256": "ee01ee39b792228cf75c4f183344c7937af0e26b9aa010188c73644216e515a8"
+    },
+    {
+      "path": "resources/views/sidang_ta_execution/admin/show.blade.php",
+      "source_before_sha256": null,
+      "target_sha256": "6a4a96b500c70740cf65d5b67310edab8c8a8aa190fc018c16e70c08bb83e8a1",
+      "source_after_sha256": "6a4a96b500c70740cf65d5b67310edab8c8a8aa190fc018c16e70c08bb83e8a1"
+    },
+    {
+      "path": "resources/views/sidang_ta_execution/partials/info.blade.php",
+      "source_before_sha256": null,
+      "target_sha256": "731ebc7f89ae776c2bb8cc4490b8a27a94c142898133f3647a6891d1f2b38748",
+      "source_after_sha256": "731ebc7f89ae776c2bb8cc4490b8a27a94c142898133f3647a6891d1f2b38748"
+    },
+    {
+      "path": "resources/views/sidang_ta_execution/partials/notices.blade.php",
+      "source_before_sha256": null,
+      "target_sha256": "fd1203eb16098e4f88b5c623ce13c98c4c9a6ea5936e26a7950a7f2ddc01ac96",
+      "source_after_sha256": "fd1203eb16098e4f88b5c623ce13c98c4c9a6ea5936e26a7950a7f2ddc01ac96"
+    },
+    {
+      "path": "resources/views/sidang_ta_execution/partials/result.blade.php",
+      "source_before_sha256": null,
+      "target_sha256": "09b1e2602cf59620e7905d76fe13f7bfd13f4cc35628041e6b7b535333e9b1ff",
+      "source_after_sha256": "09b1e2602cf59620e7905d76fe13f7bfd13f4cc35628041e6b7b535333e9b1ff"
+    },
+    {
+      "path": "resources/views/sidang_ta_execution/student/index.blade.php",
+      "source_before_sha256": null,
+      "target_sha256": "0641bbd121f8c4bb8e1223949987eb3b60356594fa989fe28fb0624fdeb99714",
+      "source_after_sha256": "0641bbd121f8c4bb8e1223949987eb3b60356594fa989fe28fb0624fdeb99714"
+    },
+    {
+      "path": "resources/views/sidang_ta_execution/student/show.blade.php",
+      "source_before_sha256": null,
+      "target_sha256": "df26af74578c0b2187ac393f53b66d0e331311eb5794fc92d62573eaa93c55db",
+      "source_after_sha256": "df26af74578c0b2187ac393f53b66d0e331311eb5794fc92d62573eaa93c55db"
+    },
+    {
+      "path": "resources/views/sidang_ta_registrations/admin/execution-settings.blade.php",
+      "source_before_sha256": "2dc5c6ee3f88f5fb953371e19533a4f84233511568444606ab84b5158d2375a8",
+      "target_sha256": "4924c1ac51f481ebf32f90e7621c6c370685db24b5af8e5160bff4f16bbeabeb",
+      "source_after_sha256": "4924c1ac51f481ebf32f90e7621c6c370685db24b5af8e5160bff4f16bbeabeb"
+    },
+    {
+      "path": "resources/views/sidang_ta_registrations/admin/index.blade.php",
+      "source_before_sha256": "b841389672eb43f6b333212fecc25d8fca890ce0d5dcd4aa48e8d855f59e0dde",
+      "target_sha256": "3a6e2db3ce105e610bfa262ac99dcaeede48ad25786fb0b0efef646d256a4498",
+      "source_after_sha256": "3a6e2db3ce105e610bfa262ac99dcaeede48ad25786fb0b0efef646d256a4498"
+    },
+    {
+      "path": "resources/views/sidang_ta_registrations/admin/show.blade.php",
+      "source_before_sha256": "4369b2eaa08e8fe0b0bc9b9629286b73e2cef79df823ee828f3a797486a6e0d6",
+      "target_sha256": "976ca34b0bd7b81634d55afb835eaf8abec2926b26e15b9795e71e41de9aae58",
+      "source_after_sha256": "976ca34b0bd7b81634d55afb835eaf8abec2926b26e15b9795e71e41de9aae58"
+    },
+    {
+      "path": "resources/views/sidang_ta_registrations/index.blade.php",
+      "source_before_sha256": "e07e536facaa2f067599b00fb4d8be105194bb9afda63597e6047050cc2ac139",
+      "target_sha256": "b5c2f2a8b626d73a986e5604dfcace97eaad16135369433760e759d764d1158a",
+      "source_after_sha256": "b5c2f2a8b626d73a986e5604dfcace97eaad16135369433760e759d764d1158a"
+    },
+    {
+      "path": "routes/web.php",
+      "source_before_sha256": "6589f0d43eff1d81aea50432b2eb1b8ee9e9db4ae1d990a328bfb8e357c7f635",
+      "target_sha256": "e5dad05b97d9502478327355a01d332861984abbfde18b0bd2aa7b3cf10ba002",
+      "source_after_sha256": "e5dad05b97d9502478327355a01d332861984abbfde18b0bd2aa7b3cf10ba002"
+    },
+    {
+      "path": "tests/Feature/SidangTaBookingUiTest.php",
+      "source_before_sha256": "a393d77c852345d6baff408beaa2841e00a46d0d0d11b819d324d59dd68f02f8",
+      "target_sha256": "863d11b453006ba891f41062edb31ddb315384b91ca00e242bd08a47dfd21941",
+      "source_after_sha256": "863d11b453006ba891f41062edb31ddb315384b91ca00e242bd08a47dfd21941"
+    },
+    {
+      "path": "tests/Feature/SidangTaExecutionAccessTest.php",
+      "source_before_sha256": null,
+      "target_sha256": "fa337893be2b825c5772b8c17c60b155e01796b4e5170a558525b536a5087739",
+      "source_after_sha256": "fa337893be2b825c5772b8c17c60b155e01796b4e5170a558525b536a5087739"
+    },
+    {
+      "path": "tests/Feature/SidangTaExecutionDomainTest.php",
+      "source_before_sha256": null,
+      "target_sha256": "581ca7b949c3548f1d40ec91027ad477dc0ad6fc5b667e1ee6343b8ca8ef07a0",
+      "source_after_sha256": "581ca7b949c3548f1d40ec91027ad477dc0ad6fc5b667e1ee6343b8ca8ef07a0"
+    },
+    {
+      "path": "tests/Feature/SidangTaExecutionPagesTest.php",
+      "source_before_sha256": null,
+      "target_sha256": "b5113b462b12e76bdcae03d2e027f48d0b15a261b7373e7d9f0a73f933e76da0",
+      "source_after_sha256": "b5113b462b12e76bdcae03d2e027f48d0b15a261b7373e7d9f0a73f933e76da0"
+    },
+    {
+      "path": "tests/Feature/SidangTaRoomBookingTest.php",
+      "source_before_sha256": "1629fc31c0ce776502db83a3140b9e368b0027641180c4db9cffeeffd96ecd7c",
+      "target_sha256": "1ef7d116bb6f5996289e129676f44fdf80009ca7a0761c92f3726977d519b48d",
+      "source_after_sha256": "1ef7d116bb6f5996289e129676f44fdf80009ca7a0761c92f3726977d519b48d"
+    },
+    {
+      "path": "tests/Feature/SidangTaRoomMysqlUpgradeTest.php",
+      "source_before_sha256": "3e3d8ceb179522e32ce05ea5cc3503a08a9c23323bf4a692a274bd7e1d1b98cd",
+      "target_sha256": "62b42b92b3fb95df19ae7277b3aecb2e7e9fa300e5f59973dbb11c34d3e41363",
+      "source_after_sha256": "62b42b92b3fb95df19ae7277b3aecb2e7e9fa300e5f59973dbb11c34d3e41363"
+    },
+    {
+      "path": "tests/Feature/SidangTaStaffSchedulingTest.php",
+      "source_before_sha256": null,
+      "target_sha256": "4220718a04770800ecea6c170d9a2c37ad2ab37003693939b8554fe14efcdf61",
+      "source_after_sha256": "4220718a04770800ecea6c170d9a2c37ad2ab37003693939b8554fe14efcdf61"
+    },
+    {
+      "path": "tests/Feature/SidangTaStudentBookingVisibilityTest.php",
+      "source_before_sha256": "97fb6c3a621b81870ad7f00f16bd39412a89149efc36f2cf4baaf16bafa94f27",
+      "target_sha256": "e88f9669e59d23209ad84587e927f9427fb6bc249f51f386fd733f9e3acf0199",
+      "source_after_sha256": "e88f9669e59d23209ad84587e927f9427fb6bc249f51f386fd733f9e3acf0199"
+    },
+    {
+      "path": "tests/Support/TaRoomScenario.php",
+      "source_before_sha256": "6196e18cbc26b24e74ba79fe2e0017c8a483e1dc34548edfa5cc9a5eaaa5eaf8",
+      "target_sha256": "d8b4b169d61fcdae0f3e23034c043f6d2c15d4beb2b45f4daa9ea6f347ca549e",
+      "source_after_sha256": "d8b4b169d61fcdae0f3e23034c043f6d2c15d4beb2b45f4daa9ea6f347ca549e"
+    }
+  ],
+  "checks": {
+    "php_syntax_files_each_repository": 29,
+    "php_syntax": "passed",
+    "git_diff_check_both": "passed",
+    "frontend_build": "passed",
+    "final_product_change_after_full_suite": "UI labels only, rechecked by 16 passing UI/access tests"
+  }
+}

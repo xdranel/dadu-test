@@ -92,5 +92,8 @@ it('review111_latest_approval_is_the_only_new_student_booking_context', function
     $new->save();
     expect(fn () => preview111($s))->toThrow(ValidationException::class);
     expect(fn () => app(SidangTaBookingService::class)->confirm($s['owner'], $s['registration'], $preview['preview_token']))->toThrow(HttpException::class);
-    $this->actingAs($s['owner'])->get(route('sidang-ta-registrations.index'))->assertOk()->assertDontSee(route('sidang-ta-bookings.index', $s['registration']))->assertSee(route('sidang-ta-bookings.index', $new));
+    $this->actingAs($s['owner'])->get(route('sidang-ta-registrations.index'))->assertOk()
+        ->assertDontSee(route('sidang-ta-bookings.index', $s['registration']))
+        ->assertDontSee(route('sidang-ta-bookings.index', $new));
+    $this->get(route('sidang-ta-execution.index'))->assertOk()->assertDontSee('Cari jadwal');
 });

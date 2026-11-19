@@ -1,6 +1,5 @@
 <x-app-layout>
     <x-slot name="header">Peninjauan Pendaftaran Sidang TA</x-slot>
-    @if(auth()->user()->can('sidang_ta_registration_review') && $registration->status==='approved')<div class="mb-4"><a data-manage-ta-booking href="{{ route('admin.sidang-ta-bookings.show',$registration) }}" class="btn btn-secondary">Kelola jadwal pelaksanaan</a></div>@endif
 
     @php
         $statusLabels = \App\Services\SidangTaReviewQuery::STATUSES;
