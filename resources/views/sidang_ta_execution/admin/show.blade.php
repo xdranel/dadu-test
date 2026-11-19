@@ -2,13 +2,33 @@
 <div class="space-y-5">
 @include('sidang_ta_execution.partials.notices')
 @include('sidang_ta_execution.partials.info')
-@php($context=$registration->roomSchedule)
+@php
+    $context = $registration->roomSchedule;
+    $executionWindow = $registration->period?->executionSetting;
+    $minimumDate = max($executionWindow?->start_date?->format('Y-m-d') ?? '', today('Asia/Jakarta')->format('Y-m-d'));
+    $maximumDate = $executionWindow?->end_date?->format('Y-m-d');
+    $canChooseDate = $executionWindow?->is_active && $maximumDate >= $minimumDate;
+@endphp
 @can('sidang_ta_registration_review')
 @if($registration->status==='approved')
 @if(($context?->result_status??'pending')==='pending')
 <section class="campus-card space-y-4 p-5"><h2 class="font-bold">{{ $context?->was_confirmed ? 'Cari jadwal pengganti' : 'Tetapkan jadwal sidang' }}</h2><p class="text-sm text-slate-500">Cari ruang kelas dan waktu yang tersedia selama 90 menit pada tanggal pelaksanaan. Semua jam menggunakan WIB.</p>
 <p class="text-xs text-slate-500">Ketersediaan ruangan belum memastikan kehadiran pembimbing dan penguji.</p>
-<form method="POST" action="{{ route('admin.sidang-ta-execution.preview',$registration) }}" class="flex flex-wrap items-end gap-3">@csrf<label class="campus-label">Tanggal<input required type="date" name="date" class="campus-input mt-1" value="{{ old('date',request('date',$context?->preferred_date?->format('Y-m-d'))) }}"></label><button class="btn btn-primary">Cari ketersediaan</button></form>
+
+<form method="POST" action="{{ route('admin.sidang-ta-execution.preview',$registration) }}" class="flex flex-wrap items-end gap-3">
+@csrf
+<label class="campus-label">Tanggal
+<input required type="date" name="date" min="{{ $minimumDate }}" max="{{ $maximumDate }}" @disabled(!$canChooseDate) aria-describedby="execution-date-help" class="campus-input mt-1" value="{{ old('date',request('date',$context?->preferred_date?->format('Y-m-d'))) }}">
+</label>
+<button class="btn btn-primary disabled:cursor-not-allowed disabled:opacity-50" @disabled(!$canChooseDate)>Cari ketersediaan</button>
+</form>
+<p id="execution-date-help" class="text-xs text-slate-500">
+@if($canChooseDate)
+Pilih tanggal {{ \Carbon\Carbon::parse($minimumDate)->format('d/m/Y') }}–{{ $executionWindow->end_date->format('d/m/Y') }} sesuai hari pelaksanaan yang diaktifkan.
+@else
+Pencarian belum tersedia. Atur atau aktifkan rentang Pelaksanaan Sidang TA terlebih dahulu.
+@endif
+</p>
 @if($preview!==null)
 @if(count($preview['options']))
 <form method="POST" action="{{ route('admin.sidang-ta-execution.confirm',$registration) }}" class="space-y-3">@csrf<label class="campus-label">Pilihan ruang dan waktu<select required name="preview_token" class="campus-select mt-1">@foreach($preview['options'] as $option)@php($candidate=$option['candidate'])<option value="{{ $option['token'] }}" @selected($option['recommended'])>{{ $option['recommended']?'Rekomendasi · ':'' }}{{ $candidate['room_code'] }} · {{ $candidate['room_name'] }} · {{ $candidate['date'] }} · {{ substr($candidate['start_time'],0,5) }}–{{ substr($candidate['end_time'],0,5) }} WIB</option>@endforeach</select></label><p class="text-xs text-slate-500">Periksa ruang dan jam sebelum menetapkan. Ketersediaan diperiksa kembali saat disimpan.@if($context?->was_confirmed) Jadwal ini akan menggantikan jadwal sebelumnya; riwayat tetap tersimpan.@endif</p><button class="btn btn-primary">Tetapkan Jadwal</button></form>

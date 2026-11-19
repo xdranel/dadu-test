@@ -66,6 +66,18 @@ test('manual plotting import requires a file while system scheduling does not', 
         ->assertSee('Cari ketersediaan')->assertDontSee('Impor terlebih dahulu');
 });
 
+test('staff date picker is bounded by execution dates and excludes past days', function () {
+    $s = $this->s;
+    $this->actingAs($s['reviewer'])->get(route('admin.sidang-ta-execution.show', $s['registration']))
+        ->assertOk()->assertSee('min="2026-11-23"', false)->assertSee('max="2026-11-27"', false);
+    $this->travelTo(Carbon::parse('2026-11-24 09:00:00', 'Asia/Jakarta'));
+    $this->get(route('admin.sidang-ta-execution.show', $s['registration']))
+        ->assertOk()->assertSee('min="2026-11-24"', false)->assertSee('max="2026-11-27"', false);
+    $this->post(route('admin.sidang-ta-execution.preview', $s['registration']), ['date' => '2026-11-28'])
+        ->assertSessionHasErrors('date');
+    expect(RoomBookingRequest::count())->toBe(0);
+});
+
 test('active info ends after actual occurrence while historical detail keeps its snapshot', function () {
     $s = $this->s;
     $booking = RoomBookingRequest::create(['user_id' => $s['reviewer']->id,

@@ -1,0 +1,1220 @@
+# Bukti verifikasi historis
+
+Laporan mesin, daftar salin dan patch lama telah dikeluarkan dari docs. Ringkasan bukti berikut mempertahankan konteks; arsip lengkap tersedia melalui histori Git dan backup privat sesi126. Tidak dipakai sebagai manifest salin atau acuan deployment terbaru.
+
+
+<a id="101-yudisium-files-txt"></a>
+
+## 101-yudisium-files.txt
+
+Catatan historis 57 baris; file mentah tidak lagi menjadi input perintah.
+- `app/Console/Commands/CleanupExpiredGraduationDrafts.php`
+- `app/Http/Controllers/Admin/GraduationFormGuideController.php`
+- `app/Http/Controllers/Admin/GraduationPeriodController.php`
+- `app/Http/Controllers/Admin/GraduationReviewController.php`
+- `app/Http/Controllers/GraduationDraftController.php`
+- `app/Http/Controllers/GraduationRegistrationController.php`
+- `app/Http/Controllers/GraduationRegistrationDocumentController.php`
+- `app/Http/Requests/SaveGraduationFormGuideRequest.php`
+- `app/Models/GraduationFormGuide.php`
+- `app/Models/GraduationPeriod.php`
+- `app/Models/GraduationRegistration.php`
+- `app/Models/GraduationRegistrationDocument.php`
+- `app/Models/GraduationRegistrationDraft.php`
+- `app/Models/GraduationRegistrationDraftDocument.php`
+- `app/Models/GraduationRegistrationLog.php`
+- `app/Services/GraduationAdmissionFacts.php`
+- `app/Services/GraduationApplicationDeletion.php`
+- `app/Services/GraduationDataSyncService.php`
+- `app/Services/GraduationDraftCleanupService.php`
+- `app/Services/GraduationDraftService.php`
+- `app/Services/GraduationFormGuideService.php`
+- `app/Services/GraduationReviewExport.php`
+- `app/Services/GraduationReviewQuery.php`
+- `app/Services/GraduationReviewService.php`
+- `app/Services/GraduationRevisionExpiryService.php`
+- `app/Support/GraduationFormGuideSlots.php`
+- `app/Support/GraduationRequirements.php`
+- `database/migrations/2026_11_11_000001_add_graduation_revision_schedule.php`
+- `database/migrations/2026_11_11_000002_create_graduation_form_guides.php`
+- `database/migrations/2026_11_11_000003_add_graduation_draft_workflow.php`
+- `resources/js/app.js`
+- `resources/js/graduation-wizard.js`
+- `resources/views/admin/graduation_registrations/modern-index.blade.php`
+- `resources/views/admin/graduation_registrations/modern-show.blade.php`
+- `resources/views/graduation_form_guides/index.blade.php`
+- `resources/views/graduation_periods/index.blade.php`
+- `resources/views/graduation_registrations/modern-index.blade.php`
+- `resources/views/graduation_registrations/modern-receipt.blade.php`
+- `resources/views/graduation_registrations/modern-review.blade.php`
+- `resources/views/graduation_registrations/modern-revision.blade.php`
+- `resources/views/graduation_registrations/modern-start.blade.php`
+- `resources/views/graduation_registrations/modern-wizard.blade.php`
+- `resources/views/graduation_registrations/partials/form-guides.blade.php`
+- `resources/views/graduation_registrations/partials/modern-academic.blade.php`
+- `resources/views/graduation_registrations/partials/modern-errors.blade.php`
+- `resources/views/graduation_registrations/partials/modern-schedule.blade.php`
+- `tests/Feature/GraduationAdmissionFactsTest.php`
+- `tests/Feature/GraduationDraftCleanupTest.php`
+- `tests/Feature/GraduationDraftFlowTest.php`
+- `tests/Feature/GraduationFormGuideTest.php`
+- `tests/Feature/GraduationModernExportTest.php`
+- `tests/Feature/GraduationModernReviewTest.php`
+- `tests/Feature/GraduationPeriodScheduleTest.php`
+- `tests/Feature/GraduationRegistrationTest.php`
+- `tests/Feature/GraduationRevisionExpiryTest.php`
+- `tests/Js/graduation-wizard.test.mjs`
+- `tests/Js/sidang-ta-entry.test.mjs`
+
+<a id="101-yudisium-shared-patch"></a>
+
+## 101-yudisium-shared.patch
+
+Patch sekali pakai sudah menjadi artefak historis; jangan diterapkan ulang pada aplikasi berjalan.
+- `config/permission_modules.php`
+- `config/sidebar.php`
+- `routes/console.php`
+- `routes/web.php`
+
+<a id="108-hasil-perbandingan-tes-sqlite-txt"></a>
+
+## 108-hasil-perbandingan-tes-sqlite.txt
+
+Catatan historis 91 baris; file mentah tidak lagi menjadi input perintah.
+Perbandingan hasil tes lama dirujuk oleh arsip progres108; gunakan bukti terbaru pada kesimpulan125/126 untuk status saat ini.
+
+<a id="112-daftar-file-salin-sidang-ta-room-txt"></a>
+
+## 112-daftar-file-salin-sidang-ta-room.txt
+
+Catatan historis 92 baris; file mentah tidak lagi menjadi input perintah.
+Perbandingan hasil tes lama dirujuk oleh arsip progres108; gunakan bukti terbaru pada kesimpulan125/126 untuk status saat ini.
+
+<a id="112-manifest-file-salin-json"></a>
+
+## 112-manifest-file-salin.json
+
+- `feature`: Sidang TA room scheduling111/112
+- `base_docker`: 57d06d7aa87fbb87b1dbb05a0a488ef2c2321dc8
+- `base_source`: 1c83b32d5f7fd9547666ecf300e0cba6f113e208
+- `note`: Self hash intentionally excluded. Source-specific variants preserve unrelated source changes.
+- `files`: 90 entri.
+  - `app/Http/Controllers/AcademicPeriodController.php`
+  - `app/Http/Controllers/Admin/SidangTaBookingController.php`
+  - `app/Http/Controllers/Admin/SidangTaExecutionController.php`
+  - `app/Http/Controllers/LecturerController.php`
+  - `app/Http/Controllers/RoomBookingController.php`
+  - `app/Http/Controllers/RoomController.php`
+  - `app/Http/Controllers/SidangTaBookingController.php`
+  - `app/Http/Controllers/SidangTaRegistrationController.php`
+  - `app/Http/Controllers/SyncController.php`
+  - `app/Http/Requests/ConfirmSidangTaBookingRequest.php`
+  - `app/Http/Requests/SaveSidangTaExecutionRequest.php`
+  - `app/Http/Requests/StoreRoomRequest.php`
+  - `app/Http/Requests/UpdateRoomRequest.php`
+  - `app/Models/AcademicPeriod.php`
+  - `app/Models/Room.php`
+  - `app/Models/RoomBookingHistory.php`
+  - `app/Models/RoomBookingOccurrence.php`
+  - `app/Models/RoomBookingRequest.php`
+  - `app/Models/RoomScheduleSource.php`
+  - `app/Models/RoomWeeklyPattern.php`
+  - `app/Models/SidangTaExecutionSetting.php`
+  - `app/Models/SidangTaPeriod.php`
+  - `app/Models/SidangTaRegistration.php`
+  - `app/Models/SidangTaSchedule.php`
+  - `app/Services/RoomAliasService.php`
+  - `app/Services/RoomAvailabilityService.php`
+  - `app/Services/RoomBookingTransitionService.php`
+  - `app/Services/RoomScheduleImportService.php`
+  - `app/Services/SidangTaBookingAccess.php`
+  - `app/Services/SidangTaBookingAdministration.php`
+  - `app/Services/SidangTaBookingIdentity.php`
+  - `app/Services/SidangTaBookingLifecycle.php`
+  - `app/Services/SidangTaBookingLock.php`
+  - `app/Services/SidangTaBookingService.php`
+  - `app/Services/SidangTaExecutionWindowService.php`
+  - `app/Services/SidangTaHistoryPresenter.php`
+  - `app/Services/SidangTaRegistrationReview.php`
+  - `app/Support/RoomTimeWindows.php`
+  - `app/Support/WeeklyRoomScheduleNormalizer.php`
+  - `config/permission_modules.php`
+  - `config/sidebar.php`
+  - `database/migrations/2026_11_11_000001_create_room_booking_tables.php`
+  - `database/migrations/2026_11_14_064319_add_lecturer_code_to_room_schedules_table.php`
+  - `database/migrations/2026_11_15_110001_create_room_weekly_patterns.php`
+  - `database/migrations/2026_11_15_110002_create_sidang_ta_scheduling_tables.php`
+  - `database/migrations/2026_11_15_110003_extend_room_booking_for_sidang_ta.php`
+  - `database/migrations/2026_11_15_110004_create_room_schedule_aliases.php`
+  - `docker/scripts/copy-ta-room-feature.sh`
+  - `docs/109-rescan-dan-catatan-awal-jadwal-pelaksanaan-sidang-ta.md`
+  - `docs/110-rancangan-integrasi-jadwal-sidang-ta-dan-peminjaman-ruangan.md`
+  - `docs/111-rencana-implementasi-jadwal-sidang-ta-dan-peminjaman-ruangan.md`
+  - `docs/112-daftar-file-salin-sidang-ta-room.txt`
+  - `docs/112-hasil-implementasi-jadwal-sidang-ta-dan-peminjaman-ruangan.md`
+  - `docs/112-kegagalan-suite-baseline.md`
+  - `docs/fixtures/sidang-ta/111-room-schedule-patterns-demo.json`
+  - `resources/views/room-bookings/create.blade.php`
+  - `resources/views/room-bookings/dashboard.blade.php`
+  - `resources/views/room-bookings/index.blade.php`
+  - `resources/views/room-bookings/review.blade.php`
+  - `resources/views/rooms/create.blade.php`
+  - `resources/views/rooms/edit.blade.php`
+  - `resources/views/rooms/index.blade.php`
+  - `resources/views/sidang_ta_registrations/admin/booking.blade.php`
+  - `resources/views/sidang_ta_registrations/admin/execution-settings.blade.php`
+  - `resources/views/sidang_ta_registrations/admin/index.blade.php`
+  - `resources/views/sidang_ta_registrations/admin/partials/approval-cancellation.blade.php`
+  - `resources/views/sidang_ta_registrations/admin/show.blade.php`
+  - `resources/views/sidang_ta_registrations/booking/index.blade.php`
+  - `resources/views/sidang_ta_registrations/index.blade.php`
+  - `resources/views/sidang_ta_registrations/partials/booking-card.blade.php`
+  - `resources/views/sidang_ta_registrations/partials/booking-identity.blade.php`
+  - `resources/views/sync/index.blade.php`
+  - `routes/web.php`
+  - `tests/Feature/LecturerBookingIdentityImportTest.php`
+  - `tests/Feature/RoomAvailabilityServiceTest.php`
+  - `tests/Feature/RoomBookingSharedAvailabilityTest.php`
+  - `tests/Feature/SidangTaBookingConcurrencyTest.php`
+  - `tests/Feature/SidangTaBookingLifecycleTest.php`
+  - `tests/Feature/SidangTaBookingUiTest.php`
+  - `tests/Feature/SidangTaExecutionSettingsTest.php`
+  - `tests/Feature/SidangTaLecturerBookingLinkTest.php`
+  - `tests/Feature/SidangTaRoomBookingTest.php`
+  - `tests/Feature/SidangTaRoomMysqlUpgradeTest.php`
+  - `tests/Feature/SidangTaRoomSchemaCompatibilityTest.php`
+  - `tests/Feature/WeeklyRoomScheduleImportTest.php`
+  - `tests/Support/TaRoomCommittedTestCase.php`
+  - `tests/Support/TaRoomConcurrencyHarness.php`
+  - `tests/Support/TaRoomScenario.php`
+  - `tests/Unit/RoomTimeWindowsTest.php`
+  - `tests/Unit/WeeklyRoomScheduleNormalizerTest.php`
+
+<a id="112-rescan-dan-salin-json"></a>
+
+## 112-rescan-dan-salin.json
+
+- `timestamp_utc`: 2026-11-15T21:46:49.293210+00:00
+- `copied_paths`: 91
+- `verified_hash_records`: 90
+- `source_backup`: /tmp/dadu112-source-before-kzp0n2qp
+- `docker_copy_output`: Copied and verified 91 files. Backup: /tmp/dadu112-copy.hCiJADwN
+- `docker_backup`: /tmp/dadu112-copy.hCiJADwN
+- `protected_files_unchanged`: 9 entri.
+- `stash_unchanged`: True
+- `head_source`: 1c83b32d5f7fd9547666ecf300e0cba6f113e208
+- `head_docker`: 57d06d7aa87fbb87b1dbb05a0a488ef2c2321dc8
+- `baseline_files_outside_allowlist_unchanged.dadu-test`: 596
+- `baseline_files_outside_allowlist_unchanged.dadu`: 602
+- `source_specific_variants`: 3 entri.
+  - `config/permission_modules.php`
+  - `config/sidebar.php`
+  - `routes/web.php`
+- `git_diff_check./home/xdranel/Code/Project/php-laravel/dadu`: True
+- `git_diff_check./home/xdranel/.codex/worktrees/09ea/dadu-test`: True
+- `test_comparison.total_cases`: 1131
+- `test_comparison.failures`: 49
+- `test_comparison.baseline_same`: True
+- `test_comparison.extra_failures`: 0
+- `test_comparison.feature_cases`: 93
+- `test_comparison.feature_skipped`: 2
+- `test_comparison.feature_assertions`: 336
+- `deployed`: False
+- `application_database_migrated`: False
+- `source_integration_verification.passed`: 58
+- `source_integration_verification.baseline_failed`: 1
+- `source_integration_verification.assertions`: 230
+- `source_integration_verification.baseline_case`: fresh seed gives Pelaksana scoped viewing without TA review or period management
+- `source_integration_verification.source_baseline_reproduced`: True
+- `source_integration_verification.source_baseline_commit`: 1c83b32d5f7fd9547666ecf300e0cba6f113e208
+- `final_verification_utc`: 2026-11-15T21:51:49.923124+00:00
+
+<a id="113-verifikasi-http-vps-json"></a>
+
+## 113-verifikasi-http-vps.json
+
+- `checked_at_utc`: 2026-11-16T14:14:14.668550+00:00
+- `cloudflare_proxied_verified`: True
+- `edge_addresses`: 2 entri.
+- `url`: https://dadu-test.gendhiramona.site
+- `tls_verified`: True
+- `revision`: 57d06d7
+- `accounts`: 3 entri.
+- `assets_http200`: True
+- `guest_reset404`: True
+- `http_redirect_https`: True
+
+<a id="115-verifikasi-akun-dosen-json"></a>
+
+## 115-verifikasi-akun-dosen.json
+
+- `checked_at_utc`: 2026-11-16T16:39:24.303169+00:00
+- `email`: dosen.ta@dosen.test
+- `role`: Pelaksana
+- `program`: Informatika
+- `tls_verified`: True
+- `login_http200`: True
+- `review_list_http200`: True
+- `program_dropdown_hidden`: True
+- `export_button_hidden`: True
+- `detail_pages_http200`: 1
+- `document_preview_http200`: True
+- `review_controls_hidden`: True
+- `review_post_http403`: True
+- `period_and_export_http403`: True
+- `users_before_creation`: 14
+- `users_after_creation`: 15
+- `student_count`: 12
+- `account_created_only_on_vps`: True
+- `role_global_unchanged`: True
+- `special_action_inherited_from_role`: True
+- `direct_permissions`: 1 entri.
+- `creation_rerun_created_duplicate`: False
+- `registration_documents_and_history_unchanged`: True
+- `json_files`: 6
+- `student_import_rows`: 12
+- `krs_items`: 95
+
+<a id="116-rescan-export-pembimbing-json"></a>
+
+## 116-rescan-export-pembimbing.json
+
+- `files`: 3 entri.
+  - `app/Services/SidangTaReviewExport.php`
+  - `tests/Feature/SidangTaAdvisorExportTest.php`
+  - `tests/Feature/SidangTaReviewExportTest.php`
+- `columns_before`: 43
+- `columns_after`: 46
+- `added_columns`: 3 entri.
+- `kk_source`: lecturers.academic_interest (Bidang Keilmuan), confirmed by user
+- `export_tests_passed`: 25
+- `selected_regression_passed`: 48
+- `selected_regression_assertions`: 312
+- `known_source_baseline_failure`: fresh seed gives Pelaksana scoped viewing without TA review or period management
+- `source_docs_and_docker_absent`: True
+- `deployed_to_vps`: False
+
+<a id="117-rescan-penutupan-booking-mahasiswa-json"></a>
+
+## 117-rescan-penutupan-booking-mahasiswa.json
+
+- `student_booking_enabled_default`: False
+- `student_card_hidden`: True
+- `student_routes_http404`: True
+- `existing_booking_preserved`: True
+- `staff_access_retained`: True
+- `tests_passed`: 54
+- `assertions`: 323
+- `files`: 7 entri.
+  - `app/Http/Controllers/SidangTaBookingController.php`
+  - `app/Http/Controllers/SidangTaRegistrationController.php`
+  - `resources/views/sidang_ta_registrations/index.blade.php`
+  - `tests/Feature/SidangTaBookingUiTest.php`
+  - `tests/Feature/SidangTaRoomBookingTest.php`
+  - `config/sidang_ta.php`
+  - `tests/Feature/SidangTaStudentBookingVisibilityTest.php`
+- `export116_preserved`: True
+- `source_docs_and_docker_absent`: True
+- `deployed_to_vps`: False
+
+<a id="118-daftar-file-salin-txt"></a>
+
+## 118-daftar-file-salin.txt
+
+Catatan historis 148 baris; file mentah tidak lagi menjadi input perintah.
+- `app/Console/Commands/BackfillAccessGroupCommand.php`
+- `app/Console/Commands/BackfillNimCommand.php`
+- `app/Console/Commands/ImportNimReviewCommand.php`
+- `app/Console/Commands/MigrateStorageCommand.php`
+- `app/Console/Commands/PruneDocumentImportBatchesCommand.php`
+- `app/Enums/AccessGroup.php`
+- `app/Http/Controllers/Admin/QueueController.php`
+- `app/Http/Controllers/Admin/QueueHistoryController.php`
+- `app/Http/Controllers/DashboardController.php`
+- `app/Http/Controllers/DocumentCategoryController.php`
+- `app/Http/Controllers/DocumentController.php`
+- `app/Http/Controllers/DocumentImportController.php`
+- `app/Http/Controllers/ExamScheduleController.php`
+- `app/Http/Controllers/LecturerController.php`
+- `app/Http/Controllers/PublicDocumentController.php`
+- `app/Http/Controllers/RoleController.php`
+- `app/Http/Controllers/StudentCourseController.php`
+- `app/Http/Controllers/UserRoleController.php`
+- `app/Http/Middleware/CacheUserPermissions.php`
+- `app/Http/Middleware/CekVisibilitasDokumen.php`
+- `app/Http/Middleware/EnsurePublicDocumentAccess.php`
+- `app/Http/Requests/Auth/LoginRequest.php`
+- `app/Http/Requests/MoveDocumentCategoryRequest.php`
+- `app/Http/Requests/StoreDocumentCategoryRequest.php`
+- `app/Http/Requests/StoreDocumentRequest.php`
+- `app/Http/Requests/StoreLecturerRequest.php`
+- `app/Http/Requests/UpdateDocumentCategoryRequest.php`
+- `app/Http/Requests/UpdateDocumentRequest.php`
+- `app/Http/Requests/UpdateLecturerRequest.php`
+- `app/Http/Requests/UpdateStudentRequest.php`
+- `app/Jobs/ProcessDocumentImportBatch.php`
+- `app/Models/Concerns/HasVisibility.php`
+- `app/Models/Document.php`
+- `app/Models/DocumentCategory.php`
+- `app/Models/DocumentImportBatch.php`
+- `app/Models/DocumentImportRow.php`
+- `app/Models/DocumentNim.php`
+- `app/Models/Lecturer.php`
+- `app/Models/QueueTicket.php`
+- `app/Models/QueueTicketHistory.php`
+- `app/Models/User.php`
+- `app/Policies/DocumentCategoryPolicy.php`
+- `app/Policies/DocumentPolicy.php`
+- `app/Services/DocumentImportParser.php`
+- `app/Services/DocumentImportTemplateService.php`
+- `app/Services/DocumentImportValidator.php`
+- `app/Services/DocumentImportZipExtractor.php`
+- `app/Services/QueueCounterService.php`
+- `app/Services/SidangTaReviewExport.php`
+- `bootstrap/app.php`
+- `config/documents.php`
+- `config/filesystems.php`
+- `config/permission_modules.php`
+- `config/roles.php`
+- `config/sidang_ta.php`
+- `config/sidebar.php`
+- `database/factories/DocumentCategoryFactory.php`
+- `database/factories/DocumentFactory.php`
+- `database/migrations/2026_11_02_000001_add_index_to_document_categories_parent_id.php`
+- `database/migrations/2026_11_04_100000_add_private_visibility_to_documents_and_categories.php`
+- `database/migrations/2026_11_09_000001_add_staff_notes_to_queue_ticket_tables.php`
+- `database/migrations/2026_11_10_000001_add_staff_notes_seq_and_updated_at_to_queue_tables.php`
+- `database/migrations/2026_11_10_000001_migrate_sso_pegawai_petugas_to_pelaksana.php`
+- `database/migrations/2026_11_11_000001_add_access_group_to_documents_and_categories.php`
+- `database/migrations/2026_11_11_000002_make_document_category_id_nullable_on_documents_table.php`
+- `database/migrations/2026_11_11_000003_relax_visibility_check_for_sqlite_testing.php`
+- `database/migrations/2026_11_12_000001_add_storage_disk_and_checksum_to_documents_table.php`
+- `database/migrations/2026_11_13_000001_create_document_nim_table.php`
+- `database/migrations/2026_11_15_000001_add_document_type_to_documents_table.php`
+- `database/migrations/2026_11_15_000002_create_document_import_tables.php`
+- `database/migrations/2026_11_16_000001_add_phone_coe_kk_to_lecturers_table.php`
+- `database/seeders/RolePermissionSeeder.php`
+- `database/seeders/RoleSeeder.php`
+- `database/seeders/UserSeeder.php`
+- `public/assets/images/document/foldercard.svg`
+- `public/assets/images/document/privateVisibility.svg`
+- `public/assets/images/document/publicVisibility.svg`
+- `public/assets/images/document/stafVisibility.svg`
+- `resources/css/app.css`
+- `resources/views/auth/login.blade.php`
+- `resources/views/components/file-icon.blade.php`
+- `resources/views/components/folder-card.blade.php`
+- `resources/views/components/item-menu.blade.php`
+- `resources/views/components/sidebar-admin.blade.php`
+- `resources/views/components/sidebar-flat-menu.blade.php`
+- `resources/views/components/sidebar.blade.php`
+- `resources/views/dashboard.blade.php`
+- `resources/views/document_categories/index.blade.php`
+- `resources/views/document_categories/show.blade.php`
+- `resources/views/documents/create.blade.php`
+- `resources/views/documents/edit.blade.php`
+- `resources/views/documents/folder.blade.php`
+- `resources/views/documents/import/create.blade.php`
+- `resources/views/documents/import/preview.blade.php`
+- `resources/views/documents/index.blade.php`
+- `resources/views/documents/partials/breadcrumb.blade.php`
+- `resources/views/documents/partials/detail-panel.blade.php`
+- `resources/views/documents/partials/doc-grid-card.blade.php`
+- `resources/views/documents/partials/move-modal.blade.php`
+- `resources/views/documents/partials/page-header.blade.php`
+- `resources/views/documents/partials/selection-toolbar.blade.php`
+- `resources/views/documents/show.blade.php`
+- `resources/views/layouts/app.blade.php`
+- `resources/views/lecturers/create.blade.php`
+- `resources/views/lecturers/edit.blade.php`
+- `resources/views/lecturers/index.blade.php`
+- `resources/views/lecturers/show.blade.php`
+- `resources/views/partials/flash.blade.php`
+- `resources/views/public_documents/index.blade.php`
+- `resources/views/public_documents/show.blade.php`
+- `resources/views/queue-tickets/admin.blade.php`
+- `resources/views/queue-tickets/history.blade.php`
+- `resources/views/queue-tickets/partials/called-ticket.blade.php`
+- `resources/views/queue-tickets/partials/finished-ticket.blade.php`
+- `resources/views/queue-tickets/partials/staff-note-dropdown.blade.php`
+- `resources/views/role/assign.blade.php`
+- `resources/views/role/edit.blade.php`
+- `resources/views/students/edit.blade.php`
+- `routes/console.php`
+- `routes/web.php`
+- `tests/Feature/Auth/AuthenticationTest.php`
+- `tests/Feature/DocumentAccessGroupInheritanceTest.php`
+- `tests/Feature/DocumentBackfillAccessGroupCommandTest.php`
+- `tests/Feature/DocumentImportTest.php`
+- `tests/Feature/DocumentNimAccessTest.php`
+- `tests/Feature/DocumentPolicyTest.php`
+- `tests/Feature/DocumentScopeVisibleToTest.php`
+- `tests/Feature/DocumentStorageSecurityTest.php`
+- `tests/Feature/LecturerImportTest.php`
+- `tests/Feature/PublicDocumentTest.php`
+- `tests/Feature/QueueAdminScrollableColumnsTest.php`
+- `tests/Feature/QueueCalledStaffNotesAutoSaveTest.php`
+- `tests/Feature/QueueHistoryStaffNotesTest.php`
+- `tests/Feature/QueueStaffNotesAndCsvExportTest.php`
+- `tests/Feature/SidangTaAdvisorExportTest.php`
+- `tests/Feature/SidangTaBookingUiTest.php`
+- `tests/Feature/SidangTaRoomBookingTest.php`
+- `tests/Feature/SidangTaStudentBookingVisibilityTest.php`
+- `tests/Feature/SsoRoleAssignmentTest.php`
+- `tests/Feature/_dosen_sample.xlsx`
+- `tests/TestCase.php`
+- `tests/Unit/AccessGroupEnumTest.php`
+- `tests/Unit/UserNimAccessorTest.php`
+- `Dockerfile`
+- `docker/scripts/entrypoint.sh`
+- `docker/php/app.ini`
+- `docker/nginx/default.conf`
+- `resources/views/documents/all.blade.php`
+
+<a id="118-rescan-hasil-json"></a>
+
+## 118-rescan-hasil.json
+
+- `source_head`: 45bbe2588ae32aba987499c2432198c14849396c
+- `target_head`: daf8a9972cbe0f036970d8a60b7147b656c8e690
+- `source_application_files_checked`: 761
+- `source_application_files_identical`: 756
+- `deliberate_source_differences`: 5 entri.
+  - `app/Policies/DocumentCategoryPolicy.php`
+  - `app/Policies/DocumentPolicy.php`
+  - `database/seeders/RolePermissionSeeder.php`
+  - `resources/css/app.css`
+  - `resources/views/queue-tickets/admin.blade.php`
+- `missing_source_application_files`: 0 entri.
+- `copy_count`: 143
+- `docker_adaptations`: 4
+- `retained_compatibility_views`: 1
+- `files_written`: 148
+- `protected_files_unchanged`: 16
+- `student_booking_enabled_both`: True
+- `source_docs_docker_absent`: True
+- `tests.baseline.total`: 1150
+- `tests.baseline.passed`: 1105
+- `tests.baseline.failed`: 43
+- `tests.baseline.skipped`: 2
+- `tests.baseline.failures`: 43 entri.
+  - Tests\Feature\Auth\PasswordResetTest — reset password link can be requested
+  - Tests\Feature\Auth\PasswordResetTest — reset password screen can be rendered
+  - Tests\Feature\Auth\PasswordResetTest — password can be reset with valid token
+  - Tests\Feature\Auth\PasswordUpdateTest — password can be updated
+  - Tests\Feature\ExamScheduleTest — guest cannot access autocomplete search endpoints
+  - Tests\Feature\ExamScheduleTest — authenticated user gets empty json if autocomplete query is empty or less than 2 characters
+  - Tests\Feature\ExamScheduleTest — autocomplete search returns matching distinct courses
+  - Tests\Feature\ExamScheduleTest — autocomplete search returns matching lecturers with name validation
+  - Tests\Feature\GraduationRegistrationTest — admin can see active period countdown banner on graduation registration index
+  - Tests\Feature\GraduationRegistrationTest — countdown banner is not visible if there is no active period
+  - Tests\Feature\GraduationRegistrationTest — countdown banner shows expired status when active period is closed
+  - Tests\Feature\GraduationRegistrationTest — student can submit graduation registration with student email and conditional title change
+  - Tests\Feature\GraduationRegistrationTest — admin can delete graduation registration submission
+  - Tests\Feature\GraduationRegistrationTest — student can submit graduation registration with honors predicate cumlaude and criteria hki
+  - Tests\Feature\GraduationRegistrationTest — admin can change review status of graduation registration
+  - Tests\Feature\GraduationRegistrationTest — backend blocks submission if student is ineligible due to failed courses or tak score
+  - Tests\Feature\PublicDocumentTest — it displays documents of a specific category folder when filtered
+  - Tests\Feature\PublicDocumentTest — it displays search results across categories and allows searching within a folder
+  - Tests\Feature\QueueHistoryAndLogTest — event called and finished are logged during next call cycle
+  - Tests\Feature\QueueHistoryAndLogTest — event skipped is logged when officer skips ticket
+  - Tests\Feature\QueueHistoryAndLogTest — event undo_call is logged when officer cancels call
+  - Tests\Feature\QueueHistoryAndLogTest — history page lists records from both active tickets and archived histories
+  - Tests\Feature\QueueHistoryAndLogTest — filtering by nim searches across all months ignoring date filters
+  - Tests\Feature\QueueHistoryAndLogTest — month filter strictly respects month boundaries
+  - Tests\Feature\QueueHistoryAndLogTest — queue:export-month exports full month to storage/app/queue-exports and overwrites cleanly
+  - Tests\Feature\QueueHistoryAndLogTest — queue:prune-history strictly rejects deletion if export file does not exist
+  - Tests\Feature\QueueHistoryAndLogTest — queue:prune-history strictly rejects deletion if export file is empty 0 bytes
+  - Tests\Feature\QueueHistoryAndLogTest — queue:prune-history strictly rejects deletion if export row count does not match database count
+  - Tests\Feature\QueueHistoryAndLogTest — queue:prune-history dry-run previews deletion count without modifying database
+  - Tests\Feature\QueueHistoryAndLogTest — queue:prune-history successfully prunes data older than retention limit when all safeguards pass
+  - Tests\Feature\QueueTicketTest — visitor get take page displays form when queue is open
+  - Tests\Feature\QueueTicketTest — ambil tiket sukses via POST /queue/take saves details and sets device_token cookie
+  - Tests\Feature\QueueTicketTest — ambil tiket saat tutup ditolak dan menampilkan view closed
+  - Tests\Feature\QueueTicketTest — dua request berurutan/bersamaan tidak menghasilkan kode kembar
+  - Tests\Feature\SidangTaMeetFinalizationTest — meet_final_staff_can_read_export_and_verify_while_revision_requires_document_feedback
+  - Tests\Feature\SyncTest — admin can import valid student JSON
+  - Tests\Feature\SyncTest — admin can import flat array Course JSON
+  - Tests\Feature\SyncTest — admin can import associative Course JSON
+  - Tests\Feature\SyncTest — admin can import valid KRS JSON when student exists
+  - Tests\Feature\SyncTest — admin can import flat array KRS JSON and automatically create or update student profile
+  - Tests\Feature\SyncTest — admin can import valid Attendance JSON when student exists
+  - Tests\Feature\SyncTest — sync import skips rows if student does not exist for KRS and Attendance
+  - Tests\Feature\SyncTest — admin can import graduation JSON payload
+- `tests.after.total`: 1260
+- `tests.after.passed`: 1213
+- `tests.after.failed`: 45
+- `tests.after.skipped`: 2
+- `tests.after.failures`: 45 entri.
+  - Tests\Feature\Auth\PasswordResetTest — reset password link can be requested
+  - Tests\Feature\Auth\PasswordResetTest — reset password screen can be rendered
+  - Tests\Feature\Auth\PasswordResetTest — password can be reset with valid token
+  - Tests\Feature\Auth\PasswordUpdateTest — password can be updated
+  - Tests\Feature\ExamScheduleTest — guest cannot access autocomplete search endpoints
+  - Tests\Feature\ExamScheduleTest — authenticated user gets empty json if autocomplete query is empty or less than 2 characters
+  - Tests\Feature\ExamScheduleTest — autocomplete search returns matching distinct courses
+  - Tests\Feature\ExamScheduleTest — autocomplete search returns matching lecturers with name validation
+  - Tests\Feature\GraduationRegistrationTest — admin can see active period countdown banner on graduation registration index
+  - Tests\Feature\GraduationRegistrationTest — countdown banner is not visible if there is no active period
+  - Tests\Feature\GraduationRegistrationTest — countdown banner shows expired status when active period is closed
+  - Tests\Feature\GraduationRegistrationTest — student can submit graduation registration with student email and conditional title change
+  - Tests\Feature\GraduationRegistrationTest — admin can delete graduation registration submission
+  - Tests\Feature\GraduationRegistrationTest — student can submit graduation registration with honors predicate cumlaude and criteria hki
+  - Tests\Feature\GraduationRegistrationTest — admin can change review status of graduation registration
+  - Tests\Feature\GraduationRegistrationTest — backend blocks submission if student is ineligible due to failed courses or tak score
+  - Tests\Feature\PreAssignRoleTest — superadmin can access pre-assign role page
+  - Tests\Feature\PreAssignRoleTest — pre-assigned role and unit are preserved when user authenticates via SSO login
+  - Tests\Feature\PublicDocumentTest — it memastikan dokumen non-publik tidak pernah muncul di portal publik dan mengembalikan 404 identik
+  - Tests\Feature\QueueHistoryAndLogTest — event called and finished are logged during next call cycle
+  - Tests\Feature\QueueHistoryAndLogTest — event skipped is logged when officer skips ticket
+  - Tests\Feature\QueueHistoryAndLogTest — event undo_call is logged when officer cancels call
+  - Tests\Feature\QueueHistoryAndLogTest — history page lists records from both active tickets and archived histories
+  - Tests\Feature\QueueHistoryAndLogTest — filtering by nim searches across all months ignoring date filters
+  - Tests\Feature\QueueHistoryAndLogTest — month filter strictly respects month boundaries
+  - Tests\Feature\QueueHistoryAndLogTest — queue:export-month exports full month to storage/app/queue-exports and overwrites cleanly
+  - Tests\Feature\QueueHistoryAndLogTest — queue:prune-history strictly rejects deletion if export file does not exist
+  - Tests\Feature\QueueHistoryAndLogTest — queue:prune-history strictly rejects deletion if export file is empty 0 bytes
+  - Tests\Feature\QueueHistoryAndLogTest — queue:prune-history strictly rejects deletion if export row count does not match database count
+  - Tests\Feature\QueueHistoryAndLogTest — queue:prune-history dry-run previews deletion count without modifying database
+  - Tests\Feature\QueueHistoryAndLogTest — queue:prune-history successfully prunes data older than retention limit when all safeguards pass
+  - Tests\Feature\QueueHistoryStaffNotesTest — 5. data dari tabel arsip queue_ticket_histories juga menampilkan staff_notes
+  - Tests\Feature\QueueTicketTest — visitor get take page displays form when queue is open
+  - Tests\Feature\QueueTicketTest — ambil tiket sukses via POST /queue/take saves details and sets device_token cookie
+  - Tests\Feature\QueueTicketTest — ambil tiket saat tutup ditolak dan menampilkan view closed
+  - Tests\Feature\QueueTicketTest — dua request berurutan/bersamaan tidak menghasilkan kode kembar
+  - Tests\Feature\SidangTaMeetFinalizationTest — meet_final_staff_can_read_export_and_verify_while_revision_requires_document_feedback
+  - Tests\Feature\SyncTest — admin can import valid student JSON
+  - Tests\Feature\SyncTest — admin can import flat array Course JSON
+  - Tests\Feature\SyncTest — admin can import associative Course JSON
+  - Tests\Feature\SyncTest — admin can import valid KRS JSON when student exists
+  - Tests\Feature\SyncTest — admin can import flat array KRS JSON and automatically create or update student profile
+  - Tests\Feature\SyncTest — admin can import valid Attendance JSON when student exists
+  - Tests\Feature\SyncTest — sync import skips rows if student does not exist for KRS and Attendance
+  - Tests\Feature\SyncTest — admin can import graduation JSON payload
+- `tests.source-reproduction.total`: 14
+- `tests.source-reproduction.passed`: 10
+- `tests.source-reproduction.failed`: 4
+- `tests.source-reproduction.skipped`: 0
+- `tests.source-reproduction.failures`: 4 entri.
+  - Tests\Feature\PreAssignRoleTest — superadmin can access pre-assign role page
+  - Tests\Feature\PreAssignRoleTest — pre-assigned role and unit are preserved when user authenticates via SSO login
+  - Tests\Feature\PublicDocumentTest — it memastikan dokumen non-publik tidak pernah muncul di portal publik dan mengembalikan 404 identik
+  - Tests\Feature\QueueHistoryStaffNotesTest — 5. data dari tabel arsip queue_ticket_histories juga menampilkan staff_notes
+- `tests.targeted.total`: 88
+- `tests.targeted.passed`: 88
+- `tests.targeted.failed`: 0
+- `tests.targeted.skipped`: 0
+- `tests.targeted.failures`: 0 entri.
+- `baseline_failures_remaining`: 41
+- `baseline_failures_resolved`: 2 entri.
+- `source_reproduced_additional_failures`: 4 entri.
+- `files`: 148 entri.
+  - `app/Console/Commands/BackfillAccessGroupCommand.php`
+  - `app/Console/Commands/BackfillNimCommand.php`
+  - `app/Console/Commands/ImportNimReviewCommand.php`
+  - `app/Console/Commands/MigrateStorageCommand.php`
+  - `app/Console/Commands/PruneDocumentImportBatchesCommand.php`
+  - `app/Enums/AccessGroup.php`
+  - `app/Http/Controllers/Admin/QueueController.php`
+  - `app/Http/Controllers/Admin/QueueHistoryController.php`
+  - `app/Http/Controllers/DashboardController.php`
+  - `app/Http/Controllers/DocumentCategoryController.php`
+  - `app/Http/Controllers/DocumentController.php`
+  - `app/Http/Controllers/DocumentImportController.php`
+  - `app/Http/Controllers/ExamScheduleController.php`
+  - `app/Http/Controllers/LecturerController.php`
+  - `app/Http/Controllers/PublicDocumentController.php`
+  - `app/Http/Controllers/RoleController.php`
+  - `app/Http/Controllers/StudentCourseController.php`
+  - `app/Http/Controllers/UserRoleController.php`
+  - `app/Http/Middleware/CacheUserPermissions.php`
+  - `app/Http/Middleware/CekVisibilitasDokumen.php`
+  - `app/Http/Middleware/EnsurePublicDocumentAccess.php`
+  - `app/Http/Requests/Auth/LoginRequest.php`
+  - `app/Http/Requests/MoveDocumentCategoryRequest.php`
+  - `app/Http/Requests/StoreDocumentCategoryRequest.php`
+  - `app/Http/Requests/StoreDocumentRequest.php`
+  - `app/Http/Requests/StoreLecturerRequest.php`
+  - `app/Http/Requests/UpdateDocumentCategoryRequest.php`
+  - `app/Http/Requests/UpdateDocumentRequest.php`
+  - `app/Http/Requests/UpdateLecturerRequest.php`
+  - `app/Http/Requests/UpdateStudentRequest.php`
+  - `app/Jobs/ProcessDocumentImportBatch.php`
+  - `app/Models/Concerns/HasVisibility.php`
+  - `app/Models/Document.php`
+  - `app/Models/DocumentCategory.php`
+  - `app/Models/DocumentImportBatch.php`
+  - `app/Models/DocumentImportRow.php`
+  - `app/Models/DocumentNim.php`
+  - `app/Models/Lecturer.php`
+  - `app/Models/QueueTicket.php`
+  - `app/Models/QueueTicketHistory.php`
+  - `app/Models/User.php`
+  - `app/Policies/DocumentCategoryPolicy.php`
+  - `app/Policies/DocumentPolicy.php`
+  - `app/Services/DocumentImportParser.php`
+  - `app/Services/DocumentImportTemplateService.php`
+  - `app/Services/DocumentImportValidator.php`
+  - `app/Services/DocumentImportZipExtractor.php`
+  - `app/Services/QueueCounterService.php`
+  - `app/Services/SidangTaReviewExport.php`
+  - `bootstrap/app.php`
+  - `config/documents.php`
+  - `config/filesystems.php`
+  - `config/permission_modules.php`
+  - `config/roles.php`
+  - `config/sidang_ta.php`
+  - `config/sidebar.php`
+  - `database/factories/DocumentCategoryFactory.php`
+  - `database/factories/DocumentFactory.php`
+  - `database/migrations/2026_11_02_000001_add_index_to_document_categories_parent_id.php`
+  - `database/migrations/2026_11_04_100000_add_private_visibility_to_documents_and_categories.php`
+  - `database/migrations/2026_11_09_000001_add_staff_notes_to_queue_ticket_tables.php`
+  - `database/migrations/2026_11_10_000001_add_staff_notes_seq_and_updated_at_to_queue_tables.php`
+  - `database/migrations/2026_11_10_000001_migrate_sso_pegawai_petugas_to_pelaksana.php`
+  - `database/migrations/2026_11_11_000001_add_access_group_to_documents_and_categories.php`
+  - `database/migrations/2026_11_11_000002_make_document_category_id_nullable_on_documents_table.php`
+  - `database/migrations/2026_11_11_000003_relax_visibility_check_for_sqlite_testing.php`
+  - `database/migrations/2026_11_12_000001_add_storage_disk_and_checksum_to_documents_table.php`
+  - `database/migrations/2026_11_13_000001_create_document_nim_table.php`
+  - `database/migrations/2026_11_15_000001_add_document_type_to_documents_table.php`
+  - `database/migrations/2026_11_15_000002_create_document_import_tables.php`
+  - `database/migrations/2026_11_16_000001_add_phone_coe_kk_to_lecturers_table.php`
+  - `database/seeders/RolePermissionSeeder.php`
+  - `database/seeders/RoleSeeder.php`
+  - `database/seeders/UserSeeder.php`
+  - `public/assets/images/document/foldercard.svg`
+  - `public/assets/images/document/privateVisibility.svg`
+  - `public/assets/images/document/publicVisibility.svg`
+  - `public/assets/images/document/stafVisibility.svg`
+  - `resources/css/app.css`
+  - `resources/views/auth/login.blade.php`
+  - `resources/views/components/file-icon.blade.php`
+  - `resources/views/components/folder-card.blade.php`
+  - `resources/views/components/item-menu.blade.php`
+  - `resources/views/components/sidebar-admin.blade.php`
+  - `resources/views/components/sidebar-flat-menu.blade.php`
+  - `resources/views/components/sidebar.blade.php`
+  - `resources/views/dashboard.blade.php`
+  - `resources/views/document_categories/index.blade.php`
+  - `resources/views/document_categories/show.blade.php`
+  - `resources/views/documents/create.blade.php`
+  - `resources/views/documents/edit.blade.php`
+  - `resources/views/documents/folder.blade.php`
+  - `resources/views/documents/import/create.blade.php`
+  - `resources/views/documents/import/preview.blade.php`
+  - `resources/views/documents/index.blade.php`
+  - `resources/views/documents/partials/breadcrumb.blade.php`
+  - `resources/views/documents/partials/detail-panel.blade.php`
+  - `resources/views/documents/partials/doc-grid-card.blade.php`
+  - `resources/views/documents/partials/move-modal.blade.php`
+  - `resources/views/documents/partials/page-header.blade.php`
+  - `resources/views/documents/partials/selection-toolbar.blade.php`
+  - `resources/views/documents/show.blade.php`
+  - `resources/views/layouts/app.blade.php`
+  - `resources/views/lecturers/create.blade.php`
+  - `resources/views/lecturers/edit.blade.php`
+  - `resources/views/lecturers/index.blade.php`
+  - `resources/views/lecturers/show.blade.php`
+  - `resources/views/partials/flash.blade.php`
+  - `resources/views/public_documents/index.blade.php`
+  - `resources/views/public_documents/show.blade.php`
+  - `resources/views/queue-tickets/admin.blade.php`
+  - `resources/views/queue-tickets/history.blade.php`
+  - `resources/views/queue-tickets/partials/called-ticket.blade.php`
+  - `resources/views/queue-tickets/partials/finished-ticket.blade.php`
+  - `resources/views/queue-tickets/partials/staff-note-dropdown.blade.php`
+  - `resources/views/role/assign.blade.php`
+  - `resources/views/role/edit.blade.php`
+  - `resources/views/students/edit.blade.php`
+  - `routes/console.php`
+  - `routes/web.php`
+  - `tests/Feature/Auth/AuthenticationTest.php`
+  - `tests/Feature/DocumentAccessGroupInheritanceTest.php`
+  - `tests/Feature/DocumentBackfillAccessGroupCommandTest.php`
+  - `tests/Feature/DocumentImportTest.php`
+  - `tests/Feature/DocumentNimAccessTest.php`
+  - `tests/Feature/DocumentPolicyTest.php`
+  - `tests/Feature/DocumentScopeVisibleToTest.php`
+  - `tests/Feature/DocumentStorageSecurityTest.php`
+  - `tests/Feature/LecturerImportTest.php`
+  - `tests/Feature/PublicDocumentTest.php`
+  - `tests/Feature/QueueAdminScrollableColumnsTest.php`
+  - `tests/Feature/QueueCalledStaffNotesAutoSaveTest.php`
+  - `tests/Feature/QueueHistoryStaffNotesTest.php`
+  - `tests/Feature/QueueStaffNotesAndCsvExportTest.php`
+  - `tests/Feature/SidangTaAdvisorExportTest.php`
+  - `tests/Feature/SidangTaBookingUiTest.php`
+  - `tests/Feature/SidangTaRoomBookingTest.php`
+  - `tests/Feature/SidangTaStudentBookingVisibilityTest.php`
+  - `tests/Feature/SsoRoleAssignmentTest.php`
+  - `tests/Feature/_dosen_sample.xlsx`
+  - `tests/TestCase.php`
+  - `tests/Unit/AccessGroupEnumTest.php`
+  - `tests/Unit/UserNimAccessorTest.php`
+  - `Dockerfile`
+  - `docker/scripts/entrypoint.sh`
+  - `docker/php/app.ini`
+  - `docker/nginx/default.conf`
+  - `resources/views/documents/all.blade.php`
+
+<a id="119-rescan-hasil-json"></a>
+
+## 119-rescan-hasil.json
+
+- `source_head`: 9bf3a00c620fa196b7f50f2d423737c8352a2146
+- `target_head`: a3e513301208e81557552bc39803ff46e8caaaaf
+- `source_files_checked`: 795
+- `identical`: 785
+- `intentional_differences`: 10 entri.
+  - `.env.example`
+  - `.gitignore`
+  - `README.md`
+  - `app/Policies/DocumentCategoryPolicy.php`
+  - `app/Policies/DocumentPolicy.php`
+  - `database/seeders/RolePermissionSeeder.php`
+  - `deploy.sh`
+  - `phpunit.xml`
+  - `resources/css/app.css`
+  - `resources/views/queue-tickets/admin.blade.php`
+- `files_copied`: 7 entri.
+- `copied_hashes_match`: True
+- `other_target_tracked_files_unchanged`: 981
+- `git_staging_unchanged`: True
+- `student_booking_enabled_both`: True
+- `source_unmodified`: True
+- `source_docs_docker_absent`: True
+- `verification.php_lint_files`: 3
+- `verification.php_lint_passed`: True
+- `verification.frontend_build_passed`: True
+- `verification.test_cases`: 76
+- `verification.assertions`: 301
+- `verification.failures`: 0
+- `verification.errors`: 0
+- `verification.skipped`: 0
+- `verification.warnings`: 76
+- `verification.warning_detail`: Dotenv reads absent target .env; reproduced with --display-warnings. Test environment supplied through process.
+- `verification.full_suite_rerun`: False
+- `verification.diff_checks_passed`: True
+
+<a id="122-daftar-file-perbaikan-txt"></a>
+
+## 122-daftar-file-perbaikan.txt
+
+Catatan historis 25 baris; file mentah tidak lagi menjadi input perintah.
+- `app/Http/Controllers/SidangTaRegistrationController.php`
+- `app/Http/Middleware/CanonicalSidangTaUrl.php`
+- `app/Models/Concerns/HasSidangTaPublicId.php`
+- `app/Models/SidangTaFormGuide.php`
+- `app/Models/SidangTaPeriod.php`
+- `app/Models/SidangTaRegistration.php`
+- `app/Models/SidangTaRegistrationDocument.php`
+- `app/Models/SidangTaRegistrationDraftDocument.php`
+- `app/Services/SidangTaExpiredDraftCleanup.php`
+- `app/Services/SidangTaReviewQuery.php`
+- `bootstrap/app.php`
+- `database/migrations/2026_11_19_120000_add_public_ids_to_sidang_ta_routes.php`
+- `resources/views/sidang_ta_registrations/admin/index.blade.php`
+- `resources/views/sidang_ta_registrations/admin/periods.blade.php`
+- `resources/views/sidang_ta_registrations/index.blade.php`
+- `resources/views/sidang_ta_registrations/partials/period-schedule.blade.php`
+- `resources/views/sidang_ta_registrations/wizard-review.blade.php`
+- `tests/Feature/SidangTaDraftCardTest.php`
+- `tests/Feature/SidangTaPublicUrlTest.php`
+- `tests/Feature/SidangTaReviewExportTest.php`
+- `tests/Feature/SidangTaReviewListTest.php`
+- `tests/Feature/SidangTaRevisionDeadlineTest.php`
+- `tests/Feature/SidangTaStudentBookingVisibilityTest.php`
+- `tests/Feature/SidangTaStudentPolishTest.php`
+- `tests/Feature/SidangTaTargetedRevisionTest.php`
+
+<a id="122-verifikasi-perbaikan-json"></a>
+
+## 122-verifikasi-perbaikan.json
+
+- `source_head`: 9bf3a00c620fa196b7f50f2d423737c8352a2146
+- `target_head`: b85951da26d845690cfbd8c8d8757b285b445124
+- `source_application_files_checked`: 766
+- `identical`: 761
+- `intentional_differences`: 5 entri.
+  - `app/Policies/DocumentCategoryPolicy.php`
+  - `app/Policies/DocumentPolicy.php`
+  - `database/seeders/RolePermissionSeeder.php`
+  - `resources/css/app.css`
+  - `resources/views/queue-tickets/admin.blade.php`
+- `files`: 25 entri.
+  - `app/Http/Controllers/SidangTaRegistrationController.php`
+  - `app/Http/Middleware/CanonicalSidangTaUrl.php`
+  - `app/Models/Concerns/HasSidangTaPublicId.php`
+  - `app/Models/SidangTaFormGuide.php`
+  - `app/Models/SidangTaPeriod.php`
+  - `app/Models/SidangTaRegistration.php`
+  - `app/Models/SidangTaRegistrationDocument.php`
+  - `app/Models/SidangTaRegistrationDraftDocument.php`
+  - `app/Services/SidangTaExpiredDraftCleanup.php`
+  - `app/Services/SidangTaReviewQuery.php`
+  - `bootstrap/app.php`
+  - `database/migrations/2026_11_19_120000_add_public_ids_to_sidang_ta_routes.php`
+  - `resources/views/sidang_ta_registrations/admin/index.blade.php`
+  - `resources/views/sidang_ta_registrations/admin/periods.blade.php`
+  - `resources/views/sidang_ta_registrations/index.blade.php`
+  - `resources/views/sidang_ta_registrations/partials/period-schedule.blade.php`
+  - `resources/views/sidang_ta_registrations/wizard-review.blade.php`
+  - `tests/Feature/SidangTaDraftCardTest.php`
+  - `tests/Feature/SidangTaPublicUrlTest.php`
+  - `tests/Feature/SidangTaReviewExportTest.php`
+  - `tests/Feature/SidangTaReviewListTest.php`
+  - `tests/Feature/SidangTaRevisionDeadlineTest.php`
+  - `tests/Feature/SidangTaStudentBookingVisibilityTest.php`
+  - `tests/Feature/SidangTaStudentPolishTest.php`
+  - `tests/Feature/SidangTaTargetedRevisionTest.php`
+- `verification.red.total`: 10
+- `verification.red.passed`: 4
+- `verification.red.failed`: 6
+- `verification.red.skipped`: 0
+- `verification.red.failures`: 6 entri.
+  - Tests\Feature\SidangTaPublicUrlTest — public TA links use opaque keys while database relationships and document paths stay intact
+  - Tests\Feature\SidangTaPublicUrlTest — legacy authorized numeric document and registration links redirect to their opaque URLs
+  - Tests\Feature\SidangTaPublicUrlTest — draft document period and form guide links also use opaque keys
+  - Tests\Feature\SidangTaPublicUrlTest — public ID backfill repairs old rows without changing primary keys status snapshots or foreign keys
+  - Tests\Feature\SidangTaDraftCardTest — empty or fully expired drafts do not leave a draft panel on the student dashboard
+  - Tests\Feature\SidangTaDraftCardTest — extending an expired period discards its old draft without changing a final submission
+- `verification.filter-red.total`: 1
+- `verification.filter-red.passed`: 0
+- `verification.filter-red.failed`: 1
+- `verification.filter-red.skipped`: 0
+- `verification.filter-red.failures`: 1 entri.
+  - Tests\Feature\SidangTaPublicUrlTest — review period filters and generated export links use public period identifiers
+- `verification.review-red.total`: 4
+- `verification.review-red.passed`: 0
+- `verification.review-red.failed`: 4
+- `verification.review-red.skipped`: 0
+- `verification.review-red.failures`: 4 entri.
+  - Tests\Feature\SidangTaDraftCardTest — an initial draft is hidden after registration closes even while verification remains open
+  - Tests\Feature\SidangTaDraftCardTest — a legacy revision without verification dates remains visible after registration closes
+  - Tests\Feature\SidangTaDraftCardTest — period disclosure stays expanded for active legacy verification and collapses when disabled
+  - Tests\Feature\SidangTaTargetedRevisionTest — revision final review submits to the public registration URL and preserves revision workflow
+- `verification.targeted.total`: 123
+- `verification.targeted.passed`: 123
+- `verification.targeted.failed`: 0
+- `verification.targeted.skipped`: 0
+- `verification.targeted.failures`: 0 entri.
+- `verification.final-targeted.total`: 168
+- `verification.final-targeted.passed`: 168
+- `verification.final-targeted.failed`: 0
+- `verification.final-targeted.skipped`: 0
+- `verification.final-targeted.failures`: 0 entri.
+- `verification.full.total`: 1284
+- `verification.full.passed`: 1235
+- `verification.full.failed`: 47
+- `verification.full.skipped`: 2
+- `verification.full.failures`: 47 entri.
+  - Tests\Feature\Auth\PasswordResetTest — reset password link can be requested
+  - Tests\Feature\Auth\PasswordResetTest — reset password screen can be rendered
+  - Tests\Feature\Auth\PasswordResetTest — password can be reset with valid token
+  - Tests\Feature\Auth\PasswordUpdateTest — password can be updated
+  - Tests\Feature\ExamScheduleTest — guest cannot access autocomplete search endpoints
+  - Tests\Feature\ExamScheduleTest — authenticated user gets empty json if autocomplete query is empty or less than 2 characters
+  - Tests\Feature\ExamScheduleTest — autocomplete search returns matching distinct courses
+  - Tests\Feature\ExamScheduleTest — autocomplete search returns matching lecturers with name validation
+  - Tests\Feature\GraduationRegistrationTest — admin can see active period countdown banner on graduation registration index
+  - Tests\Feature\GraduationRegistrationTest — countdown banner is not visible if there is no active period
+  - Tests\Feature\GraduationRegistrationTest — countdown banner shows expired status when active period is closed
+  - Tests\Feature\GraduationRegistrationTest — student can submit graduation registration with student email and conditional title change
+  - Tests\Feature\GraduationRegistrationTest — admin can delete graduation registration submission
+  - Tests\Feature\GraduationRegistrationTest — student can submit graduation registration with honors predicate cumlaude and criteria hki
+  - Tests\Feature\GraduationRegistrationTest — admin can change review status of graduation registration
+  - Tests\Feature\GraduationRegistrationTest — backend blocks submission if student is ineligible due to failed courses or tak score
+  - Tests\Feature\PreAssignRoleTest — superadmin can access pre-assign role page
+  - Tests\Feature\PreAssignRoleTest — pre-assigned role and unit are preserved when user authenticates via SSO login
+  - Tests\Feature\PublicDocumentTest — it memastikan dokumen non-publik tidak pernah muncul di portal publik dan mengembalikan 404 identik
+  - Tests\Feature\QueueHistoryAndLogTest — event called and finished are logged during next call cycle
+  - Tests\Feature\QueueHistoryAndLogTest — event skipped is logged when officer skips ticket
+  - Tests\Feature\QueueHistoryAndLogTest — event undo_call is logged when officer cancels call
+  - Tests\Feature\QueueHistoryAndLogTest — history page lists records from both active tickets and archived histories
+  - Tests\Feature\QueueHistoryAndLogTest — filtering by nim searches across all months ignoring date filters
+  - Tests\Feature\QueueHistoryAndLogTest — month filter strictly respects month boundaries
+  - Tests\Feature\QueueHistoryAndLogTest — queue:export-month exports full month to storage/app/queue-exports and overwrites cleanly
+  - Tests\Feature\QueueHistoryAndLogTest — queue:prune-history strictly rejects deletion if export file does not exist
+  - Tests\Feature\QueueHistoryAndLogTest — queue:prune-history strictly rejects deletion if export file is empty 0 bytes
+  - Tests\Feature\QueueHistoryAndLogTest — queue:prune-history strictly rejects deletion if export row count does not match database count
+  - Tests\Feature\QueueHistoryAndLogTest — queue:prune-history dry-run previews deletion count without modifying database
+  - Tests\Feature\QueueHistoryAndLogTest — queue:prune-history successfully prunes data older than retention limit when all safeguards pass
+  - Tests\Feature\QueueHistoryStaffNotesTest — 5. data dari tabel arsip queue_ticket_histories juga menampilkan staff_notes
+  - Tests\Feature\QueueTicketTest — visitor get take page displays form when queue is open
+  - Tests\Feature\QueueTicketTest — ambil tiket sukses via POST /queue/take saves details and sets device_token cookie
+  - Tests\Feature\QueueTicketTest — ambil tiket saat tutup ditolak dan menampilkan view closed
+  - Tests\Feature\QueueTicketTest — dua request berurutan/bersamaan tidak menghasilkan kode kembar
+  - Tests\Feature\SidangTaMeetFinalizationTest — meet_final_staff_can_read_export_and_verify_while_revision_requires_document_feedback
+  - Tests\Feature\SidangTaReviewExportTest — p2b_export_link_keeps_applied_filters_without_current_page
+  - Tests\Feature\SidangTaReviewUiTest — revision_confirmation_form_keeps_original_registration_and_put_method
+  - Tests\Feature\SyncTest — admin can import valid student JSON
+  - Tests\Feature\SyncTest — admin can import flat array Course JSON
+  - Tests\Feature\SyncTest — admin can import associative Course JSON
+  - Tests\Feature\SyncTest — admin can import valid KRS JSON when student exists
+  - Tests\Feature\SyncTest — admin can import flat array KRS JSON and automatically create or update student profile
+  - Tests\Feature\SyncTest — admin can import valid Attendance JSON when student exists
+  - Tests\Feature\SyncTest — sync import skips rows if student does not exist for KRS and Attendance
+  - Tests\Feature\SyncTest — admin can import graduation JSON payload
+- `verification.final-full.total`: 1288
+- `verification.final-full.passed`: 1240
+- `verification.final-full.failed`: 46
+- `verification.final-full.skipped`: 2
+- `verification.final-full.failures`: 46 entri.
+  - Tests\Feature\Auth\PasswordResetTest — reset password link can be requested
+  - Tests\Feature\Auth\PasswordResetTest — reset password screen can be rendered
+  - Tests\Feature\Auth\PasswordResetTest — password can be reset with valid token
+  - Tests\Feature\Auth\PasswordUpdateTest — password can be updated
+  - Tests\Feature\ExamScheduleTest — guest cannot access autocomplete search endpoints
+  - Tests\Feature\ExamScheduleTest — authenticated user gets empty json if autocomplete query is empty or less than 2 characters
+  - Tests\Feature\ExamScheduleTest — autocomplete search returns matching distinct courses
+  - Tests\Feature\ExamScheduleTest — autocomplete search returns matching lecturers with name validation
+  - Tests\Feature\GraduationRegistrationTest — admin can see active period countdown banner on graduation registration index
+  - Tests\Feature\GraduationRegistrationTest — countdown banner is not visible if there is no active period
+  - Tests\Feature\GraduationRegistrationTest — countdown banner shows expired status when active period is closed
+  - Tests\Feature\GraduationRegistrationTest — student can submit graduation registration with student email and conditional title change
+  - Tests\Feature\GraduationRegistrationTest — admin can delete graduation registration submission
+  - Tests\Feature\GraduationRegistrationTest — student can submit graduation registration with honors predicate cumlaude and criteria hki
+  - Tests\Feature\GraduationRegistrationTest — admin can change review status of graduation registration
+  - Tests\Feature\GraduationRegistrationTest — backend blocks submission if student is ineligible due to failed courses or tak score
+  - Tests\Feature\PreAssignRoleTest — superadmin can access pre-assign role page
+  - Tests\Feature\PreAssignRoleTest — pre-assigned role and unit are preserved when user authenticates via SSO login
+  - Tests\Feature\PublicDocumentTest — it memastikan dokumen non-publik tidak pernah muncul di portal publik dan mengembalikan 404 identik
+  - Tests\Feature\QueueHistoryAndLogTest — event called and finished are logged during next call cycle
+  - Tests\Feature\QueueHistoryAndLogTest — event skipped is logged when officer skips ticket
+  - Tests\Feature\QueueHistoryAndLogTest — event undo_call is logged when officer cancels call
+  - Tests\Feature\QueueHistoryAndLogTest — history page lists records from both active tickets and archived histories
+  - Tests\Feature\QueueHistoryAndLogTest — filtering by nim searches across all months ignoring date filters
+  - Tests\Feature\QueueHistoryAndLogTest — month filter strictly respects month boundaries
+  - Tests\Feature\QueueHistoryAndLogTest — queue:export-month exports full month to storage/app/queue-exports and overwrites cleanly
+  - Tests\Feature\QueueHistoryAndLogTest — queue:prune-history strictly rejects deletion if export file does not exist
+  - Tests\Feature\QueueHistoryAndLogTest — queue:prune-history strictly rejects deletion if export file is empty 0 bytes
+  - Tests\Feature\QueueHistoryAndLogTest — queue:prune-history strictly rejects deletion if export row count does not match database count
+  - Tests\Feature\QueueHistoryAndLogTest — queue:prune-history dry-run previews deletion count without modifying database
+  - Tests\Feature\QueueHistoryAndLogTest — queue:prune-history successfully prunes data older than retention limit when all safeguards pass
+  - Tests\Feature\QueueHistoryStaffNotesTest — 5. data dari tabel arsip queue_ticket_histories juga menampilkan staff_notes
+  - Tests\Feature\QueueTicketTest — visitor get take page displays form when queue is open
+  - Tests\Feature\QueueTicketTest — ambil tiket sukses via POST /queue/take saves details and sets device_token cookie
+  - Tests\Feature\QueueTicketTest — ambil tiket saat tutup ditolak dan menampilkan view closed
+  - Tests\Feature\QueueTicketTest — dua request berurutan/bersamaan tidak menghasilkan kode kembar
+  - Tests\Feature\SidangTaMeetFinalizationTest — meet_final_staff_can_read_export_and_verify_while_revision_requires_document_feedback
+  - Tests\Feature\SidangTaRevisionDeadlineTest — revision_expiry_wins_then_stale_draft_discard_removes_only_owned_replacement
+  - Tests\Feature\SyncTest — admin can import valid student JSON
+  - Tests\Feature\SyncTest — admin can import flat array Course JSON
+  - Tests\Feature\SyncTest — admin can import associative Course JSON
+  - Tests\Feature\SyncTest — admin can import valid KRS JSON when student exists
+  - Tests\Feature\SyncTest — admin can import flat array KRS JSON and automatically create or update student profile
+  - Tests\Feature\SyncTest — admin can import valid Attendance JSON when student exists
+  - Tests\Feature\SyncTest — sync import skips rows if student does not exist for KRS and Attendance
+  - Tests\Feature\SyncTest — admin can import graduation JSON payload
+- `verification.deadline.total`: 32
+- `verification.deadline.passed`: 32
+- `verification.deadline.failed`: 0
+- `verification.deadline.skipped`: 0
+- `verification.deadline.failures`: 0 entri.
+- `baseline_failures_unchanged`: 45
+- `outdated_assertion_fixed_after_full_suite`: 1 entri.
+- `independent_review`: No remaining important findings after fixing three findings with four RED-to-GREEN HTTP regression cases.
+- `database_application_untouched`: True
+- `vps_untouched`: True
+- `git_staging_unchanged`: True
+
+<a id="125-daftar-file-pelaksanaan-txt"></a>
+
+## 125-daftar-file-pelaksanaan.txt
+
+Catatan historis 40 baris; file mentah tidak lagi menjadi input perintah.
+- `app/Http/Controllers/Admin/SidangTaExecutionController.php`
+- `app/Http/Controllers/SidangTaBookingController.php`
+- `app/Http/Controllers/SidangTaExecutionController.php`
+- `app/Http/Requests/SaveSidangTaExecutionRequest.php`
+- `app/Models/SidangTaExecutionLog.php`
+- `app/Models/SidangTaExecutionSetting.php`
+- `app/Models/SidangTaSchedule.php`
+- `app/Services/RoomBookingTransitionService.php`
+- `app/Services/SidangTaBookingAdministration.php`
+- `app/Services/SidangTaBookingLifecycle.php`
+- `app/Services/SidangTaExecutionExport.php`
+- `app/Services/SidangTaExecutionInfoService.php`
+- `app/Services/SidangTaExecutionOutcomeService.php`
+- `app/Services/SidangTaExecutionQuery.php`
+- `app/Services/SidangTaExecutionWindowService.php`
+- `app/Services/SidangTaPlottingImportService.php`
+- `app/Services/SidangTaStaffScheduling.php`
+- `config/sidebar.php`
+- `database/migrations/2026_11_19_124000_extend_sidang_ta_execution_admin.php`
+- `resources/views/sidang_ta_execution/admin/index.blade.php`
+- `resources/views/sidang_ta_execution/admin/show.blade.php`
+- `resources/views/sidang_ta_execution/partials/info.blade.php`
+- `resources/views/sidang_ta_execution/partials/notices.blade.php`
+- `resources/views/sidang_ta_execution/partials/result.blade.php`
+- `resources/views/sidang_ta_execution/student/index.blade.php`
+- `resources/views/sidang_ta_execution/student/show.blade.php`
+- `resources/views/sidang_ta_registrations/admin/execution-settings.blade.php`
+- `resources/views/sidang_ta_registrations/admin/index.blade.php`
+- `resources/views/sidang_ta_registrations/admin/show.blade.php`
+- `resources/views/sidang_ta_registrations/index.blade.php`
+- `routes/web.php`
+- `tests/Feature/SidangTaBookingUiTest.php`
+- `tests/Feature/SidangTaExecutionAccessTest.php`
+- `tests/Feature/SidangTaExecutionDomainTest.php`
+- `tests/Feature/SidangTaExecutionPagesTest.php`
+- `tests/Feature/SidangTaRoomBookingTest.php`
+- `tests/Feature/SidangTaRoomMysqlUpgradeTest.php`
+- `tests/Feature/SidangTaStaffSchedulingTest.php`
+- `tests/Feature/SidangTaStudentBookingVisibilityTest.php`
+- `tests/Support/TaRoomScenario.php`
+
+<a id="125-verifikasi-pelaksanaan-json"></a>
+
+## 125-verifikasi-pelaksanaan.json
+
+- `source_head`: b70cb93be0d129e2f286e3f69db151cc72336028
+- `target_head`: 6fa5626c012eb79bcd6164e7daf7d9648a59795b
+- `source_application_test_files_checked`: 750
+- `source_files_matching_target`: 745
+- `files_copied_count`: 40
+- `deliberate_source_differences`: 5 entri.
+  - `app/Policies/DocumentCategoryPolicy.php`
+  - `app/Policies/DocumentPolicy.php`
+  - `database/seeders/RolePermissionSeeder.php`
+  - `resources/css/app.css`
+  - `resources/views/queue-tickets/admin.blade.php`
+- `retained_target_only_files`: 1 entri.
+- `missing_source_application_files`: 0 entri.
+- `source_docs_docker_absent`: True
+- `protected_files_unchanged`: True
+- `indexes_unchanged`: True
+- `database_scope`: Tests only: MySQL dadu_testing. No application migration/seed/reset/deployment.
+- `tests.full.total`: 1322
+- `tests.full.passed`: 1275
+- `tests.full.failed`: 45
+- `tests.full.skipped`: 2
+- `tests.full.failures`: 45 entri.
+  - Tests\Feature\Auth\PasswordResetTest — reset password link can be requested
+  - Tests\Feature\Auth\PasswordResetTest — reset password screen can be rendered
+  - Tests\Feature\Auth\PasswordResetTest — password can be reset with valid token
+  - Tests\Feature\Auth\PasswordUpdateTest — password can be updated
+  - Tests\Feature\ExamScheduleTest — guest cannot access autocomplete search endpoints
+  - Tests\Feature\ExamScheduleTest — authenticated user gets empty json if autocomplete query is empty or less than 2 characters
+  - Tests\Feature\ExamScheduleTest — autocomplete search returns matching distinct courses
+  - Tests\Feature\ExamScheduleTest — autocomplete search returns matching lecturers with name validation
+  - Tests\Feature\GraduationRegistrationTest — admin can see active period countdown banner on graduation registration index
+  - Tests\Feature\GraduationRegistrationTest — countdown banner is not visible if there is no active period
+  - Tests\Feature\GraduationRegistrationTest — countdown banner shows expired status when active period is closed
+  - Tests\Feature\GraduationRegistrationTest — student can submit graduation registration with student email and conditional title change
+  - Tests\Feature\GraduationRegistrationTest — admin can delete graduation registration submission
+  - Tests\Feature\GraduationRegistrationTest — student can submit graduation registration with honors predicate cumlaude and criteria hki
+  - Tests\Feature\GraduationRegistrationTest — admin can change review status of graduation registration
+  - Tests\Feature\GraduationRegistrationTest — backend blocks submission if student is ineligible due to failed courses or tak score
+  - Tests\Feature\PreAssignRoleTest — superadmin can access pre-assign role page
+  - Tests\Feature\PreAssignRoleTest — pre-assigned role and unit are preserved when user authenticates via SSO login
+  - Tests\Feature\PublicDocumentTest — it memastikan dokumen non-publik tidak pernah muncul di portal publik dan mengembalikan 404 identik
+  - Tests\Feature\QueueHistoryAndLogTest — event called and finished are logged during next call cycle
+  - Tests\Feature\QueueHistoryAndLogTest — event skipped is logged when officer skips ticket
+  - Tests\Feature\QueueHistoryAndLogTest — event undo_call is logged when officer cancels call
+  - Tests\Feature\QueueHistoryAndLogTest — history page lists records from both active tickets and archived histories
+  - Tests\Feature\QueueHistoryAndLogTest — filtering by nim searches across all months ignoring date filters
+  - Tests\Feature\QueueHistoryAndLogTest — month filter strictly respects month boundaries
+  - Tests\Feature\QueueHistoryAndLogTest — queue:export-month exports full month to storage/app/queue-exports and overwrites cleanly
+  - Tests\Feature\QueueHistoryAndLogTest — queue:prune-history strictly rejects deletion if export file does not exist
+  - Tests\Feature\QueueHistoryAndLogTest — queue:prune-history strictly rejects deletion if export file is empty 0 bytes
+  - Tests\Feature\QueueHistoryAndLogTest — queue:prune-history strictly rejects deletion if export row count does not match database count
+  - Tests\Feature\QueueHistoryAndLogTest — queue:prune-history dry-run previews deletion count without modifying database
+  - Tests\Feature\QueueHistoryAndLogTest — queue:prune-history successfully prunes data older than retention limit when all safeguards pass
+  - Tests\Feature\QueueHistoryStaffNotesTest — 5. data dari tabel arsip queue_ticket_histories juga menampilkan staff_notes
+  - Tests\Feature\QueueTicketTest — visitor get take page displays form when queue is open
+  - Tests\Feature\QueueTicketTest — ambil tiket sukses via POST /queue/take saves details and sets device_token cookie
+  - Tests\Feature\QueueTicketTest — ambil tiket saat tutup ditolak dan menampilkan view closed
+  - Tests\Feature\QueueTicketTest — dua request berurutan/bersamaan tidak menghasilkan kode kembar
+  - Tests\Feature\SidangTaMeetFinalizationTest — meet_final_staff_can_read_export_and_verify_while_revision_requires_document_feedback
+  - Tests\Feature\SyncTest — admin can import valid student JSON
+  - Tests\Feature\SyncTest — admin can import flat array Course JSON
+  - Tests\Feature\SyncTest — admin can import associative Course JSON
+  - Tests\Feature\SyncTest — admin can import valid KRS JSON when student exists
+  - Tests\Feature\SyncTest — admin can import flat array KRS JSON and automatically create or update student profile
+  - Tests\Feature\SyncTest — admin can import valid Attendance JSON when student exists
+  - Tests\Feature\SyncTest — sync import skips rows if student does not exist for KRS and Attendance
+  - Tests\Feature\SyncTest — admin can import graduation JSON payload
+- `tests.full.additional_failures_compared_with_118`: 0 entri.
+- `tests.full.baseline_failures_resolved`: 0 entri.
+- `tests.full.assertions`: 10266
+- `tests.full.duration_seconds`: 274.38
+- `tests.targeted.passed`: 79
+- `tests.targeted.failed`: 0
+- `tests.targeted.assertions`: 374
+- `tests.targeted.duration_seconds`: 51.4
+- `tests.final_ui_after_label_changes.passed`: 16
+- `tests.final_ui_after_label_changes.failed`: 0
+- `tests.final_ui_after_label_changes.assertions`: 94
+- `tests.final_ui_after_label_changes.duration_seconds`: 16.88
+- `review`: Independent re-review: no remaining important findings.
+- `files`: 40 entri.
+  - `app/Http/Controllers/Admin/SidangTaExecutionController.php`
+  - `app/Http/Controllers/SidangTaBookingController.php`
+  - `app/Http/Controllers/SidangTaExecutionController.php`
+  - `app/Http/Requests/SaveSidangTaExecutionRequest.php`
+  - `app/Models/SidangTaExecutionLog.php`
+  - `app/Models/SidangTaExecutionSetting.php`
+  - `app/Models/SidangTaSchedule.php`
+  - `app/Services/RoomBookingTransitionService.php`
+  - `app/Services/SidangTaBookingAdministration.php`
+  - `app/Services/SidangTaBookingLifecycle.php`
+  - `app/Services/SidangTaExecutionExport.php`
+  - `app/Services/SidangTaExecutionInfoService.php`
+  - `app/Services/SidangTaExecutionOutcomeService.php`
+  - `app/Services/SidangTaExecutionQuery.php`
+  - `app/Services/SidangTaExecutionWindowService.php`
+  - `app/Services/SidangTaPlottingImportService.php`
+  - `app/Services/SidangTaStaffScheduling.php`
+  - `config/sidebar.php`
+  - `database/migrations/2026_11_19_124000_extend_sidang_ta_execution_admin.php`
+  - `resources/views/sidang_ta_execution/admin/index.blade.php`
+  - `resources/views/sidang_ta_execution/admin/show.blade.php`
+  - `resources/views/sidang_ta_execution/partials/info.blade.php`
+  - `resources/views/sidang_ta_execution/partials/notices.blade.php`
+  - `resources/views/sidang_ta_execution/partials/result.blade.php`
+  - `resources/views/sidang_ta_execution/student/index.blade.php`
+  - `resources/views/sidang_ta_execution/student/show.blade.php`
+  - `resources/views/sidang_ta_registrations/admin/execution-settings.blade.php`
+  - `resources/views/sidang_ta_registrations/admin/index.blade.php`
+  - `resources/views/sidang_ta_registrations/admin/show.blade.php`
+  - `resources/views/sidang_ta_registrations/index.blade.php`
+  - `routes/web.php`
+  - `tests/Feature/SidangTaBookingUiTest.php`
+  - `tests/Feature/SidangTaExecutionAccessTest.php`
+  - `tests/Feature/SidangTaExecutionDomainTest.php`
+  - `tests/Feature/SidangTaExecutionPagesTest.php`
+  - `tests/Feature/SidangTaRoomBookingTest.php`
+  - `tests/Feature/SidangTaRoomMysqlUpgradeTest.php`
+  - `tests/Feature/SidangTaStaffSchedulingTest.php`
+  - `tests/Feature/SidangTaStudentBookingVisibilityTest.php`
+  - `tests/Support/TaRoomScenario.php`
+- `checks.php_syntax_files_each_repository`: 29
+- `checks.php_syntax`: passed
+- `checks.git_diff_check_both`: passed
+- `checks.frontend_build`: passed
+- `checks.final_product_change_after_full_suite`: UI labels only, rechecked by 16 passing UI/access tests
+
+<a id="81-copy-dadu-ke-dadu-test-sh"></a>
+
+## 81-copy-dadu-ke-dadu-test.sh
+
+Script penyalinan checkpoint lama dipensiunkan. Gunakan panduan penyelarasan file yang baru; jangan memakai snapshot hash lama.
+
+<a id="105-docker-akses-prodi-dosen-patch"></a>
+
+## 105-docker-akses-prodi-dosen.patch
+
+Patch sekali pakai sudah menjadi artefak historis; jangan diterapkan ulang pada aplikasi berjalan.
+- `config/permission_modules.php`
+- `config/sidebar.php`
+- `database/seeders/RolePermissionSeeder.php`
+- `routes/web.php`
+
+<a id="93-academic-routes-patch"></a>
+
+## 93-academic-routes.patch
+
+Patch sekali pakai sudah menjadi artefak historis; jangan diterapkan ulang pada aplikasi berjalan.
+- `routes/web.php`

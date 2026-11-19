@@ -64,7 +64,7 @@
                     </div>
                 </section>
                 <form data-ta-filters method="GET" action="{{ route('admin.sidang-ta-registrations.index') }}"
-                      class="grid gap-3 rounded-xl border border-slate-200 bg-white p-4 md:grid-cols-2 xl:grid-cols-5">
+                      class="grid gap-3 rounded-xl border border-slate-200 bg-white p-4 md:grid-cols-2 xl:grid-cols-4">
                     <label class="text-xs font-semibold text-slate-600">Nama atau NIM
                         <input class="campus-input mt-1" name="search" value="{{ $filters['search'] ?? '' }}"
                                placeholder="Cari nama atau NIM">
@@ -109,16 +109,14 @@
                             </select>
                         </label>
                     @endif
-                    <div class="flex flex-wrap items-end gap-2">
+                    <div class="flex flex-wrap items-center gap-2 md:col-span-2 xl:col-span-4">
                         <button type="submit" class="btn btn-primary">
                             Terapkan
                         </button>
                         <a data-ta-reset href="{{ route('admin.sidang-ta-registrations.index') }}" class="btn btn-secondary">
                             Reset
                         </a>
-                    </div>
-                    @if($canReview)
-                        <div class="flex flex-wrap items-center gap-2 md:col-span-2 xl:col-span-5">
+                        @if($canReview)
                             @if($counts['total'] > 0)
                                 <a data-ta-export href="{{ route('admin.sidang-ta-registrations.export', $filterParameters) }}" class="btn btn-success">
                                     <svg aria-hidden="true" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-width="1.7" stroke-linejoin="round" d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6zm0 0v6h6M8 12l5 6m0-6l-5 6"/></svg>
@@ -127,8 +125,8 @@
                             @else
                                 <button data-ta-export-empty type="button" disabled class="btn btn-success cursor-not-allowed opacity-50" title="Tidak ada pengajuan untuk diekspor">Export Excel</button>
                             @endif
-                        </div>
-                    @endif
+                        @endif
+                    </div>
                 </form>
                 <p class="text-xs leading-relaxed text-slate-500">
                     Ikon berkas: kuning menunggu verifikasi, hijau terverifikasi, merah perlu perbaikan, tanda ! belum ada/tidak ditemukan, tanda – tidak berlaku.

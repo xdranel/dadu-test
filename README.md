@@ -109,7 +109,7 @@ Pastikan lingkungan lokal Anda telah terpasang:
 
 ### Langkah 2: Konfigurasi Environment (`.env`) & Gotchas
 
-Buka berkas [`.env`](.env) dan perhatikan pengaturan berikut:
+Buka berkas `.env` (contoh konfigurasi: [`.env.example`](.env.example)) dan perhatikan pengaturan berikut:
 
 #### 1. Konfigurasi Database (Pilih salah satu)
 * **Pilihan A: SQLite (Paling direkomendasikan & tercepat untuk Development Lokal):**
