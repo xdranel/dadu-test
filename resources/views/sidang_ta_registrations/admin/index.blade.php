@@ -1,21 +1,11 @@
 <x-app-layout>
-    <x-slot name="header">Review Pendaftaran Sidang TA</x-slot>
+    <x-slot name="header">Review Sidang TA</x-slot>
     @php
         $statusLabels = \App\Services\SidangTaReviewQuery::STATUSES;
         $groupTitles = ['iGracias & Akademik', 'Pembayaran & Dokumen', 'Biodata'];
         $at = now();
     @endphp
     <div data-ta-review-hub class="space-y-5">
-        <header class="flex flex-wrap items-center justify-between gap-3">
-            <div>
-                <h2 class="text-xl font-bold text-slate-800">
-                    Review Sidang TA
-                </h2>
-                <p class="mt-1 text-sm text-slate-500">
-                    Tinjau pengajuan dan kelengkapan berkas mahasiswa.
-                </p>
-            </div>
-        </header>
         @if(session('success'))
             <div role="status"
                  class="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">
@@ -30,7 +20,7 @@
         @endif
         @if($canViewRegistrations)
             <div data-ta-review-data class="space-y-5">
-                <div class="grid items-start gap-4 @can('sidang_ta_period_read') md:grid-cols-2 @endcan">
+                <div class="space-y-4">
                     <section data-ta-period-card class="campus-card space-y-3 p-4">
                         <h3 class="text-sm font-bold text-slate-800">{{ isset($filters['period']) ? 'Periode terpilih' : 'Periode aktif' }}</h3>
                         @can('sidang_ta_period_read')
@@ -38,9 +28,13 @@
                         @endcan
                         <div class="space-y-3">
                             @forelse($periodCards as $period)
-                                <article data-ta-period-banner="{{ $period->id }}" class="rounded-xl border border-slate-200 bg-white p-4">
-                                    @include('sidang_ta_registrations.partials.period-schedule', ['schedulePeriod' => $period])
-                                </article>
+                                <details data-ta-period-banner="{{ $period->id }}" class="group rounded-xl border border-slate-200 bg-white p-4" @if(!$period->schedulesAreClosed()) open @endif>
+                                    <summary class="flex cursor-pointer list-none items-center justify-between gap-3 font-bold text-slate-800 [&::-webkit-details-marker]:hidden">
+                                        <span>{{ $period->name }}</span>
+                                        <svg aria-hidden="true" class="h-4 w-4 shrink-0 transition-transform group-open:rotate-90" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m9 5 7 7-7 7"/></svg>
+                                    </summary>
+                                    <div class="mt-4">@include('sidang_ta_registrations.partials.period-schedule', ['schedulePeriod' => $period, 'hideScheduleTitle' => true])</div>
+                                </details>
                             @empty
                                 <p data-ta-no-period
                                    class="rounded-xl border border-dashed border-slate-300 bg-white p-4 text-sm text-slate-500">
@@ -85,7 +79,7 @@
                         <select class="campus-select mt-1" name="period">
                             <option value="">Semua periode</option>
                             @foreach($periods as $period)
-                                <option value="{{ $period->id }}" @selected(($filters['period'] ?? null) == $period->id)>
+                                <option value="{{ $period->getRouteKey() }}" @selected(($filters['period'] ?? null) == $period->id)>
                                     {{ $period->name }}
                                 </option>
                             @endforeach
@@ -132,12 +126,12 @@
                     @if($canReview)
                         <div class="flex flex-wrap items-center gap-2 md:col-span-2 xl:col-span-5">
                             @if($counts['total'] > 0)
-                                <a data-ta-export href="{{ route('admin.sidang-ta-registrations.export', $filters) }}" class="btn btn-success">
+                                <a data-ta-export href="{{ route('admin.sidang-ta-registrations.export', $filterParameters) }}" class="btn btn-success">
                                     <svg aria-hidden="true" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-width="1.7" stroke-linejoin="round" d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6zm0 0v6h6M8 12l5 6m0-6l-5 6"/></svg>
-                                    Ekspor Excel
+                                    Export Excel
                                 </a>
                             @else
-                                <button data-ta-export-empty type="button" disabled class="btn btn-success cursor-not-allowed opacity-50" title="Tidak ada pengajuan untuk diekspor">Ekspor Excel</button>
+                                <button data-ta-export-empty type="button" disabled class="btn btn-success cursor-not-allowed opacity-50" title="Tidak ada pengajuan untuk diekspor">Export Excel</button>
                             @endif
                         </div>
                     @endif
@@ -211,7 +205,7 @@
                                         @if($registrations->total() > 0)
                                             <p>Halaman ini tidak berisi pengajuan.</p>
                                             <a data-ta-first-page
-                                               href="{{ route('admin.sidang-ta-registrations.index', $filters) }}"
+                                               href="{{ route('admin.sidang-ta-registrations.index', $filterParameters) }}"
                                                class="mt-3 inline-flex font-semibold text-[#DA2D3B] hover:underline">Kembali
                                                 ke halaman pertama
                                             </a>

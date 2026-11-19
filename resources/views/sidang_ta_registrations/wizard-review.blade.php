@@ -242,7 +242,7 @@
                     </div>
                     <form data-final-registration-form method="POST"
                           class="mt-5 flex flex-wrap justify-end gap-3"
-                          action="{{ $isRevision ? route('sidang-ta-registrations.update', $draft->source_registration_id) : route('sidang-ta-registrations.store') }}"
+                          action="{{ $isRevision ? route('sidang-ta-registrations.update', $draft->sourceRegistration) : route('sidang-ta-registrations.store') }}"
                           @submit="submit($event)">
                         @csrf
                         @if($isRevision)

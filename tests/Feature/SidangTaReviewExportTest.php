@@ -205,7 +205,7 @@ test('p2b_export_link_keeps_applied_filters_without_current_page', function () {
     $filters = ['search' => 'Tautan', 'period' => $this->a->id, 'status' => 'submitted', 'study_program' => 'Informatika'];
     $crawler = new Crawler($this->get(route('admin.sidang-ta-registrations.index', $filters + ['page' => 2]))->assertOk()->getContent());
     $href = $crawler->filter('[data-ta-export]')->attr('href');
-    expect($href)->toBe(route('admin.sidang-ta-registrations.export', $filters));
+    expect($href)->toBe(route('admin.sidang-ta-registrations.export', array_replace($filters, ['period' => $this->a->public_id])));
     parse_str(parse_url($href, PHP_URL_QUERY), $query);
     expect(array_key_exists('page', $query))->toBeFalse();
 });

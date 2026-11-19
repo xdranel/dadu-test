@@ -14,13 +14,6 @@
                  class="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">{{ session('success') }}</div>
         @endif
         <div data-registration-header class="flex flex-wrap items-center justify-between gap-4">
-            <div class="min-w-0 space-y-1">
-                <h2 class="text-xl font-bold text-slate-800">Pendaftaran Sidang Tugas Akhir</h2>
-                <p class="text-xs leading-relaxed text-slate-500 sm:text-sm">Daftar pengajuan pendaftaran sidang tugas
-                    akhir Anda.</p>
-                <span data-open-period-count
-                      class="inline-flex rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-600">{{ $openPeriods->count() }} periode terbuka</span>
-            </div>
             <div class="flex flex-wrap items-center gap-2">
                 @if($activeRegistration)
                     @if($activeRegistration->status !== 'needs_review')
@@ -60,10 +53,6 @@
                 @endif
             </div>
         </div>
-        @if(!$activeRegistration && $openPeriods->isEmpty())
-            <p class="text-xs leading-relaxed text-slate-500">Pendaftaran baru belum tersedia. Draft tersimpan tetap
-                dapat dilihat di bawah.</p>
-        @endif
         <div data-student-period-schedules class="grid gap-4 xl:grid-cols-2">
             @foreach($schedulePeriods as $schedulePeriod)
                 @php
@@ -74,7 +63,8 @@
                      x-show="status !== 'Ditutup'">@include('sidang_ta_registrations.partials.period-schedule')</div>
             @endforeach
         </div>
-        <div class="grid items-start gap-4 @if(config('sidang_ta.student_booking_enabled', false) && $bookingRegistrations->isNotEmpty()) xl:grid-cols-2 @endif">
+        <div class="grid items-start gap-4 @if($drafts->isNotEmpty() && config('sidang_ta.student_booking_enabled', false) && $bookingRegistrations->isNotEmpty()) xl:grid-cols-2 @endif">
+        @if($drafts->isNotEmpty())
         <section data-testid="drafts-panel" class="campus-card w-full space-y-4 p-5">
             <div>
                 <h3 class="text-base font-bold text-slate-800">Draft tersimpan</h3>
@@ -144,6 +134,7 @@
                 <p class="text-sm text-slate-500">Belum ada draft tersimpan.</p>
             @endforelse
         </section>
+        @endif
         @if(config('sidang_ta.student_booking_enabled', false) && $bookingRegistrations->isNotEmpty())
             <div class="space-y-4">@foreach($bookingRegistrations as $bookingRegistration)@include('sidang_ta_registrations.partials.booking-card')@endforeach</div>
         @endif

@@ -7,6 +7,8 @@ use Illuminate\Database\Eloquent\Model;
 
 class SidangTaPeriod extends Model
 {
+    use \App\Models\Concerns\HasSidangTaPublicId;
+
     protected $fillable = ['name', 'open_at', 'close_at', 'revision_open_at', 'revision_close_at', 'is_active', 'is_revision_active', 'show_to_students', 'description'];
 
     protected $attributes = ['is_revision_active' => true, 'show_to_students' => false];
@@ -29,6 +31,15 @@ class SidangTaPeriod extends Model
     public function isOpen(): bool
     {
         return $this->is_active && now()->between($this->open_at, $this->close_at);
+    }
+
+    public function schedulesAreClosed(): bool
+    {
+        $registrationAvailable = $this->is_active && $this->close_at && ! now()->gt($this->close_at);
+        $revisionAvailable = $this->is_revision_active
+            && (! $this->revisionIsConfigured() || ! now()->gt($this->revision_close_at));
+
+        return ! $registrationAvailable && ! $revisionAvailable;
     }
 
     public function revisionIsConfigured(): bool

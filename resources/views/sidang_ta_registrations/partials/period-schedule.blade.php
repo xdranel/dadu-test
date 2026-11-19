@@ -1,7 +1,9 @@
 @if($schedulePeriod)
     <section data-period-schedule="{{ $schedulePeriod->id }}" class="space-y-3"
              @if($dynamicSchedule ?? false) x-show="selectedPeriodId === @js((string) $schedulePeriod->id)" @if((string) $schedulePeriod->id !== $selectedPeriod) style="display: none;" @endif @endif>
+        @unless($hideScheduleTitle ?? false)
         <h3 class="break-words text-sm font-bold text-slate-800">{{ $schedulePeriod->name }}</h3>
+        @endunless
         <div class="grid gap-3 md:grid-cols-2">
             @include('sidang_ta_registrations.partials.period-countdown', [
                 'scheduleEnabled' => (bool) $schedulePeriod->is_active, 'scheduleKind' => 'registration', 'scheduleTitle' => 'Pendaftaran Sidang TA',
@@ -10,6 +12,5 @@
                 'scheduleEnabled' => (bool) $schedulePeriod->is_revision_active, 'scheduleKind' => 'revision', 'scheduleTitle' => 'Tanggal Verifikasi Berkas',
                 'scheduleOpen' => $schedulePeriod->revision_open_at, 'scheduleClose' => $schedulePeriod->revision_close_at])
         </div>
-        <p class="text-xs text-slate-500">Pendaftaran baru {{ $schedulePeriod->is_active ? 'diaktifkan' : 'dinonaktifkan' }}. Revisi {{ $schedulePeriod->is_revision_active ? 'diaktifkan' : 'dinonaktifkan' }} dan mengikuti jadwal verifikasi berkas.</p>
     </section>
 @endif

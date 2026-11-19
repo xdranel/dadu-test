@@ -38,6 +38,17 @@ class SidangTaRegistrationController extends Controller
         $openPeriods = SidangTaPeriod::query()->openForRegistration()->get();
         $drafts = SidangTaRegistrationDraft::query()->ownedBy(auth()->user())
             ->where('student_number', $number)->where('status', 'active')
+            ->where(function ($query) {
+                $query->where(function ($initial) {
+                    $initial->whereNull('source_registration_id')
+                        ->whereHas('period', fn ($period) => $period->where('close_at', '>=', now()));
+                })->orWhere(function ($revision) {
+                    $revision->whereNotNull('source_registration_id')->whereHas('period', function ($period) {
+                        $period->whereNull('revision_open_at')->orWhereNull('revision_close_at')
+                            ->orWhere('revision_close_at', '>=', now());
+                    });
+                });
+            })
             ->with(['period', 'sourceRegistration'])->latest()->get();
         $activeRegistration = SidangTaRegistration::where('student_number', $number)
             ->whereIn('status', ['submitted', 'needs_review'])->latest()->first();
@@ -167,6 +178,7 @@ class SidangTaRegistrationController extends Controller
         $periods = SidangTaPeriod::orderByDesc('open_at')->orderByDesc('id')->get();
         $registrations = null;
         $filters = [];
+        $filterParameters = [];
         $counts = null;
         $studyPrograms = collect();
         $periodCards = collect();
@@ -176,20 +188,21 @@ class SidangTaRegistrationController extends Controller
             if ($scopedProgram !== null) {
                 unset($filters['study_program']);
             }
+            $filterParameters = $reviewQuery->urlFilters($filters);
             $counts = $reviewQuery->counts($filters, $programScope);
             if ($canReview) {
                 $studyPrograms = SidangTaRegistration::query()->whereNotNull('study_program')
                     ->where('study_program', '!=', '')->distinct()->orderBy('study_program')->pluck('study_program');
             }
             $registrations = $reviewQuery->query($filters, $programScope)->with(['period', 'documents'])
-                ->orderByDesc('submitted_at')->orderByDesc('id')->paginate(15)->appends($filters);
+                ->orderByDesc('submitted_at')->orderByDesc('id')->paginate(15)->appends($filterParameters);
             $periodCards = isset($filters['period'])
                 ? $periods->where('id', $filters['period'])->values()
                 : $periods->where('is_active', true)->values();
         }
 
         return view('sidang_ta_registrations.admin.index', compact(
-            'canReview', 'canViewRegistrations', 'scopedProgram', 'registrations', 'periods', 'filters', 'counts', 'studyPrograms', 'periodCards'
+            'canReview', 'canViewRegistrations', 'scopedProgram', 'registrations', 'periods', 'filters', 'filterParameters', 'counts', 'studyPrograms', 'periodCards'
         ));
     }
 
@@ -344,6 +357,7 @@ class SidangTaRegistrationController extends Controller
     public function updatePeriod(Request $request, SidangTaPeriod $period)
     {
         $data = $this->validatedPeriodData($request);
+        app(\App\Services\SidangTaExpiredDraftCleanup::class)->run(false, $period->id);
         $period->update($data);
 
         return back()->with('success', 'Periode Sidang TA berhasil diperbarui.');

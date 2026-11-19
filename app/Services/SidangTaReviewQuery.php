@@ -3,9 +3,12 @@
 namespace App\Services;
 
 use App\Models\SidangTaRegistration;
+use App\Models\SidangTaPeriod;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 
 class SidangTaReviewQuery
@@ -17,19 +20,32 @@ class SidangTaReviewQuery
 
     public function filters(Request $request): array
     {
-        $values = $request->validate([
+        $input = $request->all();
+        if (isset($input['period']) && is_string($input['period']) && Str::isUuid($input['period'])) {
+            $input['period'] = SidangTaPeriod::where('public_id', $input['period'])->value('id') ?? $input['period'];
+        }
+        $values = Validator::make($input, [
             'search' => ['nullable', 'string', 'max:100'],
             'period' => ['nullable', 'integer', 'exists:sidang_ta_periods,id'],
             'status' => ['nullable', Rule::in(array_keys(self::STATUSES))],
             'study_program' => ['nullable', 'string', 'max:255'],
             'page' => ['sometimes', 'integer', 'min:1'],
-        ]);
+        ])->validate();
         unset($values['page']);
         foreach (['search', 'study_program'] as $key) {
             if (isset($values[$key])) $values[$key] = trim($values[$key]);
         }
         if (isset($values['period'])) $values['period'] = (int) $values['period'];
         return array_filter($values, fn ($value) => $value !== null && $value !== '');
+    }
+
+    public function urlFilters(array $filters): array
+    {
+        if (isset($filters['period'])) {
+            $filters['period'] = SidangTaPeriod::whereKey($filters['period'])->value('public_id');
+        }
+
+        return $filters;
     }
 
     public function query(array $filters, ?array $programScope = null): Builder

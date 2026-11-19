@@ -1,0 +1,630 @@
+{
+  "source_head": "9bf3a00c620fa196b7f50f2d423737c8352a2146",
+  "target_head": "b85951da26d845690cfbd8c8d8757b285b445124",
+  "source_application_files_checked": 766,
+  "identical": 761,
+  "intentional_differences": [
+    "app/Policies/DocumentCategoryPolicy.php",
+    "app/Policies/DocumentPolicy.php",
+    "database/seeders/RolePermissionSeeder.php",
+    "resources/css/app.css",
+    "resources/views/queue-tickets/admin.blade.php"
+  ],
+  "files": [
+    {
+      "path": "app/Http/Controllers/SidangTaRegistrationController.php",
+      "target_sha256": "47bb2537c679f09211f68dc9016de2223b9f3c69f54d17a4ff64a8997ab5d310",
+      "source_before_sha256": "f9a4b2e46ff17e6eb6f49362392e73ea15855acce8682d8f5fa7b4dd2f382e49"
+    },
+    {
+      "path": "app/Http/Middleware/CanonicalSidangTaUrl.php",
+      "target_sha256": "ae97e9c780ea1d5b0f975d04669026a7ebda18bc4a2b7ed92db9fe7cdddf0b22",
+      "source_before_sha256": null
+    },
+    {
+      "path": "app/Models/Concerns/HasSidangTaPublicId.php",
+      "target_sha256": "54a72cdc92a5e4c853664a20ad15567073877156c1d5918c1aedb8ff151b7d38",
+      "source_before_sha256": null
+    },
+    {
+      "path": "app/Models/SidangTaFormGuide.php",
+      "target_sha256": "77881df72b52ca0a5430eba4919b942f6e2070b1deb52e8c1fa5c7f29accc834",
+      "source_before_sha256": "782f8ed8b621187f4559da31682cb3ff57ab430c10767ba1950a306202ce11b7"
+    },
+    {
+      "path": "app/Models/SidangTaPeriod.php",
+      "target_sha256": "e17e89526b427465de6733ae8072579c11045046a8aec5d3479fc375a124ed0f",
+      "source_before_sha256": "227719fc2c1ac97b9ac346b96f69c198418f885f0b1dabf4989e2256dc6fb29a"
+    },
+    {
+      "path": "app/Models/SidangTaRegistration.php",
+      "target_sha256": "cf03dd6c93caee8ea4fae01e53a8adf3238dc8018c0ab68ca895deb20747ab32",
+      "source_before_sha256": "81f4c11d4204aa8c82005a7976a833110d70997cc203a107105badc1672f3e59"
+    },
+    {
+      "path": "app/Models/SidangTaRegistrationDocument.php",
+      "target_sha256": "92c01d3a08fc70c7966cfddefa321815f85c98a9308f5754661dd46120d434f1",
+      "source_before_sha256": "1d96e9043f28b891dbfd7d2d09aec542a8a5421ef2f347bc046bdb3157b8f076"
+    },
+    {
+      "path": "app/Models/SidangTaRegistrationDraftDocument.php",
+      "target_sha256": "3af83f676759bf662b6bafeba200448a3d390cd776d1e8174e5f62a35fd7922b",
+      "source_before_sha256": "6845d621fcc4795667ef5c6bd5dc47136c0ee6be9b24c171f64817248f3e6741"
+    },
+    {
+      "path": "app/Services/SidangTaExpiredDraftCleanup.php",
+      "target_sha256": "203ec25945df863e5948beae518c264cea93021e285012775301228e0f54a4a6",
+      "source_before_sha256": "f7595d6bb8171ab4f933eee68014c792705570c642680847a20f67c2f3705197"
+    },
+    {
+      "path": "app/Services/SidangTaReviewQuery.php",
+      "target_sha256": "bb1339448f7448c529024929805a14a23d727e9ff14a6efb6aa872e57988596b",
+      "source_before_sha256": "bc0ef8c03e9dca5623d7be6b531cb234748f277373bccf4daca8d2a4d31465c0"
+    },
+    {
+      "path": "bootstrap/app.php",
+      "target_sha256": "3277578b33d6238a63810599a397a9941be8fb2bab6309aa6951806bc0aace6e",
+      "source_before_sha256": "c5e217098178a6798be6d2d95744db2e6a2c97da7512ddf8d1d64719483812fd"
+    },
+    {
+      "path": "database/migrations/2026_11_19_120000_add_public_ids_to_sidang_ta_routes.php",
+      "target_sha256": "afa464dcddb35ad0932e6f21f57f66be01a1658aef1fa99ab2307af8a8e552d9",
+      "source_before_sha256": null
+    },
+    {
+      "path": "resources/views/sidang_ta_registrations/admin/index.blade.php",
+      "target_sha256": "b841389672eb43f6b333212fecc25d8fca890ce0d5dcd4aa48e8d855f59e0dde",
+      "source_before_sha256": "02f1cc9b0871b33a9b4ccd764a09160a056d9c4fbab8fe0e3774492c4368b6cc"
+    },
+    {
+      "path": "resources/views/sidang_ta_registrations/admin/periods.blade.php",
+      "target_sha256": "1ec9878e599821d96d512252e28a394f20e52d3d4a6cbfb986ce6a97a04e9092",
+      "source_before_sha256": "1ff5d868e21654ac384f28d5874f4df3ec7a6e1f262b22b23bb87723a47acb09"
+    },
+    {
+      "path": "resources/views/sidang_ta_registrations/index.blade.php",
+      "target_sha256": "e07e536facaa2f067599b00fb4d8be105194bb9afda63597e6047050cc2ac139",
+      "source_before_sha256": "77e0cea54baa492f1b3cf47e8257037ebed019dd28e8bfc3f5d547e9bd3cd1db"
+    },
+    {
+      "path": "resources/views/sidang_ta_registrations/partials/period-schedule.blade.php",
+      "target_sha256": "571351837edd48a9befde59df3c75b2763f08ce4205fe44b7bad81c595a0f487",
+      "source_before_sha256": "4c361f1928f7b2c9515cce3c271a182072eff3d46b084d527006bea679830dab"
+    },
+    {
+      "path": "resources/views/sidang_ta_registrations/wizard-review.blade.php",
+      "target_sha256": "d2fc17e7309f3d94570d316bfaf2568bb0aba4102e63408928e44c15ddd2d074",
+      "source_before_sha256": "c7390249f226fda4021bf63a478ec3440b8634ca8062dbae5c61ef4e65b1749c"
+    },
+    {
+      "path": "tests/Feature/SidangTaDraftCardTest.php",
+      "target_sha256": "4e1757717a682eaf809da22df14289a2b7ead86a29064cc6ae86bc54c2d17a38",
+      "source_before_sha256": "6a133ebb86827243fe8c67d81c4d0e0aae5e6d071aca6858c30cc69abadd21a9"
+    },
+    {
+      "path": "tests/Feature/SidangTaPublicUrlTest.php",
+      "target_sha256": "57316484b38ab678159fc79fd77a4e562efef3e3cc4facaa10d209d6074baa20",
+      "source_before_sha256": null
+    },
+    {
+      "path": "tests/Feature/SidangTaReviewExportTest.php",
+      "target_sha256": "662720ec83520993e8b061e243ca6e98788af2c89edae88539f559adade1c416",
+      "source_before_sha256": "bb6b5e7a8401159e84405c2dee899d73ce5da087f2df3e836d7cd7197c26ed6c"
+    },
+    {
+      "path": "tests/Feature/SidangTaReviewListTest.php",
+      "target_sha256": "d56e38700df61fe46082f6dd4eab56a5755660ca2605404b251ea7a17e747456",
+      "source_before_sha256": "7550eeb85bebe7fe489e674ffa62f18fb605095a635b77b3ce37713cda277245"
+    },
+    {
+      "path": "tests/Feature/SidangTaRevisionDeadlineTest.php",
+      "target_sha256": "b84830472623671066a4817c5d92c1dfbbfa12e7d132356c0a2b02a48f086110",
+      "source_before_sha256": "450183d1aff4ce25d955e88dbd33776ac6c442aa4ff17ba90eaa5abe40beb2a7"
+    },
+    {
+      "path": "tests/Feature/SidangTaStudentBookingVisibilityTest.php",
+      "target_sha256": "97fb6c3a621b81870ad7f00f16bd39412a89149efc36f2cf4baaf16bafa94f27",
+      "source_before_sha256": "54fa19c8420d1504d81860baa286b515e3780f5834fe265cb361cd1c676c6e6d"
+    },
+    {
+      "path": "tests/Feature/SidangTaStudentPolishTest.php",
+      "target_sha256": "a8e4ef2201a1a0083bff5a4e0ea056c364a5d90fa9b41619c25a70c0a3f00db9",
+      "source_before_sha256": "a15b6c6a2a41bbe0719dd8a007d0e0c7b4e2430ae9b74e57f2184d412c1ca956"
+    },
+    {
+      "path": "tests/Feature/SidangTaTargetedRevisionTest.php",
+      "target_sha256": "97c35bda96f403746332e37d6969c513519404744d5d4b42367aa2692c0aa4f4",
+      "source_before_sha256": "06a95bacee42e44adb67c9f35727a0bca7c9ea919662629507b5605289bd9cd0"
+    }
+  ],
+  "verification": {
+    "red": {
+      "total": 10,
+      "passed": 4,
+      "failed": 6,
+      "skipped": 0,
+      "failures": [
+        {
+          "class": "Tests\\Feature\\SidangTaPublicUrlTest",
+          "name": "public TA links use opaque keys while database relationships and document paths stay intact"
+        },
+        {
+          "class": "Tests\\Feature\\SidangTaPublicUrlTest",
+          "name": "legacy authorized numeric document and registration links redirect to their opaque URLs"
+        },
+        {
+          "class": "Tests\\Feature\\SidangTaPublicUrlTest",
+          "name": "draft document period and form guide links also use opaque keys"
+        },
+        {
+          "class": "Tests\\Feature\\SidangTaPublicUrlTest",
+          "name": "public ID backfill repairs old rows without changing primary keys status snapshots or foreign keys"
+        },
+        {
+          "class": "Tests\\Feature\\SidangTaDraftCardTest",
+          "name": "empty or fully expired drafts do not leave a draft panel on the student dashboard"
+        },
+        {
+          "class": "Tests\\Feature\\SidangTaDraftCardTest",
+          "name": "extending an expired period discards its old draft without changing a final submission"
+        }
+      ]
+    },
+    "filter-red": {
+      "total": 1,
+      "passed": 0,
+      "failed": 1,
+      "skipped": 0,
+      "failures": [
+        {
+          "class": "Tests\\Feature\\SidangTaPublicUrlTest",
+          "name": "review period filters and generated export links use public period identifiers"
+        }
+      ]
+    },
+    "review-red": {
+      "total": 4,
+      "passed": 0,
+      "failed": 4,
+      "skipped": 0,
+      "failures": [
+        {
+          "class": "Tests\\Feature\\SidangTaDraftCardTest",
+          "name": "an initial draft is hidden after registration closes even while verification remains open"
+        },
+        {
+          "class": "Tests\\Feature\\SidangTaDraftCardTest",
+          "name": "a legacy revision without verification dates remains visible after registration closes"
+        },
+        {
+          "class": "Tests\\Feature\\SidangTaDraftCardTest",
+          "name": "period disclosure stays expanded for active legacy verification and collapses when disabled"
+        },
+        {
+          "class": "Tests\\Feature\\SidangTaTargetedRevisionTest",
+          "name": "revision final review submits to the public registration URL and preserves revision workflow"
+        }
+      ]
+    },
+    "targeted": {
+      "total": 123,
+      "passed": 123,
+      "failed": 0,
+      "skipped": 0,
+      "failures": []
+    },
+    "final-targeted": {
+      "total": 168,
+      "passed": 168,
+      "failed": 0,
+      "skipped": 0,
+      "failures": []
+    },
+    "full": {
+      "total": 1284,
+      "passed": 1235,
+      "failed": 47,
+      "skipped": 2,
+      "failures": [
+        {
+          "class": "Tests\\Feature\\Auth\\PasswordResetTest",
+          "name": "reset password link can be requested"
+        },
+        {
+          "class": "Tests\\Feature\\Auth\\PasswordResetTest",
+          "name": "reset password screen can be rendered"
+        },
+        {
+          "class": "Tests\\Feature\\Auth\\PasswordResetTest",
+          "name": "password can be reset with valid token"
+        },
+        {
+          "class": "Tests\\Feature\\Auth\\PasswordUpdateTest",
+          "name": "password can be updated"
+        },
+        {
+          "class": "Tests\\Feature\\ExamScheduleTest",
+          "name": "guest cannot access autocomplete search endpoints"
+        },
+        {
+          "class": "Tests\\Feature\\ExamScheduleTest",
+          "name": "authenticated user gets empty json if autocomplete query is empty or less than 2 characters"
+        },
+        {
+          "class": "Tests\\Feature\\ExamScheduleTest",
+          "name": "autocomplete search returns matching distinct courses"
+        },
+        {
+          "class": "Tests\\Feature\\ExamScheduleTest",
+          "name": "autocomplete search returns matching lecturers with name validation"
+        },
+        {
+          "class": "Tests\\Feature\\GraduationRegistrationTest",
+          "name": "admin can see active period countdown banner on graduation registration index"
+        },
+        {
+          "class": "Tests\\Feature\\GraduationRegistrationTest",
+          "name": "countdown banner is not visible if there is no active period"
+        },
+        {
+          "class": "Tests\\Feature\\GraduationRegistrationTest",
+          "name": "countdown banner shows expired status when active period is closed"
+        },
+        {
+          "class": "Tests\\Feature\\GraduationRegistrationTest",
+          "name": "student can submit graduation registration with student email and conditional title change"
+        },
+        {
+          "class": "Tests\\Feature\\GraduationRegistrationTest",
+          "name": "admin can delete graduation registration submission"
+        },
+        {
+          "class": "Tests\\Feature\\GraduationRegistrationTest",
+          "name": "student can submit graduation registration with honors predicate cumlaude and criteria hki"
+        },
+        {
+          "class": "Tests\\Feature\\GraduationRegistrationTest",
+          "name": "admin can change review status of graduation registration"
+        },
+        {
+          "class": "Tests\\Feature\\GraduationRegistrationTest",
+          "name": "backend blocks submission if student is ineligible due to failed courses or tak score"
+        },
+        {
+          "class": "Tests\\Feature\\PreAssignRoleTest",
+          "name": "superadmin can access pre-assign role page"
+        },
+        {
+          "class": "Tests\\Feature\\PreAssignRoleTest",
+          "name": "pre-assigned role and unit are preserved when user authenticates via SSO login"
+        },
+        {
+          "class": "Tests\\Feature\\PublicDocumentTest",
+          "name": "it memastikan dokumen non-publik tidak pernah muncul di portal publik dan mengembalikan 404 identik"
+        },
+        {
+          "class": "Tests\\Feature\\QueueHistoryAndLogTest",
+          "name": "event called and finished are logged during next call cycle"
+        },
+        {
+          "class": "Tests\\Feature\\QueueHistoryAndLogTest",
+          "name": "event skipped is logged when officer skips ticket"
+        },
+        {
+          "class": "Tests\\Feature\\QueueHistoryAndLogTest",
+          "name": "event undo_call is logged when officer cancels call"
+        },
+        {
+          "class": "Tests\\Feature\\QueueHistoryAndLogTest",
+          "name": "history page lists records from both active tickets and archived histories"
+        },
+        {
+          "class": "Tests\\Feature\\QueueHistoryAndLogTest",
+          "name": "filtering by nim searches across all months ignoring date filters"
+        },
+        {
+          "class": "Tests\\Feature\\QueueHistoryAndLogTest",
+          "name": "month filter strictly respects month boundaries"
+        },
+        {
+          "class": "Tests\\Feature\\QueueHistoryAndLogTest",
+          "name": "queue:export-month exports full month to storage/app/queue-exports and overwrites cleanly"
+        },
+        {
+          "class": "Tests\\Feature\\QueueHistoryAndLogTest",
+          "name": "queue:prune-history strictly rejects deletion if export file does not exist"
+        },
+        {
+          "class": "Tests\\Feature\\QueueHistoryAndLogTest",
+          "name": "queue:prune-history strictly rejects deletion if export file is empty 0 bytes"
+        },
+        {
+          "class": "Tests\\Feature\\QueueHistoryAndLogTest",
+          "name": "queue:prune-history strictly rejects deletion if export row count does not match database count"
+        },
+        {
+          "class": "Tests\\Feature\\QueueHistoryAndLogTest",
+          "name": "queue:prune-history dry-run previews deletion count without modifying database"
+        },
+        {
+          "class": "Tests\\Feature\\QueueHistoryAndLogTest",
+          "name": "queue:prune-history successfully prunes data older than retention limit when all safeguards pass"
+        },
+        {
+          "class": "Tests\\Feature\\QueueHistoryStaffNotesTest",
+          "name": "5. data dari tabel arsip queue_ticket_histories juga menampilkan staff_notes"
+        },
+        {
+          "class": "Tests\\Feature\\QueueTicketTest",
+          "name": "visitor get take page displays form when queue is open"
+        },
+        {
+          "class": "Tests\\Feature\\QueueTicketTest",
+          "name": "ambil tiket sukses via POST /queue/take saves details and sets device_token cookie"
+        },
+        {
+          "class": "Tests\\Feature\\QueueTicketTest",
+          "name": "ambil tiket saat tutup ditolak dan menampilkan view closed"
+        },
+        {
+          "class": "Tests\\Feature\\QueueTicketTest",
+          "name": "dua request berurutan/bersamaan tidak menghasilkan kode kembar"
+        },
+        {
+          "class": "Tests\\Feature\\SidangTaMeetFinalizationTest",
+          "name": "meet_final_staff_can_read_export_and_verify_while_revision_requires_document_feedback"
+        },
+        {
+          "class": "Tests\\Feature\\SidangTaReviewExportTest",
+          "name": "p2b_export_link_keeps_applied_filters_without_current_page"
+        },
+        {
+          "class": "Tests\\Feature\\SidangTaReviewUiTest",
+          "name": "revision_confirmation_form_keeps_original_registration_and_put_method"
+        },
+        {
+          "class": "Tests\\Feature\\SyncTest",
+          "name": "admin can import valid student JSON"
+        },
+        {
+          "class": "Tests\\Feature\\SyncTest",
+          "name": "admin can import flat array Course JSON"
+        },
+        {
+          "class": "Tests\\Feature\\SyncTest",
+          "name": "admin can import associative Course JSON"
+        },
+        {
+          "class": "Tests\\Feature\\SyncTest",
+          "name": "admin can import valid KRS JSON when student exists"
+        },
+        {
+          "class": "Tests\\Feature\\SyncTest",
+          "name": "admin can import flat array KRS JSON and automatically create or update student profile"
+        },
+        {
+          "class": "Tests\\Feature\\SyncTest",
+          "name": "admin can import valid Attendance JSON when student exists"
+        },
+        {
+          "class": "Tests\\Feature\\SyncTest",
+          "name": "sync import skips rows if student does not exist for KRS and Attendance"
+        },
+        {
+          "class": "Tests\\Feature\\SyncTest",
+          "name": "admin can import graduation JSON payload"
+        }
+      ]
+    },
+    "final-full": {
+      "total": 1288,
+      "passed": 1240,
+      "failed": 46,
+      "skipped": 2,
+      "failures": [
+        {
+          "class": "Tests\\Feature\\Auth\\PasswordResetTest",
+          "name": "reset password link can be requested"
+        },
+        {
+          "class": "Tests\\Feature\\Auth\\PasswordResetTest",
+          "name": "reset password screen can be rendered"
+        },
+        {
+          "class": "Tests\\Feature\\Auth\\PasswordResetTest",
+          "name": "password can be reset with valid token"
+        },
+        {
+          "class": "Tests\\Feature\\Auth\\PasswordUpdateTest",
+          "name": "password can be updated"
+        },
+        {
+          "class": "Tests\\Feature\\ExamScheduleTest",
+          "name": "guest cannot access autocomplete search endpoints"
+        },
+        {
+          "class": "Tests\\Feature\\ExamScheduleTest",
+          "name": "authenticated user gets empty json if autocomplete query is empty or less than 2 characters"
+        },
+        {
+          "class": "Tests\\Feature\\ExamScheduleTest",
+          "name": "autocomplete search returns matching distinct courses"
+        },
+        {
+          "class": "Tests\\Feature\\ExamScheduleTest",
+          "name": "autocomplete search returns matching lecturers with name validation"
+        },
+        {
+          "class": "Tests\\Feature\\GraduationRegistrationTest",
+          "name": "admin can see active period countdown banner on graduation registration index"
+        },
+        {
+          "class": "Tests\\Feature\\GraduationRegistrationTest",
+          "name": "countdown banner is not visible if there is no active period"
+        },
+        {
+          "class": "Tests\\Feature\\GraduationRegistrationTest",
+          "name": "countdown banner shows expired status when active period is closed"
+        },
+        {
+          "class": "Tests\\Feature\\GraduationRegistrationTest",
+          "name": "student can submit graduation registration with student email and conditional title change"
+        },
+        {
+          "class": "Tests\\Feature\\GraduationRegistrationTest",
+          "name": "admin can delete graduation registration submission"
+        },
+        {
+          "class": "Tests\\Feature\\GraduationRegistrationTest",
+          "name": "student can submit graduation registration with honors predicate cumlaude and criteria hki"
+        },
+        {
+          "class": "Tests\\Feature\\GraduationRegistrationTest",
+          "name": "admin can change review status of graduation registration"
+        },
+        {
+          "class": "Tests\\Feature\\GraduationRegistrationTest",
+          "name": "backend blocks submission if student is ineligible due to failed courses or tak score"
+        },
+        {
+          "class": "Tests\\Feature\\PreAssignRoleTest",
+          "name": "superadmin can access pre-assign role page"
+        },
+        {
+          "class": "Tests\\Feature\\PreAssignRoleTest",
+          "name": "pre-assigned role and unit are preserved when user authenticates via SSO login"
+        },
+        {
+          "class": "Tests\\Feature\\PublicDocumentTest",
+          "name": "it memastikan dokumen non-publik tidak pernah muncul di portal publik dan mengembalikan 404 identik"
+        },
+        {
+          "class": "Tests\\Feature\\QueueHistoryAndLogTest",
+          "name": "event called and finished are logged during next call cycle"
+        },
+        {
+          "class": "Tests\\Feature\\QueueHistoryAndLogTest",
+          "name": "event skipped is logged when officer skips ticket"
+        },
+        {
+          "class": "Tests\\Feature\\QueueHistoryAndLogTest",
+          "name": "event undo_call is logged when officer cancels call"
+        },
+        {
+          "class": "Tests\\Feature\\QueueHistoryAndLogTest",
+          "name": "history page lists records from both active tickets and archived histories"
+        },
+        {
+          "class": "Tests\\Feature\\QueueHistoryAndLogTest",
+          "name": "filtering by nim searches across all months ignoring date filters"
+        },
+        {
+          "class": "Tests\\Feature\\QueueHistoryAndLogTest",
+          "name": "month filter strictly respects month boundaries"
+        },
+        {
+          "class": "Tests\\Feature\\QueueHistoryAndLogTest",
+          "name": "queue:export-month exports full month to storage/app/queue-exports and overwrites cleanly"
+        },
+        {
+          "class": "Tests\\Feature\\QueueHistoryAndLogTest",
+          "name": "queue:prune-history strictly rejects deletion if export file does not exist"
+        },
+        {
+          "class": "Tests\\Feature\\QueueHistoryAndLogTest",
+          "name": "queue:prune-history strictly rejects deletion if export file is empty 0 bytes"
+        },
+        {
+          "class": "Tests\\Feature\\QueueHistoryAndLogTest",
+          "name": "queue:prune-history strictly rejects deletion if export row count does not match database count"
+        },
+        {
+          "class": "Tests\\Feature\\QueueHistoryAndLogTest",
+          "name": "queue:prune-history dry-run previews deletion count without modifying database"
+        },
+        {
+          "class": "Tests\\Feature\\QueueHistoryAndLogTest",
+          "name": "queue:prune-history successfully prunes data older than retention limit when all safeguards pass"
+        },
+        {
+          "class": "Tests\\Feature\\QueueHistoryStaffNotesTest",
+          "name": "5. data dari tabel arsip queue_ticket_histories juga menampilkan staff_notes"
+        },
+        {
+          "class": "Tests\\Feature\\QueueTicketTest",
+          "name": "visitor get take page displays form when queue is open"
+        },
+        {
+          "class": "Tests\\Feature\\QueueTicketTest",
+          "name": "ambil tiket sukses via POST /queue/take saves details and sets device_token cookie"
+        },
+        {
+          "class": "Tests\\Feature\\QueueTicketTest",
+          "name": "ambil tiket saat tutup ditolak dan menampilkan view closed"
+        },
+        {
+          "class": "Tests\\Feature\\QueueTicketTest",
+          "name": "dua request berurutan/bersamaan tidak menghasilkan kode kembar"
+        },
+        {
+          "class": "Tests\\Feature\\SidangTaMeetFinalizationTest",
+          "name": "meet_final_staff_can_read_export_and_verify_while_revision_requires_document_feedback"
+        },
+        {
+          "class": "Tests\\Feature\\SidangTaRevisionDeadlineTest",
+          "name": "revision_expiry_wins_then_stale_draft_discard_removes_only_owned_replacement"
+        },
+        {
+          "class": "Tests\\Feature\\SyncTest",
+          "name": "admin can import valid student JSON"
+        },
+        {
+          "class": "Tests\\Feature\\SyncTest",
+          "name": "admin can import flat array Course JSON"
+        },
+        {
+          "class": "Tests\\Feature\\SyncTest",
+          "name": "admin can import associative Course JSON"
+        },
+        {
+          "class": "Tests\\Feature\\SyncTest",
+          "name": "admin can import valid KRS JSON when student exists"
+        },
+        {
+          "class": "Tests\\Feature\\SyncTest",
+          "name": "admin can import flat array KRS JSON and automatically create or update student profile"
+        },
+        {
+          "class": "Tests\\Feature\\SyncTest",
+          "name": "admin can import valid Attendance JSON when student exists"
+        },
+        {
+          "class": "Tests\\Feature\\SyncTest",
+          "name": "sync import skips rows if student does not exist for KRS and Attendance"
+        },
+        {
+          "class": "Tests\\Feature\\SyncTest",
+          "name": "admin can import graduation JSON payload"
+        }
+      ]
+    },
+    "deadline": {
+      "total": 32,
+      "passed": 32,
+      "failed": 0,
+      "skipped": 0,
+      "failures": []
+    }
+  },
+  "baseline_failures_unchanged": 45,
+  "outdated_assertion_fixed_after_full_suite": [
+    {
+      "class": "Tests\\Feature\\SidangTaRevisionDeadlineTest",
+      "name": "revision_expiry_wins_then_stale_draft_discard_removes_only_owned_replacement"
+    }
+  ],
+  "independent_review": "No remaining important findings after fixing three findings with four RED-to-GREEN HTTP regression cases.",
+  "database_application_untouched": true,
+  "vps_untouched": true,
+  "git_staging_unchanged": true
+}

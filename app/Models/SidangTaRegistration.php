@@ -7,6 +7,8 @@ use Illuminate\Database\Eloquent\Model;
 
 class SidangTaRegistration extends Model
 {
+    use \App\Models\Concerns\HasSidangTaPublicId;
+
     public const DOCUMENT_TYPES = SidangTaMeetRequirements::LABELS;
 
     public const DOCUMENT_DESCRIPTIONS = [

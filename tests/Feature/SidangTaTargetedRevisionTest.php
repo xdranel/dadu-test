@@ -132,6 +132,19 @@ beforeEach(function () {
 
 afterEach(function () { $this->travelBack(); });
 
+test('revision final review submits to the public registration URL and preserves revision workflow', function () {
+    $source = ($this->submittedSource)('automatic');
+    $draft = ($this->prepareRevision)($source);
+    ($this->replaceDocument)($draft)->assertOk();
+    $draft = ($this->markReviewed)($draft);
+    $crawler = new Crawler($this->get(route('sidang-ta-drafts.preview', $draft))->assertOk()->getContent());
+    $action = $crawler->filter('[data-final-registration-form]')->attr('action');
+    expect(\Illuminate\Support\Str::isUuid(basename(parse_url($action, PHP_URL_PATH))))->toBeTrue();
+    $this->putJson($action, ['draft_id' => $draft->id, 'version' => $draft->version,
+        'action' => 'submit', 'declaration_accepted' => true])->assertOk();
+    expect($source->fresh()->status)->toBe('submitted');
+});
+
 test('targeted_revision_request_changes_state_once_and_locks_staff_while_student_works', function () {
     $source = ($this->submittedSource)();
     $draft = ($this->prepareRevision)($source);

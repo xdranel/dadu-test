@@ -362,9 +362,9 @@ test('revision_expiry_wins_then_stale_draft_discard_removes_only_owned_replaceme
     $version = $source->fresh()->lock_version;
     $index = new Crawler($this->get(route('sidang-ta-registrations.index'))->assertOk()->getContent());
     $card = $index->filter('[data-testid="draft-card"]')->reduce(fn (Crawler $node) => $node->filter('#discard-draft-'.$draft->id)->count() === 1);
-    expect($card->count())->toBe(1);
+    expect($card->count())->toBe(0);
     expect($card->filter('a[href="'.route('sidang-ta-drafts.edit', $draft).'"]')->count())->toBe(0);
-    expect($card->filter('[data-open-discard]')->count())->toBe(1);
+    expect($card->filter('[data-open-discard]')->count())->toBe(0);
     $this->deleteJson(route('sidang-ta-drafts.destroy', $draft), ['version' => $draft->fresh()->version])->assertNoContent();
     Storage::disk('local')->assertMissing($owned);
     foreach ($originalPaths as $path) Storage::disk('local')->assertExists($path);

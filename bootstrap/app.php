@@ -26,6 +26,7 @@ return Application::configure(basePath: dirname(__DIR__))
             TrustProxies::class,
             \App\Http\Middleware\ApplyActiveRole::class,
             \App\Http\Middleware\CacheUserPermissions::class,
+            \App\Http\Middleware\CanonicalSidangTaUrl::class,
         ]);
          // Trust proxy headers (X-Forwarded-Proto, etc.) so Livewire signed upload URLs match request URL
         $middleware->trustProxies(at: '*');

@@ -17,7 +17,7 @@ test('visibility117_student_booking_is_closed_when_disabled_even_after_approval'
     $s = $this->s117;
     $before = $s['registration']->fresh()->getRawOriginal();
     $this->actingAs($s['owner'])->get(route('sidang-ta-registrations.index'))->assertOk()
-        ->assertSee('Draft tersimpan')->assertSee('Riwayat Pengajuan')
+        ->assertDontSee('Draft tersimpan')->assertSee('Riwayat Pengajuan')
         ->assertDontSee('data-ta-booking-card', false)->assertDontSee('Cari jadwal sidang')
         ->assertDontSee(route('sidang-ta-bookings.index', $s['registration']))
         ->assertViewHas('bookingRegistrations', fn ($rows) => $rows->isEmpty());

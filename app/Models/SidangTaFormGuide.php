@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class SidangTaFormGuide extends Model
 {
+    use \App\Models\Concerns\HasSidangTaPublicId;
     use SoftDeletes;
 
     protected $fillable = ['slot', 'title', 'description', 'file_path', 'file_name', 'mime_type',

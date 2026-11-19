@@ -15,10 +15,11 @@ use Throwable;
 
 class SidangTaExpiredDraftCleanup
 {
-    public function run(bool $dryRun = false): array
+    public function run(bool $dryRun = false, ?int $periodId = null): array
     {
         $summary = ['eligible_drafts' => 0, 'deleted_drafts' => 0];
         SidangTaRegistrationDraft::where('status', SidangTaRegistrationDraft::STATUS_ACTIVE)
+            ->when($periodId !== null, fn ($query) => $query->where('sidang_ta_period_id', $periodId))
             ->where(function ($query) {
                 $query->where(function ($initial) {
                     $initial->whereNull('source_registration_id')

@@ -52,6 +52,71 @@ function sidangTaDraftCardXpath(string $html): DOMXPath
     }
 }
 
+test('empty or fully expired drafts do not leave a draft panel on the student dashboard', function () {
+    $xpath = sidangTaDraftCardXpath($this->get(route('sidang-ta-registrations.index'))->assertOk()->getContent());
+    expect($xpath->query('//*[@data-testid="drafts-panel"]')->length)->toBe(0);
+    $draft = ($this->newDraft)();
+    $this->period->update(['close_at' => now()->subHour(), 'revision_open_at' => now()->subDay(), 'revision_close_at' => now()->subMinute()]);
+    $xpath = sidangTaDraftCardXpath($this->get(route('sidang-ta-registrations.index'))->assertOk()->getContent());
+    expect($xpath->query('//*[@data-testid="drafts-panel"]')->length)->toBe(0);
+});
+
+test('an initial draft is hidden after registration closes even while verification remains open', function () {
+    ($this->newDraft)();
+    $this->period->update(['close_at' => now()->subHour(),
+        'revision_open_at' => now()->subHours(2), 'revision_close_at' => now()->addDay()]);
+    $xpath = sidangTaDraftCardXpath($this->get(route('sidang-ta-registrations.index'))->assertOk()->getContent());
+    expect($xpath->query('//*[@data-testid="drafts-panel"]')->length)->toBe(0);
+});
+
+test('a legacy revision without verification dates remains visible after registration closes', function () {
+    $this->period->update(['close_at' => now()->subHour(), 'revision_open_at' => null, 'revision_close_at' => null]);
+    $source = SidangTaRegistration::create(['sidang_ta_period_id' => $this->period->id,
+        'student_number' => '1202200001', 'student_name' => 'Draft Card Test',
+        'student_phone' => '081234567890', 'parent_phone' => '081234567891',
+        'graduation_payment_date' => today()->toDateString(), 'diploma_biodata_accurate' => true,
+        'status' => 'needs_review', 'academic_snapshot' => ['admission' => ['eprt' => ['mode' => 'automatic']]]])->fresh();
+    $draft = SidangTaRegistrationDraft::create(['owner_user_id' => $this->user->id,
+        'student_number' => '1202200001', 'sidang_ta_period_id' => $this->period->id,
+        'source_registration_id' => $source->id, 'source_version' => $source->lock_version]);
+    $response = $this->get(route('sidang-ta-registrations.index'))->assertOk();
+    $response->assertSee(route('sidang-ta-drafts.edit', $draft), false);
+});
+
+test('period disclosure stays expanded for active legacy verification and collapses when disabled', function () {
+    $this->user->givePermissionTo(Permission::findOrCreate('sidang_ta_period_read', 'web'));
+    $this->period->update(['is_active' => false, 'close_at' => now()->subHour(),
+        'is_revision_active' => true, 'revision_open_at' => null, 'revision_close_at' => null]);
+    $crawler = new \Symfony\Component\DomCrawler\Crawler($this->get(route('admin.sidang-ta-periods.index'))->assertOk()->getContent());
+    expect($crawler->filter('details[data-ta-period-id]')->getNode(0)->hasAttribute('open'))->toBeTrue();
+    $this->period->update(['is_revision_active' => false]);
+    $crawler = new \Symfony\Component\DomCrawler\Crawler($this->get(route('admin.sidang-ta-periods.index'))->assertOk()->getContent());
+    expect($crawler->filter('details[data-ta-period-id]')->getNode(0)->hasAttribute('open'))->toBeFalse();
+    expect($crawler->filter('details[data-ta-period-id] summary')->text())->toContain($this->period->name);
+    expect($crawler->filter('details[data-ta-period-id] form')->count())->toBe(0);
+});
+
+test('extending an expired period discards its old draft without changing a final submission', function () {
+    $draft = ($this->newDraft)();
+    $final = SidangTaRegistration::create(['sidang_ta_period_id' => $this->period->id,
+        'student_number' => '1202200001', 'student_name' => 'Draft Card Test',
+        'student_phone' => '081234567890', 'parent_phone' => '081234567891',
+        'graduation_payment_date' => today()->toDateString(), 'diploma_biodata_accurate' => true,
+        'status' => 'rejected', 'academic_snapshot' => ['title_id' => 'Judul final tetap tersimpan']]);
+    $before = $final->fresh()->getRawOriginal();
+    $this->period->update(['close_at' => now()->subHour(), 'revision_open_at' => now()->subDay(), 'revision_close_at' => now()->subMinute()]);
+    $this->user->givePermissionTo(Permission::findOrCreate('sidang_ta_period_update', 'web'));
+    $this->put(route('admin.sidang-ta-periods.update', $this->period), [
+        'name' => $this->period->name, 'open_at' => now()->subDay()->toDateTimeString(),
+        'close_at' => now()->addDay()->toDateTimeString(), 'revision_open_at' => now()->subHour()->toDateTimeString(),
+        'revision_close_at' => now()->addDays(2)->toDateTimeString(), 'is_active' => true, 'is_revision_active' => true,
+    ])->assertRedirect()->assertSessionHasNoErrors();
+    expect(SidangTaRegistrationDraft::find($draft->id))->toBeNull()
+        ->and($final->fresh()->getRawOriginal())->toBe($before);
+    $replacement = ($this->newDraft)();
+    expect($replacement->id)->not->toBe($draft->id)->and($replacement->version)->toBe(1);
+});
+
 test('draft_delete_requires_dialog_confirmation_and_keeps_cancel_non_submitting', function () {
     $draft = ($this->newDraft)();
     $response = $this->get(route('sidang-ta-registrations.index'))->assertOk();

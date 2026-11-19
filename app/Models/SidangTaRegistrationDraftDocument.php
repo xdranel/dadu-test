@@ -7,6 +7,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class SidangTaRegistrationDraftDocument extends Model
 {
+    use \App\Models\Concerns\HasSidangTaPublicId;
+
     protected $fillable = [
         'draft_id', 'document_type', 'file_name', 'file_path',
         'file_size', 'file_type', 'source_document_id',

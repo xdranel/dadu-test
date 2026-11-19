@@ -6,6 +6,8 @@ use Illuminate\Database\Eloquent\Model;
 
 class SidangTaRegistrationDocument extends Model
 {
+    use \App\Models\Concerns\HasSidangTaPublicId;
+
     protected $fillable = [
         'sidang_ta_registration_id', 'document_type', 'file_name', 'file_path',
         'file_size', 'file_type', 'status', 'notes',

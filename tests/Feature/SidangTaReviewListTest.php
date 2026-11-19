@@ -100,7 +100,7 @@ test('p2a_pagination_keeps_all_filters_and_counts_all_matching_rows', function (
         ->assertViewHas('registrations', fn ($rows) => $rows->count() === 15 && $rows->total() === 20);
     $rows = $response->viewData('registrations');
     parse_str(parse_url($rows->nextPageUrl(), PHP_URL_QUERY), $query);
-    foreach ($filters as $key => $value) expect((string) $query[$key])->toBe((string) $value);
+    foreach ($filters as $key => $value) expect((string) $query[$key])->toBe((string) ($key === 'period' ? $this->a->public_id : $value));
     expect((string) $query['page'])->toBe('2');
     ($this->listing)($filters + ['page' => 2])->assertViewHas('registrations', fn ($page) => $page->count() === 5)
         ->assertViewHas('counts', fn ($counts) => $counts['total'] === 20);
@@ -108,7 +108,7 @@ test('p2a_pagination_keeps_all_filters_and_counts_all_matching_rows', function (
     expect($crawler->filter('[data-ta-reset]')->attr('href'))->toBe(route('admin.sidang-ta-registrations.index'));
     $crawler = new Crawler(($this->listing)($filters + ['page' => 999])->getContent());
     expect($crawler->filter('[data-ta-empty]')->text(null, true))->toContain('Halaman ini tidak berisi pengajuan.');
-    expect($crawler->filter('[data-ta-first-page]')->attr('href'))->toBe(route('admin.sidang-ta-registrations.index', $filters));
+    expect($crawler->filter('[data-ta-first-page]')->attr('href'))->toBe(route('admin.sidang-ta-registrations.index', array_replace($filters, ['period' => $this->a->public_id])));
 });
 
 test('p2a_banner_lists_all_active_periods_and_selected_inactive_period', function () {

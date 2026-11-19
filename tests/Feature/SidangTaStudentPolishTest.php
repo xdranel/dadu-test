@@ -122,7 +122,7 @@ test('s2_upload_steps_hide_downloads_and_removed_hint_but_preview_keeps_download
     $this->get(route('sidang-ta-draft-documents.download', $documents->first()))->assertOk();
 });
 
-test('s2_index_keeps_draft_and_history_when_multiple_periods_close', function () {
+test('s2_index_hides_expired_drafts_and_keeps_history_when_multiple_periods_close', function () {
     $draft = ($this->completeDraft)();
     $second = SidangTaPeriod::create(['name' => 'Periode S2 kedua', 'is_active' => true,
         'open_at' => now()->subHour(), 'close_at' => now()->addDay()]);
@@ -137,7 +137,7 @@ test('s2_index_keeps_draft_and_history_when_multiple_periods_close', function ()
     )->length)->toBe(0);
     expect($header->count())->toBe(1);
     expect($header->attr('class'))->not->toContain('campus-card');
-    expect($header->filter('[data-open-period-count]')->text(null, true))->toBe('2 periode terbuka');
+    expect($header->filter('[data-open-period-count]')->count())->toBe(0);
     expect($header->filter('[data-registration-start]')->attr('href'))
         ->toBe(route('sidang-ta-registrations.create'));
     $this->period->update(['close_at' => now()->subMinute()]);
@@ -146,9 +146,9 @@ test('s2_index_keeps_draft_and_history_when_multiple_periods_close', function ()
     $crawler = new Crawler($response->getContent());
     expect($crawler->filter('[data-registration-start]')->count())->toBe(0);
     expect($crawler->filter('[data-registration-closed][disabled]')->count())->toBe(1);
-    expect($crawler->filter('[data-open-period-count]')->text(null, true))->toBe('0 periode terbuka');
-    expect($crawler->filter('[data-testid="drafts-panel"]')->count())->toBe(1);
-    $response->assertSee(route('sidang-ta-drafts.edit', $draft), false);
+    expect($crawler->filter('[data-open-period-count]')->count())->toBe(0);
+    expect($crawler->filter('[data-testid="drafts-panel"]')->count())->toBe(0);
+    $response->assertDontSee(route('sidang-ta-drafts.edit', $draft), false);
 });
 
 test('s2_index_active_registration_hides_start_and_respects_revision_permission', function () {
