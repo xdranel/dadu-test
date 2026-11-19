@@ -7,3 +7,6 @@
 - [Rencana dan audit penataan126](126-rencana-dan-audit.md)
 
 Rancangan/rencana bernomor lama tetap berada pada [arsip progres](../arsip-progres/README.md) untuk mempertahankan kronologi. Catatan ini tidak menyimpan password atau sumber JSON pribadi. **JSON kehadiran tetap ditunggu.**
+
+- [127 — Rencana diagnosis dan akses admin](127-rencana-pencarian-dan-akses-ruangan.md)
+- [127 — Label ruang yang perlu konfirmasi](127-pemetaan-label-ruangan.md)

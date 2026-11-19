@@ -12,6 +12,7 @@ use App\Models\User;
 use App\Services\RoomAvailabilityService;
 use App\Services\RoomBookingTransitionService;
 use App\Support\RoomTimeWindows;
+use App\Support\RoomBookingAccess;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -25,13 +26,9 @@ class RoomBookingController extends Controller
         return $user->hasRole('Akademik') || $user->can('room_booking_review');
     }
 
-    private function isLecturer(User $user): bool
+    private function canBorrow(User $user): bool
     {
-        $isLocalTestAccount = app()->environment(['local', 'testing'])
-            && $user->isManualAccount()
-            && $user->hasRole('Pelaksana');
-
-        return $isLocalTestAccount || ($user->isSsoAccount() && $user->hasRole('Pelaksana'));
+        return RoomBookingAccess::canBorrow($user);
     }
 
     private function hasSuccessfulImport(): bool
@@ -145,11 +142,11 @@ class RoomBookingController extends Controller
     public function index(Request $request)
     {
         $user = $request->user();
-        if ($user->hasRole('Akademik') || ($this->isReviewer($user) && ! $this->isLecturer($user))) {
+        if ($this->isReviewer($user) && ! $this->canBorrow($user)) {
             return redirect()->route('admin.room-bookings.review');
         }
 
-        abort_unless($this->isLecturer($user) && $user->can('room_booking_read'), 403);
+        abort_unless($this->canBorrow($user) && $user->can('room_booking_read'), 403);
 
         $bookings = Booking::with(['room', 'user', 'occurrences'])
             ->where('user_id', $user->id)
@@ -163,11 +160,11 @@ class RoomBookingController extends Controller
     public function dashboard(Request $request)
     {
         $user = $request->user();
-        if ($user->hasRole('Akademik') || ($this->isReviewer($user) && ! $this->isLecturer($user))) {
+        if ($this->isReviewer($user) && ! $this->canBorrow($user)) {
             return redirect()->route('admin.room-bookings.review');
         }
 
-        abort_unless($this->isLecturer($user) && $user->can('room_booking_read'), 403);
+        abort_unless($this->canBorrow($user) && $user->can('room_booking_read'), 403);
         $monthInput = $request->input('month');
         if ($monthInput && preg_match('/^\d{4}-\d{2}$/', $monthInput)) {
             $month = Carbon::createFromFormat('!Y-m', $monthInput, 'Asia/Jakarta');
@@ -196,7 +193,7 @@ class RoomBookingController extends Controller
 
     public function create(Request $request)
     {
-        abort_unless($this->isLecturer($request->user()) && $request->user()->can('room_booking_create'), 403);
+        abort_unless($this->canBorrow($request->user()) && $request->user()->can('room_booking_create'), 403);
         $rooms = Room::where('status', 'Dapat Dipakai')->orderBy('name')->get();
         $hasImported = $this->hasSuccessfulImport();
 
@@ -205,7 +202,7 @@ class RoomBookingController extends Controller
 
     public function checkAvailability(Request $request)
     {
-        abort_unless($this->isLecturer($request->user()) && $request->user()->can('room_booking_create'), 403);
+        abort_unless($this->canBorrow($request->user()) && $request->user()->can('room_booking_create'), 403);
         if (! $this->hasSuccessfulImport()) {
             return response()->json(['message' => 'Jadwal iGracias belum disinkronisasi.'], 422);
         }
@@ -260,7 +257,7 @@ class RoomBookingController extends Controller
 
     public function store(Request $request)
     {
-        abort_unless($this->isLecturer($request->user()) && $request->user()->can('room_booking_create'), 403);
+        abort_unless($this->canBorrow($request->user()) && $request->user()->can('room_booking_create'), 403);
         if (! $this->hasSuccessfulImport()) {
             return back()->withInput()->withErrors([
                 'availability' => 'Jadwal iGracias belum berhasil disinkronisasi. Pengajuan belum dapat dikirim.',
@@ -336,9 +333,9 @@ class RoomBookingController extends Controller
 
     public function cancel(Request $request, Booking $booking)
     {
-        abort_unless($booking->user_id === $request->user()->id && $this->isLecturer($request->user()) && $request->user()->can('room_booking_update'), 403);
+        abort_unless($booking->user_id === $request->user()->id && $this->canBorrow($request->user()) && $request->user()->can('room_booking_update'), 403);
         abort_unless($booking->status === 'pending', 422, 'Hanya pengajuan yang menunggu persetujuan yang dapat dibatalkan.');
-        app(RoomBookingTransitionService::class)->cancel($request->user(), $booking, 'Dibatalkan oleh dosen');
+        app(RoomBookingTransitionService::class)->cancel($request->user(), $booking, 'Dibatalkan oleh peminjam');
 
         return back()->with('success', 'Pengajuan dibatalkan.');
     }

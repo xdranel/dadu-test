@@ -8,6 +8,7 @@ use App\Models\RoomBookingHistory;
 use App\Models\RoomBookingRequest;
 use App\Models\User;
 use App\Support\RoomTimeWindows;
+use App\Support\RoomBookingAccess;
 use Closure;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -83,8 +84,7 @@ class RoomBookingTransitionService
     public function cancel(User $actor, RoomBookingRequest $booking, string $reason): RoomBookingRequest
     {
         return $this->inContext($booking, function ($locked) use ($actor, $reason) {
-            $lecturer = ($actor->isSsoAccount() && $actor->hasRole('Pelaksana')) || (app()->environment(['local', 'testing']) && $actor->isManualAccount() && $actor->hasRole('Pelaksana'));
-            $ownerPending = $locked->booking_origin === 'ordinary' && $locked->status === 'pending' && $locked->user_id === $actor->id && $lecturer && $actor->can('room_booking_update');
+            $ownerPending = $locked->booking_origin === 'ordinary' && $locked->status === 'pending' && $locked->user_id === $actor->id && RoomBookingAccess::canBorrow($actor) && $actor->can('room_booking_update');
             if (! $ownerPending) {
                 if ($locked->sidang_ta_registration_id) {
                     app(SidangTaBookingAccess::class)->authorizeStaff($actor, $locked);

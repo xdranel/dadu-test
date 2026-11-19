@@ -101,10 +101,10 @@ return [
             'label' => 'Peminjaman Ruangan',
             'icon' => 'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z',
             'items' => [
-                ['label' => 'Dashboard', 'route' => 'room-bookings.index', 'active' => 'room-bookings.index', 'permission' => 'room_booking_read', 'exclude_roles' => ['Akademik']],
-                ['label' => 'Pengajuan Peminjaman Ruangan', 'route' => 'room-bookings.create', 'active' => 'room-bookings.create', 'permission' => 'room_booking_create', 'exclude_roles' => ['Akademik']],
-                ['label' => 'Daftar Peminjaman Saya', 'route' => 'room-bookings.my', 'active' => 'room-bookings.my', 'permission' => 'room_booking_read', 'exclude_roles' => ['Akademik']],
-                ['label' => 'Review Peminjaman Ruangan', 'route' => 'admin.room-bookings.review', 'active' => 'admin.room-bookings.*', 'permission' => 'room_booking_review', 'roles' => ['Akademik']],
+                ['label' => 'Dashboard', 'route' => 'room-bookings.index', 'active' => 'room-bookings.index', 'permission' => 'room_booking_read'],
+                ['label' => 'Pengajuan Peminjaman Ruangan', 'route' => 'room-bookings.create', 'active' => 'room-bookings.create', 'permission' => 'room_booking_create'],
+                ['label' => 'Daftar Peminjaman Saya', 'route' => 'room-bookings.my', 'active' => 'room-bookings.my', 'permission' => 'room_booking_read'],
+                ['label' => 'Review Peminjaman Ruangan', 'route' => 'admin.room-bookings.review', 'active' => 'admin.room-bookings.*', 'permission' => 'room_booking_review'],
             ],
         ],
 

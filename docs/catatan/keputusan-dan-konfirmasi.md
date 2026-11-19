@@ -25,3 +25,7 @@ Pertanyaan divisi dan aturan yang belum final tetap disimpan pada [catatan91](..
 ## Data yang masih ditunggu
 
 **JSON kehadiran belum tersedia.** Riwayat gagal sidang sebelum DADU membutuhkan sumber tanggal/periode/keputusan yang terkonfirmasi; MK TA mengulang saja tidak dijadikan bukti gagal otomatis.
+
+## Identitas ruang dari master dan jadwal (127)
+
+JSON jadwal sudah tersedia dan valid; yang belum pasti ialah pemetaan label iGracias ke master fisik, terutama B-CLS, KTT dengan suffix, aula dan lab yang belum ada pada XLSX master. Lihat [tabel konfirmasi127](127-pemetaan-label-ruangan.md). Jangan otomatis menggabungkan ruang berbeda. Klasifikasi ruang kelas di VPS juga belum diisi.

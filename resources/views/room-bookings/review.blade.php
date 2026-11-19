@@ -99,7 +99,7 @@
                                 @if($booking->sidang_ta_registration_id || $booking->booking_origin === 'sidang_ta_automatic')
                                     <span class="text-[10px] font-semibold uppercase px-2 py-0.5 rounded bg-sky-100 text-sky-800 border border-sky-300">Sidang TA</span>
                                 @else
-                                    <span class="text-[10px] font-semibold uppercase px-2 py-0.5 rounded bg-slate-100 text-slate-700">Dosen</span>
+                                    <span class="text-[10px] font-semibold uppercase px-2 py-0.5 rounded bg-slate-100 text-slate-700">Peminjaman</span>
                                 @endif
                             </div>
                             @php($lecturer = ($booking->user->employee_id && isset($lecturersByNip) ? $lecturersByNip->get(trim($booking->user->employee_id)) : null) ?? $lecturers->get(mb_strtolower(trim($booking->user->name))))

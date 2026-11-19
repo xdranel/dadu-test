@@ -15,3 +15,5 @@ Mulai dari panduan sesuai peran dan tugas. Hasil tes/daftar perubahan berada di 
 - [Penyelarasan file ke dadu-test](penyelarasan-file.md)
 
 Panduan95 menjelaskan contoh A lama sebagai sejarah kontrak; unggahan sekarang hanya **B/C**, dideteksi otomatis. Untuk VPS1 GB, baca penyesuaian resource sebelum menjalankan build Docker.
+
+- [Peminjaman admin dan penyiapan sumber jadwal ruangan](peminjaman-dan-sumber-jadwal-ruangan.md)

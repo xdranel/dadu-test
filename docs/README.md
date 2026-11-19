@@ -5,13 +5,15 @@ Dokumentasi dipisahkan agar hasil pekerjaan, catatan teknis dan langkah pemakaia
 | Folder | Isi |
 | --- | --- |
 | [panduan-pemakaian](panduan-pemakaian/README.md) | Langkah memakai fitur dan memperbarui lokal/Docker/VPS |
-| [kesimpulan](kesimpulan/README.md) | Ringkasan hasil progres001–126 |
+| [kesimpulan](kesimpulan/README.md) | Ringkasan hasil progres001–127 |
 | [arsip-progres](arsip-progres/README.md) | Dokumen historis bernomor, termasuk rencana dan bukti saat itu |
 | [catatan](catatan/README.md) | Catatan kerja, keputusan, konfirmasi dan ringkasan bukti teknis |
 | [fixtures](fixtures/sidang-ta/README.md) | Input sintetis aktif dan konfigurasi pemulihan VPS; sumber privat tetap di-ignore |
 
 Mulai membaca pembaruan terakhir:
 
+- [Kesimpulan127 — Diagnosis ruang dan akses peminjaman admin](kesimpulan/127-diagnosis-dan-akses-peminjaman-ruangan.md)
+- [Panduan peminjaman dan sumber jadwal ruangan](panduan-pemakaian/peminjaman-dan-sumber-jadwal-ruangan.md)
 - [Kesimpulan125 — Pelaksanaan Sidang TA](kesimpulan/125-pelaksanaan-sidang-ta-admin.md)
 - [Hasil teknis125 yang dipindahkan dari root docs](arsip-progres/125-hasil-pelaksanaan-sidang-ta-admin.md)
 - [Panduan pemakaian Pelaksanaan Sidang TA](panduan-pemakaian/pelaksanaan-sidang-ta.md)

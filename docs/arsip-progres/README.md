@@ -139,3 +139,5 @@ Dokumen asli bernomor dipertahankan sebagai jejak pekerjaan. Perintah yang berga
 - [124-rencana-pelaksanaan-sidang-ta-admin](124-rencana-pelaksanaan-sidang-ta-admin.md)
 - [125-hasil-pelaksanaan-sidang-ta-admin](125-hasil-pelaksanaan-sidang-ta-admin.md)
 - [126 — Perapian tampilan, batas tanggal dan dokumentasi](126-hasil-perapian-tampilan-dan-dokumentasi.md)
+
+- [127 — Diagnosis dan akses peminjaman ruangan](127-hasil-diagnosis-dan-akses-peminjaman-ruangan.md)

@@ -249,9 +249,9 @@ test('manual account lecturer with non-krisna email can access dashboard, create
     $this->actingAs($manualLecturer)->get(route('room-bookings.my'))->assertOk();
 });
 
-test('academic admin accessing dashboard is automatically redirected to review page', function () {
+test('academic admin can access borrowing dashboard alongside review', function () {
     $response = $this->actingAs($this->admin)->get(route('room-bookings.index'));
-    $response->assertRedirect(route('admin.room-bookings.review'));
+    $response->assertOk()->assertSee('Dashboard Peminjaman Ruangan');
 });
 
 test('dashboard displays flash success message when redirected with session success', function () {

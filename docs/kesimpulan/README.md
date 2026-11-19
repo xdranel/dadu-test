@@ -128,3 +128,5 @@ Satu ringkasan per nomor progres; sub-checkpoint huruf digabung pada nomor utama
 - [124 — rencana pelaksanaan sidang ta admin](124-rencana-pelaksanaan-sidang-ta-admin.md)
 - [125 — pelaksanaan sidang ta admin](125-pelaksanaan-sidang-ta-admin.md)
 - [126 — perapian tampilan dokumentasi dan batas tanggal](126-perapian-tampilan-dokumentasi-dan-batas-tanggal.md)
+
+- [127 — Diagnosis dan akses peminjaman ruangan](127-diagnosis-dan-akses-peminjaman-ruangan.md)

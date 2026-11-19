@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\AcademicPeriod;
 use App\Models\Room;
 use App\Models\RoomBookingRequest;
 use App\Models\SidangTaExecutionSetting;
@@ -114,7 +115,32 @@ class SidangTaStaffScheduling
         }
 
         return ['options' => $options, 'context_version' => $c?->lock_version ?? 0,
-            'reason' => $options ? null : 'Belum ada ruang kelas tersedia atau sumber jadwal semester belum lengkap.'];
+            'reason' => $options ? null : $this->emptySearchReason($date)];
+    }
+
+    private function emptySearchReason(string $date): string
+    {
+        $reasons = [];
+        $rooms = Room::where('status', 'Dapat Dipakai');
+        if (! (clone $rooms)->where('is_classroom', true)->exists()) {
+            $reasons[] = $rooms->exists()
+                ? 'Belum ada ruang kelas aktif untuk Sidang TA. Buka Data Akademik → Ruangan → Edit, lalu pilih Klasifikasi ruang: Ruang kelas untuk ruangan yang memang kelas. Impor master XLSX saja belum menetapkan klasifikasi ini.'
+                : 'Tidak ada ruangan berstatus Dapat Dipakai. Periksa status dan Klasifikasi ruang pada Data Akademik → Ruangan.';
+        }
+        if (! app(RoomAvailabilityService::class)->coverage($date, $date)['ready']) {
+            $periods = AcademicPeriod::with('roomSource')->whereDate('start_date', '<=', $date)
+                ->whereDate('end_date', '>=', $date)->get();
+            if ($periods->isEmpty()) {
+                $reasons[] = 'Tanggal '.$date.' belum tercakup periode akademik terdaftar. Periksa tanggal semester sumber jadwal.';
+            } else {
+                $labels = $periods->filter(fn ($p) => ! $p->roomSource?->is_complete || $p->roomSource?->scope !== 'semester')
+                    ->map(fn ($p) => $p->label ?: $p->year.' '.($p->semester === 1 ? 'Ganjil' : 'Genap'))->implode(', ');
+                $reasons[] = 'Data sumber jadwal semester '.$labels.' belum lengkap untuk '.$date.'. Impor snapshot mingguan lengkap di IT Panel → Sinkronisasi → Jadwal Ruangan iGracias; periksa hasil impor dan pemetaan alias ruangan. Jadwal tanggal tertentu belum menjadi sumber semester.';
+            }
+        }
+
+        return $reasons ? implode(' ', $reasons)
+            : 'Tidak ada slot kosong 90 menit pada tanggal ini dalam jam pelaksanaan. Ruang kelas aktif sudah terpakai atau celah waktunya tidak cukup; periksa jadwal kuliah dan peminjaman pending/disetujui, atau pilih tanggal lain.';
     }
 
     public function confirm(User $actor, SidangTaRegistration $registration, string $token): SidangTaSchedule
