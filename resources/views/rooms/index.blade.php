@@ -102,6 +102,7 @@
                         <th>Nama Ruangan</th>
                         <th>Lokasi Gedung</th>
                         <th>Kapasitas</th>
+                        <th>Label</th>
                         <th class="!text-center">Status</th>
                         <th class="!text-center">Aksi</th>
                     </tr>
@@ -113,14 +114,15 @@
                                 {{ $r->room_code }}
                             </td>
                             <td class="text-slate-800">
-                                {{ $r->name }}
+                                {{ $r->name ?: '—' }}
                             </td>
                             <td class="whitespace-nowrap text-slate-500">
-                                {{ $r->building }}
+                                {{ $r->building ?: '—' }}
                             </td>
                             <td class="whitespace-nowrap font-semibold text-slate-700">
-                                {{ $r->capacity }} orang
+                                {{ $r->capacity ? $r->capacity.' orang' : '—' }}
                             </td>
+                            <td class="whitespace-nowrap text-slate-700">{{ $r->label ?? '—' }}</td>
                             <td class="whitespace-nowrap text-center">
                                 @if($r->status === 'Dapat Dipakai')
                                     <span class="badge badge-success">
@@ -160,7 +162,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="6" class="empty-state">
+                            <td colspan="7" class="empty-state">
                                 <div class="empty-state-icon">
                                     <svg class="w-12 h-12 mx-auto text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
@@ -203,8 +205,8 @@
                 </div>
                 <div class="mb-5 p-3.5 bg-slate-50 rounded-xl border border-slate-200">
                     <p class="text-xs font-semibold text-slate-600 mb-1">Format header kolom Excel:</p>
-                    <code class="text-xs text-[#DA2D3B] font-medium">room_code | name | building | capacity | status</code>
-                    <p class="text-xs text-slate-400 mt-1.5">* Kode ruang duplikat akan otomatis diperbarui.</p>
+                    <code class="text-xs text-[#DA2D3B] font-medium">Kode Ruang | Nama Ruang | Lokasi Gedung | Kapasitas | Status | Label</code>
+                    <p class="text-xs text-slate-500 mt-1.5">Isi Label dengan KELAS atau LAB. Sel yang kosong mempertahankan data yang sudah ada.</p>
                 </div>
                 <div class="flex justify-end gap-3">
                     <button type="button"

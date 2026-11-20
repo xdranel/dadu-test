@@ -2,7 +2,6 @@
 
 use App\Models\RoomBookingRequest;
 use App\Services\SidangTaExecutionWindowService;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use Spatie\Permission\Models\Permission;
 use Tests\Support\TaRoomScenario;
@@ -42,14 +41,15 @@ test('execution111_academic_identity_in_use_cannot_be_rewritten', function () {
     $this->actingAs($this->s['reviewer'])->put(route('academic_periods.update', $p), $data)->assertSessionHasErrors('year');
     expect($p->fresh()->semester)->toBe(1);
 });
-test('execution111_room_fields_and_explicit_alias_are_saved_atomically', function () {
+test('room edits save the label and can clear it without changing other details', function () {
     $r = $this->s['rooms']['a'];
-    $data = $r->only(['room_code', 'name', 'building', 'capacity', 'status']) + ['igracias_aliases' => 'KTT1.02'];
-    $this->actingAs($this->s['reviewer'])->put(route('rooms.update', $r), $data)->assertSessionHasNoErrors();
-    expect(DB::table('room_schedule_aliases')->where('alias_key', 'KTT102')->value('room_id'))->toBe($r->id);
-    $other = $this->s['rooms']['unknown'];
-    $before = $other->fresh()->getRawOriginal();
-    $data = array_replace($other->only(['room_code', 'name', 'building', 'capacity', 'status']), ['igracias_aliases' => 'KTT1.02']);
-    $this->put(route('rooms.update',$other), $data)->assertSessionHasErrors('igracias_aliases');
-    expect($other->fresh()->getRawOriginal())->toBe($before);
+    $data = $r->only(['room_code', 'name', 'building', 'capacity', 'status']);
+    $this->actingAs($this->s['reviewer'])->get(route('rooms.edit', $r))->assertOk()
+        ->assertSee('name="label"', false)->assertDontSee('igracias_aliases')->assertSee('LABEL DITULIS DENGAN HURUF BESAR');
+    $this->put(route('rooms.update', $r), $data + ['label' => 'LAB'])->assertSessionHasNoErrors();
+    expect($r->fresh()->label)->toBe('LAB');
+    $this->put(route('rooms.update', $r), $data + ['label' => 'AULA'])->assertSessionHasErrors('label');
+    expect($r->fresh()->label)->toBe('LAB');
+    $this->put(route('rooms.update', $r), $data + ['label' => ''])->assertSessionHasNoErrors();
+    expect($r->fresh()->label)->toBeNull()->and($r->fresh()->only(array_keys($data)))->toBe($data);
 });

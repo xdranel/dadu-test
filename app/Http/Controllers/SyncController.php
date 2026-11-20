@@ -512,6 +512,9 @@ class SyncController extends Controller
         $message = ($result['mode'] ?? null) === 'weekly'
             ? "Import {$result['imported']} pola mingguan ruangan berhasil untuk semester sumber."
             : "Import {$result['imported']} jadwal tanggal tertentu berhasil. Sumber pola semester tetap perlu dilengkapi untuk pencarian Sidang TA.";
+        if ($result['excluded'] ?? 0) {
+            $message .= " {$result['excluded']} pola ruang di luar cakupan Akademik dilewati.";
+        }
 
         return redirect()->route('sync.index')->with('success', $message);
     }

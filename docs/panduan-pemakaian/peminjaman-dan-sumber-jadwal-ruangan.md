@@ -1,8 +1,8 @@
 # Peminjaman ruangan dan sumber jadwal semester
 
-## Kebijakan master ruang setelah perubahan128
+## Label ruang
 
-Pengguna mengonfirmasi seluruh master XLSX merupakan ruang kelas. Kolom Klasifikasi TA dan syarat is_classroom dihapus. Status Dapat Dipakai/Tidak Dapat Dipakai tetap persis seperti semula; pencarian hanya memakai Dapat Dipakai dan tetap memeriksa bentrok. Tidak ada penandaan kelas manual.
+Master di Data Akademik → Ruangan menyimpan label **KELAS**, **LAB**, atau kosong. Pencarian Sidang TA dan pengajuan Peminjaman Ruangan menawarkan ruang **KELAS** berstatus **Dapat Dipakai** setelah memeriksa jadwal kuliah dan peminjaman. Isi label yang belum ditentukan lewat Edit Ruangan setelah diverifikasi Akademik.
 
 ## Diagnosis historis sebelum perubahan128
 
@@ -13,16 +13,16 @@ Berkas asli memiliki827 baris untuk 9–15 November 2026, periode 2627/1 dan jen
 ## Urutan penyiapan oleh admin
 
 1. **Periode akademik:** pastikan 2026/2027 Ganjil terdaftar dengan batas semester yang benar. Pada VPS periode ini sudah ada 1 Agustus 2026–31 Januari 2027; tidak perlu membuat duplikat atau mengganti tanggal Pelaksanaan menjadi tanggal 9–15 November.
-2. **Master ruang:** gunakan `DataRuangan.xlsx` terbaru sebagai daftar kelas Akademik. Impor di Data Akademik → Ruangan menambahkan atau memperbarui ruang menurut Kode Ruang. Cocokkan dan selaraskan kode lama dengan kelas fisik yang sama sebelum impor agar kelas seperti `1.02` dan `KTT1.02` tidak tercatat dua kali.
+2. **Master ruang:** setelah migrasi kolom Label, impor `DataRuangan.xlsx` terbaru melalui Data Akademik → Ruangan. Setiap baris berkode disimpan. Nama, lokasi, kapasitas, dan label yang kosong dapat dilengkapi lewat Edit Ruangan. Impor ulang dengan sel kosong mempertahankan isian yang sudah ada. Impor mencocokkan kode tanpa membedakan spasi dan tanda baca.
 3. **Status:** pertahankan status yang benar dari master. Dapat Dipakai dapat menjadi kandidat setelah lolos pemeriksaan jadwal; Tidak Dapat Dipakai dikecualikan meskipun kosong. Penghapusan klasifikasi tidak mengaktifkan ruangan nonaktif.
-4. **Nama/alias:** isi alias melalui Edit Ruangan setelah memastikan ruang fisiknya sama. Master terbaru sudah cocok langsung dengan 51 dari 69 label iGracias, termasuk sejumlah ruang `B-CLS`. Enam belas label lab, `KTT AULA`, dan `KTT 1.27 B` masih belum tercocokkan. Lab berada di luar cakupan Akademik. Periksa dua label lain sebelum memetakan atau mengecualikannya. [Hasil pencocokan master terbaru](../kesimpulan/129-review-pelaksanaan-dan-ruangan.md)
+4. **Kode ruang:** gunakan kode sesuai iGracias, termasuk `KTT 1.27 B`. Label `KELAS` dan `LAB` menentukan jenis ruang. Koreksi identitas melalui Kode Ruang atau Nama Ruangan di master. Bila kode lama dan baru tercatat untuk satu kelas, gunakan kode terbaru. Kode lama tanpa label dan tanpa pemakaian mendatang tidak menghalangi impor.
 5. **Impor mingguan lengkap:** buka IT Panel → Sinkronisasi → Jadwal Ruangan iGracias dan unggah file asli `rekap_igracias_2026-11-13 JADWAL PERKULIAHAN.json`. Jangan gunakan contoh satu baris atau menghapus baris/metadata agar terlihat berhasil. Snapshot harus penuh tanpa filter prodi/ruang/bentrok.
-6. **Periksa hasil:** pastikan sumber semester lengkap tersedia. Angka 825 adalah jumlah pola unik pada ekspor penuh, termasuk ruang di luar cakupan Akademik. Importer saat ini masih membatalkan impor jika ada label yang belum terpetakan atau jadwal baru bentrok dengan booking aktif. Jadwal per tanggal tunggal belum memenuhi syarat sumber semester.
+6. **Periksa hasil:** uji pada master dan JSON terbaru menghasilkan 798 pola tersimpan dan 27 pola dari lima lab di luar master yang dilewati. Ruang asing di luar daftar pengecualian dan bentrok dengan booking aktif tetap membatalkan impor. Jadwal per tanggal tunggal belum memenuhi syarat sumber semester. [Hasil uji impor](../kesimpulan/131-label-ruangan-dan-import-jadwal.md)
 7. **Pelaksanaan TA:** pilih semester sumber yang sesuai, tanggal/jam pelaksanaan, hari dan aktivasi, lalu cari jadwal peserta approved. Tanggal 23–27 November boleh memakai pola referensi 9–15 November karena harinya diulang selama semester. Setiap slot TA 90 menit dan tetap diperiksa ulang sebelum Tetapkan Jadwal.
 
 ## Arti pesan pencarian setelah pembaruan128
 
-- **Tidak ada ruangan Dapat Dipakai:** periksa status master. Jangan mengubah status ruangan yang memang tidak bisa digunakan demi mengisi hasil pencarian.
+- **Tidak ada ruang KELAS dan Dapat Dipakai:** periksa label dan status di master.
 - **Sumber semester belum lengkap:** periksa periode, hasil impor mingguan dan alias. Jadwal tanggal tertentu saja belum membuktikan ketersediaan sepanjang semester.
 - **Tidak ada slot 90 menit:** sumber sudah lengkap dan kelas aktif tersedia, tetapi celah kosong tidak cukup dalam jam pelaksanaan. Coba tanggal lain atau periksa jadwal kuliah/booking pending dan approved.
 

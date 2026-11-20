@@ -50,7 +50,7 @@ class SidangTaBookingService
         $busy = $exceptBookingId ? $availability->rangeExcept($date, $date, $exceptBookingId) : $availability->forRange($date, $date);
         $notBefore = $date === today('Asia/Jakarta')->toDateString() ? W::minutes(now('Asia/Jakarta')->format('H:i:s'), true) : 0;
         $candidates = [];
-        foreach (Room::where('status', 'Dapat Dipakai')->orderBy('id')->get() as $room) {
+        foreach (Room::bookableClassrooms()->orderBy('id')->get() as $room) {
             $slot = W::firstFit($busy[$date][$room->id] ?? [], app(SidangTaExecutionWindowService::class)->windows($s), $s->duration_minutes, $notBefore);
             if ($slot) {
                 $candidates[] = ['date' => $date, 'room_id' => $room->id, 'room_code' => $room->room_code, 'room_name' => $room->name, 'start_time' => W::time($slot['start']), 'end_time' => W::time($slot['end']), 'duration_minutes' => $s->duration_minutes];

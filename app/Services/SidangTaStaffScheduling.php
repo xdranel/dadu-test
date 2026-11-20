@@ -59,7 +59,7 @@ class SidangTaStaffScheduling
         $notBefore = $date === today('Asia/Jakarta')->toDateString() ? W::minutes(now('Asia/Jakarta')->format('H:i:s'), true) + 1 : 0;
         $preferred = $c?->preferred_date?->format('Y-m-d') === $date ? $c?->preferred_start_time : null;
         $slots = [];
-        foreach (Room::where('status', 'Dapat Dipakai')->orderBy('room_code')->orderBy('id')->get() as $room) {
+        foreach (Room::bookableClassrooms()->orderBy('room_code')->orderBy('id')->get() as $room) {
             $occupied = $busy[$date][$room->id] ?? [];
             $seeds = array_merge(range($start, $end, 30), array_column($occupied, 'end'), [$start, $notBefore]);
             if ($preferred) {
@@ -121,9 +121,9 @@ class SidangTaStaffScheduling
     private function emptySearchReason(string $date): string
     {
         $reasons = [];
-        $rooms = Room::where('status', 'Dapat Dipakai');
+        $rooms = Room::bookableClassrooms();
         if (! $rooms->exists()) {
-            $reasons[] = 'Tidak ada ruangan berstatus Dapat Dipakai. Periksa status ruangan pada Data Akademik → Ruangan.';
+            $reasons[] = 'Tidak ada ruang berlabel KELAS dan berstatus Dapat Dipakai. Periksa master ruang pada Data Akademik → Ruangan.';
         }
         if (! app(RoomAvailabilityService::class)->coverage($date, $date)['ready']) {
             $periods = AcademicPeriod::with('roomSource')->whereDate('start_date', '<=', $date)

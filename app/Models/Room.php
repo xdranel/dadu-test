@@ -6,13 +6,28 @@ use Illuminate\Database\Eloquent\Model;
 
 class Room extends Model
 {
+    public const LABEL_CLASSROOM = 'KELAS';
+
+    public const LABELS = [self::LABEL_CLASSROOM, 'LAB'];
+
     protected $fillable = [
         'room_code',
         'name',
         'building',
         'capacity',
+        'label',
         'status',
     ];
+
+    public function scopeBookableClassrooms($query)
+    {
+        return $query->where('label', self::LABEL_CLASSROOM)->where('status', 'Dapat Dipakai');
+    }
+
+    public function isBookableClassroom(): bool
+    {
+        return $this->label === self::LABEL_CLASSROOM && $this->status === 'Dapat Dipakai';
+    }
 
     public function scopeSearch($query, ?string $search)
     {

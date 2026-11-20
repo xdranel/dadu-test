@@ -34,7 +34,7 @@ final class TaRoomScenario
         $source = RoomScheduleSource::create(['academic_period_id' => $academic->id, 'is_complete' => true, 'scope' => 'semester', 'fingerprint' => 'dummy-initial', 'version' => 1]);
         $rooms = [];
         foreach (['a' => 'KELAS A', 'b' => 'KELAS B', 'lab' => 'RUANG LAB', 'unknown' => 'RUANG UNKNOWN'] as $name => $roomName) {
-            $rooms[$name] = Room::create(['room_code' => strtoupper($name), 'name' => $roomName, 'building' => 'Dummy', 'capacity' => 20, 'status' => 'Dapat Dipakai']);
+            $rooms[$name] = Room::create(['room_code' => strtoupper($name), 'name' => $roomName, 'building' => 'Dummy', 'capacity' => 20, 'status' => 'Dapat Dipakai', 'label' => 'KELAS']);
         }
 
         return compact('owner', 'reviewer', 'student', 'academic', 'period', 'registration', 'settings', 'source', 'rooms');

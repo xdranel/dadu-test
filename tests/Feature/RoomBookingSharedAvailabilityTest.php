@@ -40,11 +40,19 @@ beforeEach(function () {
 afterEach(function () {
     $this->travelBack();
 });
-it('uses weekly occupancy for lecturer availability and store while keeping other room types available', function () {
+it('uses weekly occupancy and only offers labelled classrooms for ordinary bookings', function () {
+    $lab = $this->s['rooms']['lab'];
+    $lab->update(['label' => 'LAB']);
+    $unlabelled = $this->s['rooms']['unknown'];
+    $unlabelled->update(['label' => null]);
     $this->actingAs($this->lecturer)->postJson(route('room-bookings.availability'), ['start_at' => '2026-11-23T08:30', 'end_at' => '2026-11-23T10:30'])->assertOk()->assertJsonMissing(['id' => $this->s['rooms']['a']->id]);
     $this->post(route('room-bookings.store'), ['room_id' => $this->s['rooms']['a']->id, 'start_at' => '2026-11-23T08:30', 'end_at' => '2026-11-23T10:30', 'purpose' => 'New'])->assertSessionHasErrors('availability');
+    $freeSlot = ['start_at' => '2026-11-23T06:30', 'end_at' => '2026-11-23T07:30'];
+    $this->postJson(route('room-bookings.availability'), $freeSlot)->assertOk()
+        ->assertJsonFragment(['id' => $this->s['rooms']['b']->id])
+        ->assertJsonMissing(['id' => $lab->id])->assertJsonMissing(['id' => $unlabelled->id]);
+    $this->post(route('room-bookings.store'), $freeSlot + ['room_id' => $lab->id, 'purpose' => 'Lab'])->assertUnprocessable();
     expect(RoomBookingRequest::count())->toBe(0);
-    $this->postJson(route('room-bookings.availability'), ['start_at' => '2026-11-23T06:30', 'end_at' => '2026-11-23T07:30'])->assertOk()->assertJsonFragment(['id' => $this->s['rooms']['lab']->id]);
 });
 it('includes weekly classes in the daily calendar detail', function () {
     $this->actingAs($this->lecturer)->getJson(route('room-bookings.calendar.detail', ['date' => '2026-11-23']))->assertOk()->assertJsonCount(1, 'schedules')->assertJsonFragment(['start_time' => '08:30']);

@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Models\Room;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -25,7 +26,7 @@ class StoreRoomRequest extends FormRequest
             'name' => ['required', 'string', 'max:255'],
             'building' => ['required', 'string', 'max:100'],
             'capacity' => ['required', 'integer', 'min:1', 'max:1000'],
-            'igracias_aliases' => ['nullable', 'string', 'max:5000'],
+            'label' => ['nullable', 'string', Rule::in(Room::LABELS)],
             'status' => ['required', Rule::in(['Dapat Dipakai', 'Tidak Dapat Dipakai'])],
         ];
     }

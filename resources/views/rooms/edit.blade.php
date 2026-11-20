@@ -106,9 +106,7 @@
                         @enderror
                     </div>
 
-<div class="mb-4"><label for="igracias_aliases">Tambahkan alias nama ruangan iGracias (satu per baris)</label><textarea id="igracias_aliases" name="igracias_aliases" class="w-full rounded border-gray-300">{{ old('igracias_aliases') }}</textarea>
-@isset($aliases)<p class="text-sm">Alias tersimpan: {{ implode(', ',$aliases) ?: '-' }}</p>@endisset
-<p class="text-sm text-slate-500">Pastikan setiap alias menunjuk ruang fisik yang sama. Alias tersimpan tetap dipertahankan.</p></div>
+                    @include('rooms.partials.label-field')
                     <div class="flex items-center justify-end gap-4">
                         <a href="{{ route('rooms.index', $listQuery) }}"
                            class="px-4 py-2 text-sm text-gray-600 hover:text-gray-900">Batal</a>

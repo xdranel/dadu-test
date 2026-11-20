@@ -85,7 +85,7 @@ class SidangTaBookingAdministration
     {
         $v = Validator::make($slot, ['date' => ['required', 'date_format:Y-m-d'], 'room_id' => ['required', 'integer', 'exists:rooms,id'], 'start_time' => ['required', 'date_format:H:i'], 'end_time' => ['required', 'date_format:H:i', 'after:start_time']])->validate();
         $room = Room::findOrFail($v['room_id']);
-        if (! $s || ! $s->is_active || $room->status !== 'Dapat Dipakai') {
+        if (! $s || ! $s->is_active || ! $room->isBookableClassroom()) {
             throw ValidationException::withMessages(['room_id' => 'Ruang kelas aktif dan jadwal pelaksanaan diperlukan.']);
         }
         app(SidangTaExecutionWindowService::class)->assertSlot($s, $v['date'], $v['start_time'], $v['end_time']);

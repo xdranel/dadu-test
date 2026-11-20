@@ -50,9 +50,9 @@ class RoomBookingTransitionService
             abort_unless($locked->status === 'pending', 422, 'Pengajuan bukan berstatus menunggu persetujuan.');
             if ($decision === 'approved') {
                 $room = Room::query()->whereKey($locked->room_id)->lockForUpdate()->first();
-                if (! $room || $room->status !== 'Dapat Dipakai') {
+                if (! $room?->isBookableClassroom()) {
                     throw ValidationException::withMessages([
-                        'availability' => 'Ruangan ini sedang tidak dapat digunakan (status: '.($room?->status ?? 'Tidak Ditemukan').'). Pengajuan tidak dapat disetujui.',
+                        'availability' => 'Persetujuan memerlukan ruang berlabel KELAS dan berstatus Dapat Dipakai.',
                     ]);
                 }
 

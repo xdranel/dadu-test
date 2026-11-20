@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\AcademicPeriod;
+use App\Models\Room;
 use App\Models\RoomBookingRequest;
 use App\Models\RoomWeeklyPattern;
 use App\Services\RoomAvailabilityService;
@@ -43,6 +44,56 @@ it('requires an explicit room alias instead of inventing a second physical room'
     DB::table('room_schedule_aliases')->insert(['room_id' => $s['rooms']['a']->id, 'alias_key' => 'KTTA', 'label' => 'KTT A']);
     $r = $service->import(imported111Payload('KTT A'), $s['reviewer'], 'mapped.json');
     expect($r['successful'])->toBeTrue()->and(RoomWeeklyPattern::firstOrFail()->room_id)->toBe($s['rooms']['a']->id);
+});
+it('matches KTT 1.27 B to its exact master code and excludes known spaces missing from the master', function () {
+    $s = $this->s;
+    $room = $s['rooms']['a'];
+    $room->update(['room_code' => 'KTT 1.27 B']);
+    $payload = imported111Payload('KTT 1.27 B');
+    $payload['data'][] = imported111Payload('MANSYS LAB.')['data'][0];
+    $payload['data'][] = imported111Payload('KTT AULA')['data'][0];
+    $payload['total'] = count($payload['data']);
+    $s['reviewer']->givePermissionTo(Permission::findOrCreate('sync_execute', 'web'));
+
+    $file = UploadedFile::fake()->createWithContent('schedule.json', json_encode($payload));
+    $this->actingAs($s['reviewer'])->post(route('sync.import-json'), ['type' => 'room_schedule', 'json_file' => $file])
+        ->assertSessionHasNoErrors()->assertRedirect(route('sync.index'))
+        ->assertSessionHas('success', fn ($message) => str_contains($message, '2 pola ruang di luar cakupan Akademik dilewati'));
+
+    $pattern = RoomWeeklyPattern::sole();
+    expect($pattern->room_id)->toBe($room->id)->and(Room::count())->toBe(4)
+        ->and((int) DB::table('room_import_logs')->value('rows_imported'))->toBe(1)
+        ->and($s['source']->fresh()->metadata['excluded_room_labels'])->toEqualCanonicalizing(['MANSYS LAB.', 'KTT AULA']);
+    expect(app(RoomAvailabilityService::class)->busyIntervals($room->id, '2026-11-23'))->toBe([['start' => 510, 'end' => 630]]);
+});
+it('preserves the previous snapshot if all patterns are outside Academic scope or if the classroom alias has no target', function (string $label, string $message) {
+    $s = $this->s;
+    $service = app(RoomScheduleImportService::class);
+    $service->import(imported111Payload(), $s['reviewer'], 'previous.json');
+    $before = $s['source']->fresh()->getRawOriginal();
+    $s['rooms']['b']->update(['room_code' => 'KTT1.27']);
+
+    $result = $service->import(imported111Payload($label), $s['reviewer'], 'replacement.json');
+    expect($result['successful'])->toBeFalse()->and($result['errors'][0])->toContain($message)
+        ->and($s['source']->fresh()->getRawOriginal())->toBe($before)
+        ->and(RoomWeeklyPattern::sole()->room_id)->toBe($s['rooms']['a']->id);
+})->with([
+    ['SE LAB', 'Tidak ada pola jadwal yang terpetakan'],
+    ['KTT 1.27 B', 'Pemetaan alias ruang belum pasti: KTT 1.27 B'],
+]);
+it('rejects duplicate old and KTT master codes when the old record can still be booked', function () {
+    $s = $this->s;
+    $room = $s['rooms']['a'];
+    $room->update(['room_code' => 'KTT1.27']);
+    $legacy = Room::create(['room_code' => '1.27'] + $room->only(['name', 'building', 'capacity', 'status', 'label']));
+    $result = app(RoomScheduleImportService::class)->import(imported111Payload('KTT1.27'), $s['reviewer'], 'duplicate.json');
+
+    expect($result['successful'])->toBeFalse()->and($result['errors'][0])->toContain('Duplikat ruang fisik', '1.27')
+        ->and(RoomWeeklyPattern::count())->toBe(0)->and($s['source']->fresh()->fingerprint)->toBe('dummy-initial');
+    $legacy->update(['label' => null]);
+    $result = app(RoomScheduleImportService::class)->import(imported111Payload('KTT1.27'), $s['reviewer'], 'updated-master.json');
+    expect($result['successful'])->toBeTrue()->and(RoomWeeklyPattern::sole()->room_id)->toBe($room->id)
+        ->and($legacy->fresh()->label)->toBeNull();
 });
 it('rejects partial snapshots without changing the complete source', function () {
     $s = $this->s;

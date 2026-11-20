@@ -4,22 +4,31 @@ namespace App\Services;
 
 use App\Models\AcademicPeriod;
 use App\Models\Room;
+use App\Models\RoomBookingRequest;
 use App\Models\RoomScheduleSource;
 use App\Models\RoomWeeklyPattern;
 use App\Models\User;
 use App\Support\RoomTimeWindows;
 use App\Support\WeeklyRoomScheduleNormalizer;
 use DateTimeImmutable;
+use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Collection;
 use InvalidArgumentException;
 
 class RoomScheduleImportService
 {
+    private const NON_ACADEMIC_ROOM_KEYS = [
+        'APDEVLAB', 'BEELAB', 'BESTLAB', 'CAMLAB', 'COSPILAB', 'CPROGLAB', 'CYCLDLAB',
+        'DATAILAB', 'DIGITALLAB', 'EMLAB', 'MANSYSLAB', 'PORSCELAB', 'QBILAB', 'SELAB',
+        'SWENGLAB', 'TCONLAB', 'KTTAULA',
+    ];
+
     /**
      * Validate the complete iGracias payload before replacing the currently
      * active schedule. A partially valid import must never create false availability.
      *
-     * @return array{imported:int, created_rooms:int, errors:array<int, string>, successful:bool}
+     * @return array{imported:int, created_rooms?:int, errors:array<int, string>, successful:bool, mode?:string, excluded?:int}
      */
     public function import(array $payload, User $actor, string $filename): array
     {
@@ -246,16 +255,26 @@ class RoomScheduleImportService
                 throw new InvalidArgumentException('Periode jadwal belum terdaftar; buat/periksa periode akademik dahulu.');
             }
             $normalized = (new WeeklyRoomScheduleNormalizer)->normalize($payload, ['id' => $period->id, 'year' => $period->year, 'semester' => $period->semester, 'start_date' => $period->start_date->toDateString(), 'end_date' => $period->end_date->toDateString()]);
-            DB::transaction(function () use ($normalized, $period, $actor, $filename) {
+            $result = DB::transaction(function () use ($normalized, $period, $actor, $filename) {
                 $locked = AcademicPeriod::whereKey($period->id)->lockForUpdate()->firstOrFail();
                 if ($locked->getRawOriginal() !== $period->getRawOriginal()) {
                     throw new InvalidArgumentException('Periode berubah; muat ulang dan impor ulang.');
                 }
                 $rooms = Room::orderBy('id')->lockForUpdate()->get();
+                $roomKey = WeeklyRoomScheduleNormalizer::roomKey(...);
+                $duplicateCodes = $this->conflictingLegacyRoomCodes($rooms, $period);
+                if ($duplicateCodes->isNotEmpty()) {
+                    $examples = $duplicateCodes->take(5)->implode(', ');
+                    throw new InvalidArgumentException("Duplikat ruang fisik pada kode lama dan kode KTT ({$examples}). Periksa label, jadwal dan peminjaman pada kode lama sebelum impor ulang; jadwal lama dipertahankan.");
+                }
+
                 $lookup = [];
                 foreach ($rooms as $room) {
                     foreach ([$room->room_code, $room->name] as $value) {
-                        $lookup[WeeklyRoomScheduleNormalizer::roomKey($value)][$room->id] = true;
+                        $key = $roomKey($value);
+                        if ($key !== '') {
+                            $lookup[$key][$room->id] = true;
+                        }
                     }
                 }
                 foreach (DB::table('room_schedule_aliases')->get() as $alias) {
@@ -263,10 +282,20 @@ class RoomScheduleImportService
                 }
                 $patterns = [];
                 $unknown = [];
+                $excludedLabels = [];
+                $excludedCount = 0;
                 foreach ($normalized['patterns'] as $p) {
-                    $candidates = array_keys($lookup[WeeklyRoomScheduleNormalizer::roomKey($p['source_room_label'])] ?? []);
+                    $label = $p['source_room_label'];
+                    $key = $roomKey($label);
+                    $candidates = array_keys($lookup[$key] ?? []);
+                    if ($candidates === [] && in_array($key, self::NON_ACADEMIC_ROOM_KEYS, true)) {
+                        $excludedLabels[$label] = true;
+                        $excludedCount++;
+
+                        continue;
+                    }
                     if (count($candidates) !== 1) {
-                        $unknown[$p['source_room_label']] = true;
+                        $unknown[$label] = true;
 
                         continue;
                     }
@@ -276,7 +305,10 @@ class RoomScheduleImportService
                     $patterns[$p['source_identity']] = $p;
                 }
                 if ($unknown) {
-                    throw new InvalidArgumentException('Pemetaan alias ruang belum pasti: '.implode(', ', array_keys($unknown)).'. Lengkapi di Data Akademik → Ruangan; jadwal lama dipertahankan.');
+                    throw new InvalidArgumentException('Pemetaan alias ruang belum pasti: '.implode(', ', array_keys($unknown)).'. Periksa kecocokan kode atau nama ruang dengan iGracias di Data Akademik → Ruangan; jadwal lama dipertahankan.');
+                }
+                if ($patterns === []) {
+                    throw new InvalidArgumentException('Tidak ada pola jadwal yang terpetakan ke master ruang Akademik; jadwal lama dipertahankan.');
                 }
                 $conflicts = app(RoomAvailabilityService::class)->conflictingBookings(array_values($patterns), $period->start_date->toDateString(), $period->end_date->toDateString());
                 if ($conflicts) {
@@ -287,14 +319,43 @@ class RoomScheduleImportService
                     RoomWeeklyPattern::create($p);
                 }
                 $source = RoomScheduleSource::firstOrNew(['academic_period_id' => $period->id]);
-                $source->fill(['is_complete' => true, 'scope' => 'semester', 'fingerprint' => $normalized['fingerprint'], 'version' => ($source->exists ? $source->version : 0) + 1, 'metadata' => ['filename' => $filename, 'source_week' => $normalized['source_week']]])->save();
-                DB::table('room_import_logs')->insert(['user_id' => $actor->id, 'filename' => $filename, 'rows_imported' => count($normalized['patterns']), 'errors' => '[]', 'created_at' => now(), 'updated_at' => now()]);
+                $source->fill(['is_complete' => true, 'scope' => 'semester', 'fingerprint' => $normalized['fingerprint'], 'version' => ($source->exists ? $source->version : 0) + 1, 'metadata' => [
+                    'filename' => $filename, 'source_week' => $normalized['source_week'],
+                    'excluded_patterns' => $excludedCount, 'excluded_room_labels' => array_keys($excludedLabels),
+                ]])->save();
+                DB::table('room_import_logs')->insert(['user_id' => $actor->id, 'filename' => $filename, 'rows_imported' => count($patterns), 'errors' => '[]', 'created_at' => now(), 'updated_at' => now()]);
+
+                return ['imported' => count($patterns), 'excluded' => $excludedCount];
             }, 3);
 
-            return ['imported' => count($normalized['patterns']), 'created_rooms' => 0, 'errors' => [], 'successful' => true, 'mode' => 'weekly'];
+            return $result + ['created_rooms' => 0, 'errors' => [], 'successful' => true, 'mode' => 'weekly'];
         } catch (InvalidArgumentException $e) {
             return $this->recordFailure($actor, $filename, [$e->getMessage()]);
         }
+    }
+
+    private function conflictingLegacyRoomCodes(EloquentCollection $rooms, AcademicPeriod $period): Collection
+    {
+        $roomKey = WeeklyRoomScheduleNormalizer::roomKey(...);
+        $roomsByCode = $rooms->keyBy(fn (Room $room) => $roomKey($room->room_code));
+        $legacyRooms = $rooms->filter(function (Room $room) use ($roomKey, $roomsByCode) {
+            $replacement = $roomsByCode->get('KTT'.$roomKey($room->room_code));
+
+            return $replacement && $roomKey($room->name) === $roomKey($replacement->name)
+                && $roomKey($room->building) === $roomKey($replacement->building);
+        });
+        if ($legacyRooms->isEmpty()) {
+            return collect();
+        }
+
+        $dates = [max(today('Asia/Jakarta')->toDateString(), $period->start_date->toDateString()), $period->end_date->toDateString()];
+        $scheduled = DB::table('room_schedules')->whereIn('room_id', $legacyRooms->modelKeys())
+            ->whereBetween('usage_date', $dates)->pluck('room_id');
+        $booked = RoomBookingRequest::whereIn('room_id', $legacyRooms->modelKeys())->whereIn('status', ['pending', 'approved'])
+            ->whereHas('occurrences', fn ($query) => $query->whereBetween('usage_date', $dates))->pluck('room_id');
+
+        return $legacyRooms->filter(fn (Room $room) => $room->isBookableClassroom()
+            || $scheduled->contains($room->id) || $booked->contains($room->id))->pluck('room_code');
     }
 
     private function isCompleteScheduleExport(array $payload, int $rowCount): bool

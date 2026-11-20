@@ -3,7 +3,10 @@
 use App\Models\Room;
 use App\Services\SidangTaStaffScheduling;
 use Carbon\Carbon;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Schema;
+use Rap2hpoutre\FastExcel\FastExcel;
 use Spatie\Permission\Models\Permission;
 use Tests\Support\TaRoomScenario;
 
@@ -13,17 +16,49 @@ beforeEach(function () {
     $this->s['settings']->update(['duration_minutes' => 90]);
 });
 
-test('all usable master rooms are eligible without classification and inactive status is preserved', function () {
+test('TA scheduling only offers usable rooms with a KELAS label', function () {
     $s = $this->s;
+    $s['rooms']['lab']->update(['label' => 'LAB']);
+    $s['rooms']['unknown']->update(['label' => null]);
     $inactive = Room::create(['room_code' => 'AAA-INACTIVE', 'name' => 'KELAS NONAKTIF',
-        'building' => 'Dummy', 'capacity' => 20, 'status' => 'Tidak Dapat Dipakai']);
+        'building' => 'Dummy', 'capacity' => 20, 'status' => 'Tidak Dapat Dipakai', 'label' => 'KELAS']);
     $before = Room::orderBy('id')->get()->mapWithKeys(fn ($r) => [$r->id => $r->status])->all();
     $result = app(SidangTaStaffScheduling::class)->preview($s['reviewer'], $s['registration'], '2026-11-23');
     $ids = collect($result['options'])->pluck('candidate.room_id')->unique()->sort()->values()->all();
-    expect($ids)->toBe(collect($s['rooms'])->pluck('id')->sort()->values()->all())
+    expect($ids)->toBe([$s['rooms']['a']->id, $s['rooms']['b']->id])
         ->not->toContain($inactive->id);
     expect(Room::orderBy('id')->get()->mapWithKeys(fn ($r) => [$r->id => $r->status])->all())->toBe($before);
     expect(Schema::hasColumn('rooms', 'is_classroom'))->toBeFalse();
+});
+
+test('XLSX master import keeps coded rooms with incomplete details and preserves manual entries on reimport', function () {
+    $actor = $this->s['reviewer'];
+    $actor->givePermissionTo(Permission::findOrCreate('room_create', 'web'), Permission::findOrCreate('room_read', 'web'));
+    $oldLab = Room::create(['room_code' => 'MANSYS LAB.', 'name' => '', 'building' => '', 'capacity' => 0]);
+    $rows = [
+        ['Kode Ruang' => 'KTT 1.27 B', 'Nama Ruang' => 'KELAS 1.27 B', 'Lokasi Gedung' => 'Gedung Utama', 'Kapasitas' => 80, 'Status' => 'Aktif', 'Label' => 'KELAS'],
+        ['Kode Ruang' => 'MANSYS LAB', 'Nama Ruang' => '', 'Lokasi Gedung' => '', 'Kapasitas' => '', 'Status' => 'Aktif', 'Label' => 'lab'],
+        ['Kode Ruang' => 'KTT A-1.03', 'Nama Ruang' => 'KELAS A-1.03', 'Lokasi Gedung' => 'Gedung AB', 'Kapasitas' => 45, 'Status' => 'Non Aktif', 'Label' => ''],
+    ];
+    Storage::fake('local');
+    $path = Storage::disk('local')->path('rooms.xlsx');
+    (new FastExcel(collect($rows)))->export($path);
+    $file = new UploadedFile($path, 'rooms.xlsx', null, UPLOAD_ERR_OK, true);
+
+    $this->actingAs($actor)->post(route('rooms.import'), ['file' => $file])->assertRedirect(route('rooms.index'))
+        ->assertSessionHas('success');
+    $lab = Room::where('room_code', 'MANSYS LAB')->sole();
+    $unlabelled = Room::where('room_code', 'KTT A-1.03')->sole();
+    expect($lab->id)->toBe($oldLab->id)->and($lab->label)->toBe('LAB')->and($lab->status)->toBe('Dapat Dipakai')
+        ->and($unlabelled->label)->toBeNull()->and($unlabelled->status)->toBe('Tidak Dapat Dipakai')
+        ->and(Room::where('room_code', 'KTT 1.27 B')->sole()->label)->toBe('KELAS');
+    $lab->update(['name' => 'Nama Lab Terverifikasi', 'building' => 'Gedung Lab', 'capacity' => 32]);
+    $unlabelled->update(['label' => 'KELAS']);
+
+    $this->post(route('rooms.import'), ['file' => $file])->assertRedirect(route('rooms.index'));
+    expect($lab->fresh()->only(['name', 'building', 'capacity']))->toBe(['name' => 'Nama Lab Terverifikasi', 'building' => 'Gedung Lab', 'capacity' => 32])
+        ->and($unlabelled->fresh()->label)->toBe('KELAS');
+    $this->get(route('rooms.index', ['search' => 'MANSYS LAB']))->assertOk()->assertSee('Label')->assertSee('LAB');
 });
 
 test('room CRUD no longer requires classification and accepts an old open form without changing status', function () {

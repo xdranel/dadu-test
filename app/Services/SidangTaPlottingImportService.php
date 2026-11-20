@@ -156,7 +156,7 @@ class SidangTaPlottingImportService
                                 $matches = Room::where('name', $roomReference)->get();
                             }
                             $room = $matches->count() === 1 ? $matches->first() : null;
-                            if (! $room || $room->status !== 'Dapat Dipakai') {
+                            if (! $room?->isBookableClassroom()) {
                                 $this->invalid('Ruang plotting harus ruang kelas aktif yang valid.');
                             }
                         }

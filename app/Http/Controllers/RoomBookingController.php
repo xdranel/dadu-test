@@ -117,7 +117,7 @@ class RoomBookingController extends Controller
         $service = app(RoomAvailabilityService::class);
         $busy = $service->forRange($start, $end);
         $coverage = $service->coverage($start, $end);
-        $rooms = Room::where('status', 'Dapat Dipakai')->get();
+        $rooms = Room::bookableClassrooms()->get();
         $calendar = [];
         foreach ($busy as $date => $byRoom) {
             if (in_array($date, $coverage['missing_dates'], true)) {
@@ -194,7 +194,7 @@ class RoomBookingController extends Controller
     public function create(Request $request)
     {
         abort_unless($this->canBorrow($request->user()) && $request->user()->can('room_booking_create'), 403);
-        $rooms = Room::where('status', 'Dapat Dipakai')->orderBy('name')->get();
+        $rooms = Room::bookableClassrooms()->orderBy('name')->get();
         $hasImported = $this->hasSuccessfulImport();
 
         return view('room-bookings.create', compact('rooms', 'hasImported'));
@@ -226,7 +226,7 @@ class RoomBookingController extends Controller
         for ($day = Carbon::parse($data['start_date']); $day->lte(Carbon::parse($data['end_date'])); $day->addDay()) {
             $dates[] = $day->toDateString();
         }
-        $rooms = Room::where('status', 'Dapat Dipakai')->orderBy('name')->get();
+        $rooms = Room::bookableClassrooms()->orderBy('name')->get();
         $busy = app(RoomAvailabilityService::class)->forRange($data['start_date'], $data['end_date']);
         $available = $rooms->filter(function ($room) use ($dates, $data, $busy) {
             foreach ($dates as $date) {
@@ -300,7 +300,7 @@ class RoomBookingController extends Controller
             }
             // Lock the room as the serialization point for all bookings and imports for it.
             $room = Room::query()->whereKey($data['room_id'])->lockForUpdate()->firstOrFail();
-            abort_unless($room->status === 'Dapat Dipakai', 422, 'Ruangan ini belum diaktifkan untuk peminjaman.');
+            abort_unless($room->isBookableClassroom(), 422, 'Peminjaman memerlukan ruang berlabel KELAS dan berstatus Dapat Dipakai.');
 
             $busy = app(RoomAvailabilityService::class)->forRange($data['start_date'], $data['end_date']);
             foreach ($dates as $date) {
@@ -475,7 +475,7 @@ class RoomBookingController extends Controller
 
         // Hitung slot yang masih tersedia (≥ 1 jam) per ruangan
         $sourceReady = app(RoomAvailabilityService::class)->coverage($date, $date)['ready'];
-        $rooms = $sourceReady ? Room::where('status', 'Dapat Dipakai')->orderBy('name')->get() : collect();
+        $rooms = $sourceReady ? Room::bookableClassrooms()->orderBy('name')->get() : collect();
         $availableSlots = [];
         foreach ($rooms as $room) {
             $free = $this->computeFreeSlots($roomSlots[$room->id] ?? [], 390, 1290, 60);
