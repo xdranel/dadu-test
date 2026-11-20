@@ -33,7 +33,7 @@ function room127Booking(array $s, User $owner, string $status = 'pending', strin
     return $booking;
 }
 
-test('authorized admin can see borrowing submenus and submit an ordinary pending booking', function (string $role) {
+test('authorized admin can submit an ordinary booking for review', function (string $role) {
     $actor = room127Admin($role);
     $this->actingAs($actor)->get(route('room-bookings.index'))->assertOk()
         ->assertSee('Pengajuan Peminjaman Ruangan')->assertSee('Daftar Peminjaman Saya');
@@ -46,6 +46,11 @@ test('authorized admin can see borrowing submenus and submit an ordinary pending
     $booking = RoomBookingRequest::where('purpose', 'Rapat admin127')->sole();
     expect($booking->user_id)->toBe($actor->id)->and($booking->status)->toBe('pending')
         ->and($booking->booking_origin)->toBe('ordinary')->and($booking->occurrences()->count())->toBe(1);
+
+    $this->actingAs($this->s['reviewer'])->get(route('admin.room-bookings.review'))->assertOk()->assertSee('Rapat admin127');
+    $this->post(route('admin.room-bookings.decision', $booking), ['decision' => 'approved'])
+        ->assertSessionHasNoErrors()->assertRedirect();
+    expect($booking->fresh()->status)->toBe('approved');
 })->with(['admin', 'Akademik']);
 
 test('admin without review permission can only cancel their own pending ordinary booking', function () {

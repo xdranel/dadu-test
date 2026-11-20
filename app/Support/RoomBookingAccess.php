@@ -14,6 +14,6 @@ final class RoomBookingAccess
         }
 
         return $user->hasRole('Pelaksana') && ($user->isSsoAccount()
-            || (app()->environment(['local', 'testing']) && $user->isManualAccount()));
+            || (app()->environment(['local', 'testing', 'staging']) && $user->isManualAccount()));
     }
 }

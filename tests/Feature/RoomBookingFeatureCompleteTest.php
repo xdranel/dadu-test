@@ -228,7 +228,10 @@ test('lecturer can access dashboard and view active bookings', function () {
     $response->assertSee('Kalender Ketersediaan Ruangan');
 });
 
-test('manual account lecturer with non-krisna email can access dashboard, create, and my history without 403', function () {
+test('manual lecturer can submit a booking and see the academic approval in staging', function () {
+    $this->app->instance('env', 'staging');
+    $csrfToken = str()->random(40);
+    $this->withSession(['_token' => $csrfToken])->withHeader('X-CSRF-TOKEN', $csrfToken);
     $manualLecturer = User::factory()->create([
         'name' => 'Dosen Simulasi Sidang TA',
         'email' => 'dosen.ta@dosen.test',
@@ -239,15 +242,42 @@ test('manual account lecturer with non-krisna email can access dashboard, create
     $manualLecturer->assignRole($role);
     $manualLecturer->givePermissionTo(['room_booking_create', 'room_booking_read', 'room_booking_update']);
 
-    // Dashboard
     $this->actingAs($manualLecturer)->get(route('room-bookings.index'))->assertOk();
+    $this->get(route('room-bookings.create'))->assertOk();
+    $this->get(route('room-bookings.my'))->assertOk();
+    $this->get(route('admin.room-bookings.review'))->assertForbidden();
 
-    // Ajukan Peminjaman
-    $this->actingAs($manualLecturer)->get(route('room-bookings.create'))->assertOk();
+    $room = $this->scenario['rooms']['a'];
+    $slot = ['start_at' => '2026-11-24T10:00', 'end_at' => '2026-11-24T11:00'];
+    $purpose = 'Peminjaman kelas untuk kegiatan dosen';
+    $this->postJson(route('room-bookings.availability'), $slot)->assertOk()->assertJsonFragment(['id' => $room->id]);
+    $this->post(route('room-bookings.store'), $slot + ['room_id' => $room->id, 'purpose' => $purpose])
+        ->assertSessionHasNoErrors()->assertRedirect(route('room-bookings.index'));
+    $booking = RoomBookingRequest::where('purpose', $purpose)->sole();
+    expect($booking->user_id)->toBe($manualLecturer->id)->and($booking->status)->toBe('pending');
 
-    // Riwayat Peminjaman
-    $this->actingAs($manualLecturer)->get(route('room-bookings.my'))->assertOk();
+    $this->actingAs($this->admin)->get(route('admin.room-bookings.review'))->assertOk()->assertSee($purpose);
+    $this->postJson(route('room-bookings.availability'), $slot)->assertOk()->assertJsonMissing(['id' => $room->id]);
+    $this->post(route('admin.room-bookings.decision', $booking), ['decision' => 'approved'])
+        ->assertSessionHasNoErrors()->assertRedirect();
+    expect($booking->fresh()->status)->toBe('approved');
+
+    $this->actingAs($manualLecturer)->get(route('room-bookings.my'))->assertOk()->assertSee($purpose)
+        ->assertViewHas('bookings', fn ($bookings) => $bookings->contains(fn ($row) => $row->is($booking) && $row->status === 'approved'));
 });
+
+test('manual Pelaksana borrowing eligibility respects environment and permission', function (string $environment, bool $grant) {
+    $this->app->instance('env', $environment);
+    $user = User::factory()->create(['auth_source' => 'manual', 'status' => 'active']);
+    $user->assignRole('Pelaksana');
+    if ($grant) {
+        $user->givePermissionTo(['room_booking_read', 'room_booking_create']);
+    }
+
+    $this->actingAs($user)->get(route('room-bookings.index'))->assertForbidden();
+    $this->get(route('room-bookings.create'))->assertForbidden();
+    $this->get(route('room-bookings.my'))->assertForbidden();
+})->with([['production', true], ['staging', false]]);
 
 test('academic admin can access borrowing dashboard alongside review', function () {
     $response = $this->actingAs($this->admin)->get(route('room-bookings.index'));

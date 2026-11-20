@@ -26,7 +26,7 @@ test('execution111_stale_and_student_writes_are_rejected', function () {
     $this->actingAs($this->s['reviewer'])->put(route('admin.sidang-ta-execution.update', $this->s['period']), $this->values + ['lock_version' => 0])->assertConflict();
     $this->actingAs($this->s['owner'])->get(route('admin.sidang-ta-execution.index'))->assertForbidden();
     $this->put(route('admin.sidang-ta-execution.update', $this->s['period']), $this->values + ['lock_version' => 1])->assertForbidden();
-    $this->actingAs($this->s['reviewer'])->get(route('admin.sidang-ta-execution.index'))->assertOk()->assertSee('Pelaksanaan Sidang TA');
+    $this->actingAs($this->s['reviewer'])->get(route('admin.sidang-ta-execution.index'))->assertOk()->assertSee('Review Pelaksanaan Sidang TA');
 });
 test('execution111_window_cannot_cut_existing_booking_but_new_default_duration_can_change', function () {
     $b = RoomBookingRequest::create(['user_id' => $this->s['owner']->id, 'room_id' => $this->s['rooms']['a']->id, 'purpose' => 'Dummy TA', 'type' => 'single', 'participants' => 1, 'start_date' => '2026-11-23', 'end_date' => '2026-11-23', 'start_time' => '08:00', 'end_time' => '10:00', 'status' => 'approved', 'booking_origin' => 'sidang_ta', 'sidang_ta_registration_id' => $this->s['registration']->id]);

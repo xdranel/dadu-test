@@ -20,7 +20,7 @@
                     </div>
                 @endif
 
-                <form action="{{ route('rooms.update', $room) }}" method="POST">
+                <form action="{{ route('rooms.update', ['room' => $room, 'list' => $listQuery]) }}" method="POST">
                     @csrf
                     @method('PUT')
 
@@ -110,7 +110,7 @@
 @isset($aliases)<p class="text-sm">Alias tersimpan: {{ implode(', ',$aliases) ?: '-' }}</p>@endisset
 <p class="text-sm text-slate-500">Pastikan setiap alias menunjuk ruang fisik yang sama. Alias tersimpan tetap dipertahankan.</p></div>
                     <div class="flex items-center justify-end gap-4">
-                        <a href="{{ route('rooms.index') }}"
+                        <a href="{{ route('rooms.index', $listQuery) }}"
                            class="px-4 py-2 text-sm text-gray-600 hover:text-gray-900">Batal</a>
                         <button type="submit"
                                 class="px-6 py-2 bg-[#DA2D3B] text-white text-sm font-medium rounded-md

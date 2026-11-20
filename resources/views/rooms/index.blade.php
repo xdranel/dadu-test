@@ -136,7 +136,7 @@
                                  <div class="inline-flex items-center justify-center gap-1">
                                      {{-- Tombol Edit --}}
                                      @can('room_update')
-                                     <a href="{{ route('rooms.edit', $r->id) }}"
+                                     <a href="{{ route('rooms.edit', ['room' => $r, 'list' => $listQuery]) }}"
                                         class="inline-flex items-center justify-center w-8 h-8 rounded-lg text-gray-400 hover:text-amber-500 hover:bg-amber-50 transition-all duration-200"
                                         title="Edit">
                                          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

@@ -39,3 +39,28 @@ test('room CRUD no longer requires classification and accepts an old open form w
         ->assertSessionHasNoErrors()->assertRedirect(route('rooms.index'));
     expect(Room::where('room_code', 'STATUS-OFF')->sole()->status)->toBe('Tidak Dapat Dipakai');
 });
+
+test('editing a room returns to the originating filtered page after saving or cancelling', function () {
+    $actor = $this->s['reviewer'];
+    $actor->givePermissionTo(Permission::findOrCreate('room_read', 'web'), Permission::findOrCreate('room_update', 'web'));
+    $attributes = ['building' => 'Gedung Uji', 'capacity' => 20, 'status' => 'Dapat Dipakai'];
+    $room = Room::create($attributes + ['room_code' => 'URUT-0', 'name' => 'Kelas Uji 0']);
+    $this->travel(1)->minutes();
+    foreach (range(1, 15) as $number) {
+        Room::create($attributes + ['room_code' => 'URUT-'.$number, 'name' => 'Kelas Uji '.$number]);
+    }
+
+    $filters = ['page' => '2', 'search' => 'Kelas Uji', 'gedung' => 'Gedung Uji', 'status' => 'Dapat Dipakai'];
+    $listUrl = route('rooms.index', $filters);
+    $editUrl = route('rooms.edit', ['room' => $room, 'list' => $filters]);
+    $updateUrl = route('rooms.update', ['room' => $room, 'list' => $filters]);
+
+    $this->actingAs($actor)->get($listUrl)->assertOk()->assertSee($editUrl);
+    $this->get($editUrl)->assertOk()->assertSee($updateUrl)->assertSee($listUrl);
+    $this->from($editUrl)->put($updateUrl, $attributes + ['room_code' => 'URUT-0', 'name' => ''])
+        ->assertSessionHasErrors('name')->assertRedirect($editUrl);
+    $this->get($editUrl)->assertOk()->assertSee($updateUrl);
+    $this->put($updateUrl, ['status' => 'Tidak Dapat Dipakai', 'room_code' => 'URUT-0', 'name' => 'Kelas Uji Diperbarui'] + $attributes)
+        ->assertSessionHasNoErrors()->assertRedirect($listUrl);
+    expect($room->fresh()->status)->toBe('Tidak Dapat Dipakai');
+});

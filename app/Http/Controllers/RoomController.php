@@ -14,6 +14,7 @@ class RoomController extends Controller
 {
     public function index(Request $request)
     {
+        $listQuery = $this->listQuery($request->query());
         $rooms = Room::search($request->search)
             ->filterBuilding($request->gedung)
             ->filterStatus($request->status)
@@ -26,7 +27,7 @@ class RoomController extends Controller
             ->orderBy('building')
             ->pluck('building');
 
-        return view('rooms.index', compact('rooms', 'gedungList'));
+        return view('rooms.index', compact('rooms', 'gedungList', 'listQuery'));
     }
 
     public function export(Request $request)
@@ -116,19 +117,32 @@ class RoomController extends Controller
             ->with('success', 'Ruangan berhasil ditambahkan.');
     }
 
-    public function edit(Room $room)
+    public function edit(Request $request, Room $room)
     {
         $aliases = DB::table('room_schedule_aliases')->where('room_id', $room->id)->pluck('label')->all();
+        $listQuery = $this->listQuery($request->query('list'));
 
-        return view('rooms.edit', compact('room', 'aliases'));
+        return view('rooms.edit', compact('room', 'aliases', 'listQuery'));
     }
 
     public function update(UpdateRoomRequest $request, Room $room)
     {
         app(RoomAliasService::class)->save($room, $request->validated());
 
-        return redirect()->route('rooms.index')
+        return redirect()->route('rooms.index', $this->listQuery($request->query('list')))
             ->with('success', "Data {$room->name} berhasil diperbarui.");
+    }
+
+    private function listQuery(mixed $query): array
+    {
+        if (! is_array($query)) {
+            return [];
+        }
+
+        return array_filter(
+            array_intersect_key($query, array_flip(['page', 'search', 'gedung', 'status'])),
+            fn ($value) => is_string($value) && $value !== '',
+        );
     }
 
     public function destroy(Room $room)

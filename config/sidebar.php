@@ -136,7 +136,7 @@ return [
             'items' => [
                 ['label' => 'Review Yudisium',      'route' => 'admin.graduation-registrations.index', 'active' => 'admin.graduation-registrations.*', 'permission' => 'graduation_registration_review'],
                 ['label' => 'Review Sidang TA',     'route' => 'admin.sidang-ta-registrations.index', 'active' => ['admin.sidang-ta-registrations.*', 'admin.sidang-ta-periods.*'], 'permissions_any' => ['sidang_ta_registration_review', 'sidang_ta_period_read', 'sidang_ta_registration_view_program']],
-                ['label' => 'Pelaksanaan Sidang TA', 'route' => 'admin.sidang-ta-execution.index', 'active' => ['admin.sidang-ta-execution.*', 'admin.sidang-ta-bookings.*'], 'permissions_any' => ['sidang_ta_registration_review', 'sidang_ta_registration_view_program']],
+                ['label' => 'Review Pelaksanaan Sidang TA', 'route' => 'admin.sidang-ta-execution.index', 'active' => ['admin.sidang-ta-execution.*', 'admin.sidang-ta-bookings.*'], 'permissions_any' => ['sidang_ta_registration_review', 'sidang_ta_registration_view_program']],
                 ['label' => 'Review Banding Nilai', 'route' => 'admin.grade-appeals.index',            'active' => 'admin.grade-appeals.*',            'permission' => 'grade_appeal_review'],
                 ['label' => 'Antrian',    'route' => 'admin.queue.index',                    'active' => 'admin.queue.*',                    'permission' => 'queue_ticket_read', 'badge_key' => 'queue_pending'],
             ],

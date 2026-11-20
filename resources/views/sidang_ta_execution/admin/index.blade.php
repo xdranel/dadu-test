@@ -1,4 +1,4 @@
-<x-app-layout><x-slot name="header">Pelaksanaan Sidang TA</x-slot>
+<x-app-layout><x-slot name="header">Review Pelaksanaan Sidang TA</x-slot>
 <div class="space-y-5">
 @include('sidang_ta_execution.partials.notices')
 @can('sidang_ta_period_read')<section class="campus-card space-y-3 p-5"><h2 class="font-bold">Pelaksanaan Sidang TA</h2><p class="text-sm text-slate-500">Atur periode pelaksanaan, hari dan jam pencarian ruang kelas.</p><a class="btn btn-secondary" href="{{ route('admin.sidang-ta-execution.settings') }}">Kelola Pelaksanaan</a></section>@endcan
