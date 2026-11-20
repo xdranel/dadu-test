@@ -30,15 +30,6 @@ class SidangTaStaffScheduling
         }
     }
 
-    private function searchWindow(SidangTaExecutionSetting $s): SidangTaExecutionSetting
-    {
-        $window = clone $s;
-        // Official 90-minute slots include free lunch-time rooms. Existing bookings are unchanged.
-        $window->forceFill(['duration_minutes' => 90, 'break_start_time' => null, 'break_end_time' => null]);
-
-        return $window;
-    }
-
     private function candidates(SidangTaExecutionSetting $s, ?SidangTaSchedule $c, string $date): array
     {
         Validator::make(['date' => $date], ['date' => ['required', 'date_format:Y-m-d']])->validate();
@@ -54,6 +45,7 @@ class SidangTaStaffScheduling
         $booking = $c?->booking;
         $except = $booking && in_array($booking->status, ['pending', 'approved'], true) ? $booking->id : null;
         $busy = $except ? $availability->rangeExcept($date, $date, $except) : $availability->forRange($date, $date);
+        $duration = app(SidangTaExecutionWindowService::class)->forStaffScheduling($s)->duration_minutes;
         $start = W::minutes($s->start_time);
         $end = W::minutes($s->end_time);
         $notBefore = $date === today('Asia/Jakarta')->toDateString() ? W::minutes(now('Asia/Jakarta')->format('H:i:s'), true) + 1 : 0;
@@ -66,14 +58,14 @@ class SidangTaStaffScheduling
                 $seeds[] = W::minutes($preferred);
             }
             foreach (array_unique($seeds) as $minute) {
-                if ($minute < max($start, $notBefore) || $minute + 90 > $end) {
+                if ($minute < max($start, $notBefore) || $minute + $duration > $end) {
                     continue;
                 }
-                if (collect($occupied)->contains(fn ($b) => $b['start'] < $minute + 90 && $b['end'] > $minute)) {
+                if (collect($occupied)->contains(fn ($b) => $b['start'] < $minute + $duration && $b['end'] > $minute)) {
                     continue;
                 }
                 $slots[] = ['date' => $date, 'room_id' => $room->id, 'room_code' => $room->room_code,
-                    'room_name' => $room->name, 'start_time' => W::time($minute), 'end_time' => W::time($minute + 90), 'duration_minutes' => 90];
+                    'room_name' => $room->name, 'start_time' => W::time($minute), 'end_time' => W::time($minute + $duration), 'duration_minutes' => $duration];
             }
         }
         $score = static function ($slot) use ($c, $preferred) {
@@ -165,7 +157,7 @@ class SidangTaStaffScheduling
             if ($c->was_confirmed || $activeBooking) {
                 $slot = ['date' => $candidate['date'], 'room_id' => $candidate['room_id'],
                     'start_time' => substr($candidate['start_time'], 0, 5), 'end_time' => substr($candidate['end_time'], 0, 5)];
-                $c = app(SidangTaBookingAdministration::class)->reschedule($actor, $r, $slot, $c->lock_version, 'Penyesuaian plotting oleh admin.');
+                $c = app(SidangTaBookingAdministration::class)->reschedule($actor, $r, $slot, $c->lock_version, 'Penyesuaian plotting oleh admin.', useStaffWindow: true);
                 if ($c->booking->status === 'pending') {
                     app(RoomBookingTransitionService::class)->decide($actor, $c->booking, 'approved', 'Jadwal ditetapkan admin.');
                     $c = $c->fresh();

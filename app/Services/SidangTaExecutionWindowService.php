@@ -17,6 +17,11 @@ use Illuminate\Validation\ValidationException;
 
 class SidangTaExecutionWindowService
 {
+    public function forStaffScheduling(SidangTaExecutionSetting $setting): SidangTaExecutionSetting
+    {
+        return (clone $setting)->forceFill(['duration_minutes' => 90, 'break_start_time' => null, 'break_end_time' => null]);
+    }
+
     public function windows(SidangTaExecutionSetting $s): array
     {
         $start = W::minutes($s->start_time);

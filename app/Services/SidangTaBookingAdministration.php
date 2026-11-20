@@ -105,9 +105,12 @@ class SidangTaBookingAdministration
         return $v;
     }
 
-    public function reschedule(User $actor, SidangTaRegistration $registration, array $slot, int $version, string $reason): SidangTaSchedule
+    public function reschedule(User $actor, SidangTaRegistration $registration, array $slot, int $version, string $reason, bool $useStaffWindow = false): SidangTaSchedule
     {
-        return $this->context($actor, $registration, $version, $reason, function ($r, $c, $s) use ($actor, $slot, $reason) {
+        return $this->context($actor, $registration, $version, $reason, function ($r, $c, $s) use ($actor, $slot, $reason, $useStaffWindow) {
+            if ($s && $useStaffWindow) {
+                $s = app(SidangTaExecutionWindowService::class)->forStaffScheduling($s);
+            }
             $b = $c->booking;
             if (! $b || ! in_array($b->status, ['pending', 'approved'], true)) {
                 if (! $c->was_confirmed) {

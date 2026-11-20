@@ -89,7 +89,7 @@ test('academic admin can access review page with list of bookings and calendar',
     $response->assertSee($this->scenario['rooms']['a']->name);
 });
 
-test('academic admin can approve a pending room booking', function () {
+test('academic admin can approve a pending room booking with or without a note', function (?string $note) {
     $booking = RoomBookingRequest::create([
         'user_id' => $this->lecturer->id,
         'room_id' => $this->scenario['rooms']['b']->id,
@@ -111,14 +111,14 @@ test('academic admin can approve a pending room booking', function () {
 
     $response = $this->actingAs($this->admin)->post(route('admin.room-bookings.decision', $booking), [
         'decision' => 'approved',
-        'note' => 'Disetujui untuk ujian susulan',
+        'note' => $note ?? '',
     ]);
 
     $response->assertRedirect();
     $response->assertSessionHas('success');
     expect($booking->fresh()->status)->toBe('approved');
-    expect($booking->fresh()->admin_note)->toBe('Disetujui untuk ujian susulan');
-});
+    expect($booking->fresh()->admin_note)->toBe($note);
+})->with([['Disetujui untuk ujian susulan'], [null]]);
 
 test('academic admin CANNOT approve booking if room status is inactive / tidak dapat dipakai (mutlak ditolak)', function () {
     // Ruangan sedang tidak dapat dipakai
@@ -152,7 +152,7 @@ test('academic admin CANNOT approve booking if room status is inactive / tidak d
     expect($booking->fresh()->status)->toBe('pending');
 });
 
-test('academic admin can reject a pending booking with note', function () {
+test('academic admin can reject a pending booking with or without a note', function (?string $note) {
     $booking = RoomBookingRequest::create([
         'user_id' => $this->lecturer->id,
         'room_id' => $this->scenario['rooms']['b']->id,
@@ -174,14 +174,14 @@ test('academic admin can reject a pending booking with note', function () {
 
     $response = $this->actingAs($this->admin)->post(route('admin.room-bookings.decision', $booking), [
         'decision' => 'rejected',
-        'note' => 'Ruangan akan dipakai agenda pimpinan',
+        'note' => $note ?? '',
     ]);
 
     $response->assertRedirect();
     $response->assertSessionHas('success');
     expect($booking->fresh()->status)->toBe('rejected');
-    expect($booking->fresh()->admin_note)->toBe('Ruangan akan dipakai agenda pimpinan');
-});
+    expect($booking->fresh()->admin_note)->toBe($note);
+})->with([['Ruangan akan dipakai agenda pimpinan'], [null]]);
 
 test('academic admin can cancel an approved booking with reason', function () {
     $booking = RoomBookingRequest::create([

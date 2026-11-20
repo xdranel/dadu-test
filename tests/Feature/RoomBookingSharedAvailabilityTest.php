@@ -74,7 +74,9 @@ it('does not let a room-only reviewer cancel a TA booking through the old endpoi
     $b = ($this->requestBooking)('approved', true);
     $actor = User::factory()->create(['status' => 'active']);
     $actor->givePermissionTo('room_booking_review');
-    $this->actingAs($actor)->post(route('admin.room-bookings.cancel', $b), ['reason' => 'Not my authority'])->assertForbidden();
+    $this->actingAs($actor)->get(route('admin.room-bookings.review'))->assertOk()
+        ->assertSee($b->purpose)->assertDontSee(route('admin.room-bookings.cancel', $b));
+    $this->post(route('admin.room-bookings.cancel', $b), ['reason' => 'Not my authority'])->assertForbidden();
     expect($b->fresh()->status)->toBe('approved');
 });
 it('marks calendar dates unknown when the source is not verified instead of available', function () {

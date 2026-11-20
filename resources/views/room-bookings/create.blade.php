@@ -109,17 +109,14 @@
         const endSubmit = document.getElementById('end_at_submit');
         const roomSubmit = document.getElementById('room_id_submit');
 
-        let checked = false;
+        let checkedRange = null;
+        let availabilityVersion = 0;
         let lastStartDate = startDate.value;
         const today = '{{ now("Asia/Jakarta")->toDateString() }}';
 
         const syncDateTime = () => {
-            if (startDate.value && startTime.value) {
-                start.value = `${startDate.value}T${startTime.value}`;
-            }
-            if (endDate.value && endTime.value) {
-                end.value = `${endDate.value}T${endTime.value}`;
-            }
+            start.value = startDate.value && startTime.value ? `${startDate.value}T${startTime.value}` : '';
+            end.value = endDate.value && endTime.value ? `${endDate.value}T${endTime.value}` : '';
 
             if (start.value && end.value && start.value >= end.value) {
                 timeWarning.classList.remove('hidden');
@@ -142,12 +139,13 @@
             return sTime >= '06:30' && sTime < eTime && eTime <= '21:30';
         };
 
-        const updateSubmit = () => {
-            submit.disabled = !(checked && validPeriod() && room.value && purpose.value.trim());
-        };
+        const matchesRange = range => range?.start_at === start.value && range?.end_at === end.value;
+        const canSubmit = () => matchesRange(checkedRange) && validPeriod() && room.value && purpose.value.trim();
+        const updateSubmit = () => { submit.disabled = !canSubmit(); };
 
         const reset = () => {
-            checked = false;
+            availabilityVersion++;
+            checkedRange = null;
             submit.disabled = true;
             roomField.classList.add('hidden');
             purposeField.classList.add('hidden');
@@ -198,6 +196,9 @@
                 message.textContent = 'Periksa rentang tanggal dan jam. Waktu selesai harus setelah waktu mulai (06.30–21.30 WIB).';
                 return;
             }
+            const version = availabilityVersion;
+            const range = { start_at: start.value, end_at: end.value };
+            const isCurrent = () => version === availabilityVersion && matchesRange(range);
             try {
                 const response = await fetch('{{ route('room-bookings.availability') }}', {
                     method: 'POST',
@@ -206,9 +207,10 @@
                         'Accept': 'application/json',
                         'X-CSRF-TOKEN': document.querySelector('input[name="_token"]').value
                     },
-                    body: JSON.stringify({ start_at: start.value, end_at: end.value })
+                    body: JSON.stringify(range)
                 });
                 const result = await response.json();
+                if (!isCurrent()) return;
                 if (!response.ok) throw new Error(result.message || Object.values(result.errors || {}).flat().join(' '));
                 if (!result.rooms.length) {
                     message.textContent = 'Tidak ada ruangan tersedia pada rentang waktu tersebut.';
@@ -220,12 +222,12 @@
                     option.textContent = item.name + ' · ' + item.code + ' · ' + (item.building || 'Lokasi belum diisi') + ' · kapasitas ' + item.capacity;
                     room.append(option);
                 });
-                checked = true;
+                checkedRange = range;
                 room.disabled = false;
                 roomField.classList.remove('hidden');
                 message.textContent = 'Pilih ruangan yang tersedia untuk melanjutkan.';
             } catch (error) {
-                message.textContent = error.message;
+                if (isCurrent()) message.textContent = error.message;
             }
         });
 
@@ -240,7 +242,7 @@
 
         document.getElementById('bookingForm').addEventListener('submit', event => {
             syncDateTime();
-            if (!checked || !validPeriod() || !room.value || !purpose.value.trim()) {
+            if (!canSubmit()) {
                 event.preventDefault();
                 updateSubmit();
                 message.textContent = 'Cek ketersediaan, pilih ruangan, dan isi agenda terlebih dahulu.';

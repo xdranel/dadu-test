@@ -137,19 +137,20 @@
                     </div>
 
                     {{-- Aksi admin --}}
-                    @if($booking->status === 'pending')
+                    @php($canReviewBooking = !$booking->sidang_ta_registration_id || auth()->user()->can('sidang_ta_registration_review'))
+                    @if($canReviewBooking && $booking->status === 'pending')
                         <form method="POST" action="{{ route('admin.room-bookings.decision', $booking) }}"
-                              onsubmit="this.querySelectorAll('button').forEach(b => b.disabled = true);"
+                              onsubmit="if (this.dataset.submitting) return false; this.dataset.submitting = 'true';"
                               class="flex flex-wrap items-center gap-2 mt-4 pt-4 border-t border-slate-100">
                             @csrf
                             <input name="note" placeholder="Catatan (opsional)"
                                    class="campus-input flex-1 min-w-[200px]">
-                            <button name="decision" value="approved"
+                            <button type="submit" name="decision" value="approved"
                                     class="btn btn-success px-4">Setujui</button>
-                            <button name="decision" value="rejected"
+                            <button type="submit" name="decision" value="rejected"
                                     class="btn btn-danger px-4">Tolak</button>
                         </form>
-                    @elseif($booking->status === 'approved')
+                    @elseif($canReviewBooking && $booking->status === 'approved')
                         <form method="POST" action="{{ route('admin.room-bookings.cancel', $booking) }}"
                               onsubmit="if(confirm('Batalkan seluruh jadwal dalam pengajuan ini? Pastikan alasan pembatalan sudah benar.')){ this.querySelector('button').disabled = true; return true; } return false;"
                               class="flex flex-wrap items-center gap-2 mt-4 pt-4 border-t border-slate-100">
@@ -207,7 +208,10 @@
     <script>
     const detailApiUrl = '{{ route("admin.room-bookings.calendar.detail") }}';
 
+    let dayDetailVersion = 0;
+
     function openDayDetailModal(date) {
+        const version = ++dayDetailVersion;
         const modal = document.getElementById('calendarDetailModal');
         modal.classList.remove('hidden');
         document.getElementById('modalDateSubtitle').textContent = 'Tanggal: ' + date;
@@ -222,11 +226,15 @@
                 'Accept': 'application/json'
             }
         })
-        .then(res => res.json())
-        .then(data => {
-            renderModalContent(data);
+        .then(res => {
+            if (!res.ok) throw new Error('Gagal mengambil rincian ruangan.');
+            return res.json();
         })
-        .catch(err => {
+        .then(data => {
+            if (version === dayDetailVersion) renderModalContent(data);
+        })
+        .catch(() => {
+            if (version !== dayDetailVersion) return;
             document.getElementById('modalBodyContent').innerHTML = `
                 <div class="text-center py-6 text-rose-600 text-sm">
                     Gagal mengambil rincian ruangan. Silakan coba lagi.
@@ -235,6 +243,7 @@
     }
 
     function closeDayDetailModal() {
+        dayDetailVersion++;
         document.getElementById('calendarDetailModal').classList.add('hidden');
     }
 

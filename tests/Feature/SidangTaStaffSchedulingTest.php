@@ -53,6 +53,25 @@ test('staff can choose a non recommended slot and it is immediately approved wit
     expect($s['registration']->fresh()->status)->toBe('approved');
 });
 
+test('staff can move an existing booking into an offered ninety minute slot on a legacy period', function () {
+    $s = $this->s;
+    $s['settings']->update(['duration_minutes' => 120, 'break_start_time' => '12:00', 'break_end_time' => '13:00']);
+    $service = app(SidangTaStaffScheduling::class);
+    $original = $service->preview($s['reviewer'], $s['registration'], '2026-11-23')['options'][0];
+    $before = $service->confirm($s['reviewer'], $s['registration'], $original['token']);
+    $preview = $service->preview($s['reviewer'], $s['registration'], '2026-11-24');
+    $replacement = collect($preview['options'])->first(fn ($option) => $option['candidate']['start_time'] === '12:00:00');
+    expect($replacement)->not->toBeNull();
+
+    $after = $service->confirm($s['reviewer'], $s['registration'], $replacement['token']);
+    $occurrence = $after->booking->occurrences->sole();
+    expect($after->booking->id)->toBe($before->booking->id)
+        ->and($occurrence->usage_date->toDateString())->toBe('2026-11-24')
+        ->and(substr($occurrence->start_time, 0, 5))->toBe('12:00')
+        ->and(substr($occurrence->end_time, 0, 5))->toBe('13:30')
+        ->and($s['settings']->fresh()->duration_minutes)->toBe(120);
+});
+
 test('a room taken after preview rejects the chosen token without silently using another slot', function () {
     $s = $this->s;
     $service = app(SidangTaStaffScheduling::class);

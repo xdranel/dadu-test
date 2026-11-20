@@ -195,7 +195,10 @@
     <script>
     const detailApiUrl = '{{ route("room-bookings.calendar.detail") }}';
 
+    let dayDetailVersion = 0;
+
     function openDayDetailModal(date) {
+        const version = ++dayDetailVersion;
         const modal = document.getElementById('calendarDetailModal');
         modal.classList.remove('hidden');
         document.getElementById('modalDateSubtitle').textContent = 'Tanggal: ' + date;
@@ -210,11 +213,15 @@
                 'Accept': 'application/json'
             }
         })
-        .then(res => res.json())
-        .then(data => {
-            renderModalContent(data);
+        .then(res => {
+            if (!res.ok) throw new Error('Gagal mengambil rincian ruangan.');
+            return res.json();
         })
-        .catch(err => {
+        .then(data => {
+            if (version === dayDetailVersion) renderModalContent(data);
+        })
+        .catch(() => {
+            if (version !== dayDetailVersion) return;
             document.getElementById('modalBodyContent').innerHTML = `
                 <div class="text-center py-6 text-rose-600 text-sm">
                     Gagal mengambil rincian ruangan. Silakan coba lagi.
@@ -223,6 +230,7 @@
     }
 
     function closeDayDetailModal() {
+        dayDetailVersion++;
         document.getElementById('calendarDetailModal').classList.add('hidden');
     }
 
