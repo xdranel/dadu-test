@@ -89,6 +89,9 @@ test('meet_staff_rejecting_a_document_does_not_start_student_revision', function
     $log = $registration->logs()->firstOrFail();
     expect($log->from_status)->toBe('submitted');
     expect($log->to_status)->toBe('submitted');
+    $history = ($this->reviewPage)($registration)->filter('section[data-staff-registration-history] ol');
+    expect($history->text())->toContain('Dokumen diminta perbaikan')->toContain('Perbaiki PDF')
+        ->toContain($this->reviewer->name);
 });
 
 test('meet_staff_can_reverse_both_document_states_and_verification_clears_notes', function () {
@@ -261,8 +264,10 @@ test('meet_staff_detail_groups_uploads_into_two_columns_with_status_colors_and_d
     expect($crawler->filter('[data-ta-request-revision]')->getNode(0)->hasAttribute('disabled'))->toBeTrue();
     expect($crawler->filter('[data-ta-revision-blockers]')->count())->toBe(1);
     expect($crawler->filter('[data-ta-revision-blockers]')->text(null, true))->toContain('Selesaikan verifikasi');
-    expect($crawler->filter('[data-ta-review-window]')->text(null, true))->toContain($this->period->close_at->format('d/m/Y H:i'));
-    expect($crawler->filter('[data-staff-registration-history]')->getNode(0)->hasAttribute('open'))->toBeFalse();
+    expect($crawler->filter('[data-ta-review-window]')->count())->toBe(0);
+    expect($crawler->filter('[data-period-schedule] [data-schedule="registration"]')->text())
+        ->toContain($this->period->close_at->copy()->timezone('Asia/Jakarta')->format('d/m/Y H:i'));
+    expect($crawler->filter('section[data-staff-registration-history] ol')->text())->toContain('Belum ada riwayat status.');
 });
 
 test('meet_staff_pdm_and_automatic_groups_only_show_their_six_uploads', function () {
@@ -301,10 +306,15 @@ test('meet_staff_escapes_file_names_and_document_feedback', function () {
     $registration = ($this->makeMeetRegistration)();
     $document = $registration->documents()->firstOrFail();
     $document->update(['file_name' => '<script>badName()</script>.pdf', 'notes' => '<script>badNote()</script>', 'status' => 'rejected']);
-    $card = ($this->reviewPage)($registration)->filter('#review-document-'.$document->id);
+    $registration->logAction('document_rejected', 'submitted', 'submitted', '<script>badHistory()</script>', $this->reviewer->id);
+    $page = ($this->reviewPage)($registration);
+    $card = $page->filter('#review-document-'.$document->id);
+    $history = $page->filter('[data-staff-registration-history] ol');
     expect($card->filter('script')->count())->toBe(0);
     expect($card->filter('[data-document-notes]')->text(null, true))->toBe('<script>badNote()</script>');
     expect($card->filter('textarea[name="notes"]')->getNode(0)->textContent)->toBe('<script>badNote()</script>');
+    expect($history->filter('script')->count())->toBe(0);
+    expect($history->text())->toContain('<script>badHistory()</script>');
 });
 
 test('meet_staff_unsupported_requirements_marker_is_rejected_before_mutation', function (int $marker) {

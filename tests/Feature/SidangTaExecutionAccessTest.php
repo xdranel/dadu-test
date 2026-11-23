@@ -13,7 +13,8 @@ beforeEach(function () {
 test('student has a separate readonly execution page showing their TA identity', function () {
     $s = $this->executionScenario;
     $this->actingAs($s['owner'])->get('/dashboard/sidang-ta-execution')->assertOk()
-        ->assertSee('Info Sidang')->assertSee($s['student']->student_number)->assertSee('Riwayat Pelaksanaan');
+        ->assertSee('Info Sidang')->assertSee('Plotting Jadwal')->assertSee('Riwayat Pelaksanaan')
+        ->assertSee(route('sidang-ta-execution.show', $s['registration']));
 });
 
 test('student cannot search or confirm through the legacy booking endpoints', function () {
@@ -29,7 +30,7 @@ test('student cannot search or confirm through the legacy booking endpoints', fu
 test('execution admin index lists approved participants independently from execution settings', function () {
     $s = $this->executionScenario;
     $this->actingAs($s['reviewer'])->get('/dashboard/admin/sidang-ta-execution')->assertOk()
-        ->assertSee($s['student']->student_number)->assertSee('Ringkasan hasil filter')->assertSee('Kelola Pelaksanaan');
+        ->assertSee($s['student']->student_number)->assertDontSee('Ringkasan hasil filter')->assertSee('Kelola Pelaksanaan');
 });
 
 test('student cannot write an execution result', function () {

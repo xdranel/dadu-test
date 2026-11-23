@@ -63,6 +63,8 @@ afterEach(function () {
 // =========================================================================
 
 test('academic admin can access review page with list of bookings and calendar', function () {
+    $room = $this->scenario['rooms']['a'];
+    $room->update(['room_code' => 'KTT-REVIEW-01']);
     $booking = RoomBookingRequest::create([
         'user_id' => $this->lecturer->id,
         'room_id' => $this->scenario['rooms']['a']->id,
@@ -86,7 +88,7 @@ test('academic admin can access review page with list of bookings and calendar',
     $response->assertOk();
     $response->assertSee('Review Peminjaman Ruangan');
     $response->assertSee('Rapat Koordinasi Dosen');
-    $response->assertSee($this->scenario['rooms']['a']->name);
+    $response->assertSee($room->room_code)->assertDontSee($room->name);
 });
 
 test('academic admin can approve a pending room booking with or without a note', function (?string $note) {

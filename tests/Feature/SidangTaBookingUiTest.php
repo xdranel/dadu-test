@@ -15,7 +15,8 @@ test('bookingui111_student_reads_execution_in_separate_menu_and_cannot_search', 
     $s = $this->s;
     $this->actingAs($s['owner'])->get(route('sidang-ta-registrations.index'))->assertOk()->assertDontSee('data-ta-booking-card', false);
     $this->get(route('sidang-ta-bookings.index', $s['registration']))->assertRedirect(route('sidang-ta-execution.show', $s['registration']));
-    $this->get(route('sidang-ta-execution.index'))->assertOk()->assertSee('Info Sidang')->assertSee($s['student']->student_number)
+    $this->get(route('sidang-ta-execution.index'))->assertOk()->assertSee('Info Sidang')->assertSee('Plotting Jadwal')
+        ->assertSee(route('sidang-ta-execution.show', $s['registration']))
         ->assertDontSee('name="room_id"', false)->assertDontSee('name="date"', false);
     $this->post(route('sidang-ta-bookings.search', $s['registration']), ['date' => '2026-11-23'])->assertForbidden();
 });

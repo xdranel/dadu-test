@@ -13,6 +13,7 @@ use App\Services\SidangTaExecutionInfoService;
 use App\Services\SidangTaExecutionOutcomeService;
 use App\Services\SidangTaExecutionQuery;
 use App\Services\SidangTaExecutionWindowService;
+use App\Services\SidangTaHistoryPresenter;
 use App\Services\SidangTaPlottingImportService;
 use App\Services\SidangTaProgramAccess;
 use App\Services\SidangTaStaffScheduling;
@@ -33,7 +34,7 @@ class SidangTaExecutionController extends Controller
         $periods = SidangTaPeriod::orderByDesc('id')->get();
         $studyPrograms = $canReview ? SidangTaRegistration::whereNotNull('study_program')->distinct()->orderBy('study_program')->pluck('study_program') : collect();
 
-        return view('sidang_ta_execution.admin.index', compact('canReview', 'scopedProgram', 'filters', 'counts', 'registrations', 'information', 'periods', 'studyPrograms'));
+        return view('sidang_ta_execution.admin.index', compact('canReview', 'filters', 'counts', 'registrations', 'information', 'periods', 'studyPrograms'));
     }
 
     public function settings()
@@ -50,11 +51,12 @@ class SidangTaExecutionController extends Controller
 
     private function detail(SidangTaRegistration $registration, SidangTaExecutionInfoService $service, ?array $preview = null)
     {
-        $registration->load('period.executionSetting', 'roomSchedule.booking.occurrences', 'roomSchedule.executionLogs.actor');
+        $registration->load('period.executionSetting', 'roomSchedule.booking.occurrences');
         $info = $service->forRegistration($registration);
+        $events = app(SidangTaHistoryPresenter::class)->forExecution($registration, staff: true);
         $rooms = Room::bookableClassrooms()->orderBy('room_code')->get();
 
-        return view('sidang_ta_execution.admin.show', compact('registration', 'info', 'preview', 'rooms'));
+        return view('sidang_ta_execution.admin.show', compact('registration', 'info', 'preview', 'rooms', 'events'));
     }
 
     public function preview(Request $request, SidangTaRegistration $sidang_ta_registration, SidangTaStaffScheduling $service, SidangTaExecutionInfoService $info)

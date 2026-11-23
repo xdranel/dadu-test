@@ -3,7 +3,6 @@
     @php
         $statusLabels = \App\Services\SidangTaReviewQuery::STATUSES;
         $groupTitles = ['iGracias & Akademik', 'Pembayaran & Dokumen', 'Biodata'];
-        $at = now();
     @endphp
     <div data-ta-review-hub class="space-y-5">
         @if(session('success'))
@@ -45,31 +44,13 @@
                     </section>
 
                 </div>
-                <section class="space-y-3">
-                    <h3 class="text-sm font-bold text-slate-800">
-                        Ringkasan hasil filter
-                    </h3>
-                    <div class="grid grid-cols-2 gap-3 lg:grid-cols-5">
-                        @foreach(['total' => 'Total'] + $statusLabels as $key => $label)
-                            <article class="rounded-xl border border-slate-200 bg-white p-4">
-                                <p class="text-xs text-slate-500">
-                                    {{ $label }}
-                                </p>
-                                <p data-ta-stat="{{ $key }}"
-                                   class="mt-2 text-2xl font-bold {{ $key === 'total' ? 'text-[#DA2D3B]' : 'text-slate-800' }}">
-                                    {{ $counts[$key] }}
-                                </p>
-                            </article>
-                        @endforeach
-                    </div>
-                </section>
                 <form data-ta-filters method="GET" action="{{ route('admin.sidang-ta-registrations.index') }}"
-                      class="grid gap-3 rounded-xl border border-slate-200 bg-white p-4 md:grid-cols-2 xl:grid-cols-4">
-                    <label class="text-xs font-semibold text-slate-600">Nama atau NIM
+                      class="filter-card grid gap-3 md:grid-cols-2 {{ $scopedProgram === null ? 'xl:grid-cols-4' : 'lg:grid-cols-3' }}">
+                    <label class="campus-label">Nama atau NIM
                         <input class="campus-input mt-1" name="search" value="{{ $filters['search'] ?? '' }}"
                                placeholder="Cari nama atau NIM">
                     </label>
-                    <label class="text-xs font-semibold text-slate-600">Periode
+                    <label class="campus-label">Periode
                         <select class="campus-select mt-1" name="period">
                             <option value="">Semua periode</option>
                             @foreach($periods as $period)
@@ -79,7 +60,7 @@
                             @endforeach
                         </select>
                     </label>
-                    <label class="text-xs font-semibold text-slate-600">Status
+                    <label class="campus-label">Status
                         <select class="campus-select mt-1" name="status">
                             <option value="">Semua status</option>
                             @foreach($statusLabels as $value => $label)
@@ -89,12 +70,8 @@
                             @endforeach
                         </select>
                     </label>
-                    @if($scopedProgram !== null)
-                        <p data-ta-program-scope class="text-xs font-semibold text-slate-600">Program studi
-                            <span class="mt-2 block text-sm text-slate-800">{{ $scopedProgram }}</span>
-                        </p>
-                    @else
-                        <label class="text-xs font-semibold text-slate-600">Program studi
+                    @if($scopedProgram === null)
+                        <label class="campus-label">Program Studi
                             <select class="campus-select mt-1" name="study_program">
                                 <option value="">Semua prodi</option>
                                 @if(isset($filters['study_program']) && !$studyPrograms->contains($filters['study_program']))
@@ -109,7 +86,7 @@
                             </select>
                         </label>
                     @endif
-                    <div class="flex flex-wrap items-center gap-2 md:col-span-2 xl:col-span-4">
+                    <div class="col-span-full flex flex-wrap items-center gap-2">
                         <button type="submit" class="btn btn-primary">
                             Terapkan
                         </button>
@@ -128,10 +105,7 @@
                         @endif
                     </div>
                 </form>
-                <p class="text-xs leading-relaxed text-slate-500">
-                    Ikon berkas: kuning menunggu verifikasi, hijau terverifikasi, merah perlu perbaikan, tanda ! belum ada/tidak ditemukan, tanda – tidak berlaku.
-                    Arahkan kursor atau fokuskan ikon untuk melihat nama dan status.
-                </p>
+                <x-review-counts :labels="['total' => 'Total'] + $statusLabels" :counts="$counts" count-attribute="data-ta-stat" />
                 <section class="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
                     <div class="overflow-x-auto">
                         <table class="w-full min-w-[1100px] text-left text-sm">

@@ -104,7 +104,7 @@
                             </div>
                             @php($lecturer = ($booking->user->employee_id && isset($lecturersByNip) ? $lecturersByNip->get(trim($booking->user->employee_id)) : null) ?? $lecturers->get(mb_strtolower(trim($booking->user->name))))
                             <p class="text-xs text-slate-500">NIP: {{ $lecturer->nip_ypt ?? $booking->user->employee_id ?? '-' }} · Prodi: {{ $lecturer->study_program ?? '-' }}</p>
-                            <p class="text-sm text-slate-500">{{ $booking->room->name }} &middot; Kapasitas {{ $booking->room->capacity }}</p>
+                            <p class="text-sm text-slate-500">{{ $booking->room->room_code }} · {{ $booking->room->building ?: 'Lokasi belum diisi' }} · Kapasitas {{ $booking->room->capacity ?: '—' }}</p>
                         </div>
                         <span class="badge {{ match($booking->status) {
                             'pending'   => 'badge-warning',
@@ -284,7 +284,7 @@
                 html += `
                 <div class="p-3 rounded-xl border ${isInternal ? 'border-amber-200 bg-amber-50/50' : 'border-sky-200 bg-sky-50/50'} text-xs">
                     <div class="flex flex-wrap items-center justify-between gap-2 mb-1">
-                        <span class="font-bold text-slate-800 text-sm">${item.room_name} <span class="text-slate-400 font-normal">(${item.room_code})</span></span>
+                        <span class="font-bold text-slate-800 text-sm">${item.room_code}</span>
                         <span class="font-mono font-semibold px-2 py-0.5 rounded ${isInternal ? 'bg-amber-100 text-amber-800' : 'bg-sky-100 text-sky-800'}">
                             ${item.start_time} – ${item.end_time} WIB
                         </span>
@@ -324,9 +324,10 @@
                 html += `
                 <div class="p-3 rounded-xl border ${hasSlots ? 'border-emerald-200 bg-emerald-50/40' : 'border-slate-200 bg-slate-50/60'} text-xs">
                     <div class="font-bold text-slate-800 mb-1 flex items-center justify-between">
-                        <span>${room.room_name}</span>
+                        <span>${room.room_code}</span>
                         <span class="text-[10px] text-slate-400 font-normal">Kapasitas: ${room.capacity || '-'}</span>
                     </div>
+                    <p class="text-slate-500">${room.building || 'Lokasi belum diisi'}</p>
                     ${hasSlots
                         ? `<div class="flex flex-wrap gap-1 mt-1.5">
                             ${room.free_slots.map(s => `<span class="bg-white border border-emerald-300 text-emerald-800 px-2 py-0.5 rounded text-[11px] font-mono font-medium">${s}</span>`).join('')}

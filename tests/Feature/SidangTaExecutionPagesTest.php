@@ -6,6 +6,7 @@ use App\Models\User;
 use App\Services\SidangTaExecutionInfoService;
 use Carbon\Carbon;
 use Spatie\Permission\Models\Permission;
+use Symfony\Component\DomCrawler\Crawler;
 use Tests\Support\TaRoomScenario;
 
 beforeEach(function () {
@@ -14,9 +15,14 @@ beforeEach(function () {
 });
 
 test('execution participant page and settings are separate pages', function () {
-    $this->actingAs($this->s['reviewer'])->get('/dashboard/admin/sidang-ta-execution')
-        ->assertOk()->assertSee('Ringkasan hasil filter')->assertSee($this->s['student']->student_number)
-        ->assertSee('Impor plotting')->assertSee('Export Excel');
+    $response = $this->actingAs($this->s['reviewer'])->get('/dashboard/admin/sidang-ta-execution')
+        ->assertOk()->assertDontSee('Ringkasan hasil filter')->assertSee($this->s['student']->student_number)
+        ->assertSee('Impor plotting')->assertSee('Export Excel')->assertDontSee('Pilih periode dan file Excel plotting peserta.');
+    $page = new Crawler($response->getContent());
+    expect($page->filter('[data-execution-filters] [name]')->each(fn ($field) => $field->attr('name')))
+        ->toBe(['search', 'period', 'status', 'study_program'])
+        ->and($page->filter('.campus-card > div > [data-execution-count]')->count())->toBe(6)
+        ->and($page->filter('#plotting-file')->attr('type'))->toBe('file');
     $this->get('/dashboard/admin/sidang-ta-execution/settings')->assertOk()
         ->assertSee('Semester sumber jadwal')->assertSee('90')->assertSee('Kembali');
 });
@@ -24,13 +30,34 @@ test('execution participant page and settings are separate pages', function () {
 test('student execution pages have identity cards and no scheduling controls', function () {
     $s = $this->s;
     $this->actingAs($s['owner'])->get('/dashboard/sidang-ta-execution')->assertOk()
-        ->assertSee('Peserta TA')->assertSee('Plotting Jadwal')->assertSee('Riwayat Pelaksanaan')
+        ->assertDontSee('Peserta TA')->assertSee('Plotting Jadwal')->assertSee('Riwayat Pelaksanaan')->assertSee('Aksi')
+        ->assertSee(route('sidang-ta-execution.show', $s['registration']))
         ->assertDontSee('Tetapkan Jadwal')->assertDontSee('Cari ketersediaan');
     $this->get('/dashboard/sidang-ta-execution/'.$s['registration']->getRouteKey())->assertOk()
-        ->assertSee($s['student']->student_number)->assertDontSee('ID Pengajuan');
+        ->assertSee('Peserta TA')->assertSee($s['student']->student_number)->assertSee('Riwayat Status')->assertDontSee('ID Pengajuan');
     $other = User::factory()->create(['status' => 'active']);
     $other->givePermissionTo('sidang_ta_registration_read');
     $this->actingAs($other)->get('/dashboard/sidang-ta-execution/'.$s['registration']->getRouteKey())->assertForbidden();
+});
+
+test('admin and student execution detail render the same timeline without exposing staff notes to students', function () {
+    $s = $this->s;
+    $schedule = $s['registration']->roomSchedule()->create(['student_number' => $s['student']->student_number]);
+    $schedule->executionLogs()->create([
+        'action' => 'scheduled', 'notes' => 'Catatan internal penetapan',
+        'performed_by' => $s['reviewer']->id, 'performed_at' => now()->subMinute(),
+    ]);
+    $schedule->executionLogs()->create([
+        'action' => 'result_updated', 'from_status' => 'pending', 'to_status' => 'passed',
+        'notes' => 'Catatan internal hasil', 'performed_by' => $s['reviewer']->id, 'performed_at' => now(),
+    ]);
+
+    $this->actingAs($s['reviewer'])->get(route('admin.sidang-ta-execution.show', $s['registration']))
+        ->assertOk()->assertSeeInOrder(['Riwayat Status', 'Perubahan hasil · Belum ada hasil → Lulus', 'Penetapan jadwal'])
+        ->assertSee('Catatan internal hasil');
+    $this->actingAs($s['owner'])->get(route('sidang-ta-execution.show', $s['registration']))
+        ->assertOk()->assertSeeInOrder(['Riwayat Status', 'Perubahan hasil · Lulus', 'Penetapan jadwal'])
+        ->assertDontSee('Catatan internal hasil')->assertDontSee('Catatan internal penetapan');
 });
 
 test('period reader cannot inspect participants and participant identifiers use UUIDs', function () {
@@ -53,7 +80,8 @@ test('program reader cannot expand execution filters or write results or export'
     $foreign->study_program = 'Sistem Informasi';
     $foreign->save();
     $this->actingAs($reader)->get('/dashboard/admin/sidang-ta-execution?study_program=Sistem%20Informasi')->assertOk()
-        ->assertSee($this->s['student']->student_number)->assertDontSee('Peserta Prodi Lain')->assertDontSee('Export Excel');
+        ->assertSee($this->s['student']->student_number)->assertDontSee('Peserta Prodi Lain')->assertDontSee('Export Excel')
+        ->assertDontSee('name="study_program"', false)->assertDontSee('Akses baca Program Studi');
     $this->get('/dashboard/admin/sidang-ta-execution/'.$foreign->getRouteKey())->assertForbidden();
     $this->get('/dashboard/admin/sidang-ta-execution/export')->assertForbidden();
     $this->post('/dashboard/admin/sidang-ta-execution/'.$this->s['registration']->getRouteKey().'/outcome', ['status' => 'passed', 'context_version' => 0])->assertForbidden();
@@ -76,6 +104,15 @@ test('staff date picker is bounded by execution dates and excludes past days', f
     $this->post(route('admin.sidang-ta-execution.preview', $s['registration']), ['date' => '2026-11-28'])
         ->assertSessionHasErrors('date');
     expect(RoomBookingRequest::count())->toBe(0);
+});
+
+test('staff search presents classroom code location and capacity instead of the room name', function () {
+    $s = $this->s;
+    $s['rooms']['a']->update(['room_code' => 'KTT-UI', 'name' => 'Nama Lama Ruang Uji', 'building' => 'Gedung Uji', 'capacity' => 42]);
+    $response = $this->actingAs($s['reviewer'])->post(route('admin.sidang-ta-execution.preview', $s['registration']), ['date' => '2026-11-23'])
+        ->assertOk()->assertDontSee('Nama Lama Ruang Uji');
+    $options = (new Crawler($response->getContent()))->filter('select[name="preview_token"]')->text();
+    expect($options)->toContain('KTT-UI', 'Gedung Uji', 'kapasitas 42');
 });
 
 test('active info ends after actual occurrence while historical detail keeps its snapshot', function () {

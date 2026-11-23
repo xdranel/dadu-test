@@ -25,7 +25,7 @@
             @if($linkedBooking && in_array($linkedBooking->status,['pending','approved']))
                 <div class="space-y-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
                     <p class="font-semibold">Booking ruangan tertaut akan ikut dibatalkan dan slotnya kembali tersedia.</p>
-                    <p>Booking #{{ $linkedBooking->id }} · {{ $linkedBooking->room?->name }}</p>
+                    <p>Booking #{{ $linkedBooking->id }} · {{ $linkedBooking->room?->room_code }}</p>
                     @foreach($linkedBooking->occurrences as $occurrence)<p>{{ $occurrence->usage_date->format('d/m/Y') }} · {{ substr($occurrence->start_time,0,5) }}–{{ substr($occurrence->end_time,0,5) }} WIB</p>@endforeach
                     <p>Penjadwalan pengganti harus ditangani SSC; riwayat tetap disimpan.</p>
                 </div>

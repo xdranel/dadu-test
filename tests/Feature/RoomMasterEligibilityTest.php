@@ -58,7 +58,10 @@ test('XLSX master import keeps coded rooms with incomplete details and preserves
     $this->post(route('rooms.import'), ['file' => $file])->assertRedirect(route('rooms.index'));
     expect($lab->fresh()->only(['name', 'building', 'capacity']))->toBe(['name' => 'Nama Lab Terverifikasi', 'building' => 'Gedung Lab', 'capacity' => 32])
         ->and($unlabelled->fresh()->label)->toBe('KELAS');
-    $this->get(route('rooms.index', ['search' => 'MANSYS LAB']))->assertOk()->assertSee('Label')->assertSee('LAB');
+    $this->get(route('rooms.index', ['search' => 'MANSYS LAB']))->assertOk()
+        ->assertSee('MANSYS LAB')->assertSee('Gedung Lab')->assertSee('32 orang')
+        ->assertSee('Label')->assertSee('LAB')
+        ->assertDontSee('<th>Nama Ruangan</th>', false)->assertDontSee('Nama Lab Terverifikasi');
 });
 
 test('room CRUD no longer requires classification and accepts an old open form without changing status', function () {
@@ -72,7 +75,31 @@ test('room CRUD no longer requires classification and accepts an old open form w
     $this->post(route('rooms.store'), ['room_code' => 'STATUS-OFF', 'name' => 'KELAS TETAP NONAKTIF',
         'building' => 'Dummy', 'capacity' => 20, 'status' => 'Tidak Dapat Dipakai', 'is_classroom' => '1'])
         ->assertSessionHasNoErrors()->assertRedirect(route('rooms.index'));
-    expect(Room::where('room_code', 'STATUS-OFF')->sole()->status)->toBe('Tidak Dapat Dipakai');
+    expect(Room::where('room_code', 'STATUS-OFF')->sole()->only(['name', 'status']))
+        ->toBe(['name' => 'KELAS TETAP NONAKTIF', 'status' => 'Tidak Dapat Dipakai']);
+});
+
+test('room forms create and update rooms without requiring a name', function () {
+    $actor = $this->s['reviewer'];
+    $actor->givePermissionTo(Permission::findOrCreate('room_create', 'web'), Permission::findOrCreate('room_update', 'web'));
+    $room = $this->s['rooms']['a'];
+    $existingName = $room->name;
+    $data = ['room_code' => ' ktt-tanpa-nama ', 'building' => 'Gedung A',
+        'capacity' => 35, 'label' => 'KELAS', 'status' => 'Dapat Dipakai'];
+
+    $this->actingAs($actor)->get(route('rooms.create'))->assertOk()->assertDontSee('name="name"', false);
+    $this->get(route('rooms.edit', $room))->assertOk()->assertDontSee('name="name"', false);
+    $this->post(route('rooms.store'), $data)->assertSessionHasNoErrors()->assertRedirect(route('rooms.index'));
+    expect(Room::where('room_code', 'KTT-TANPA-NAMA')->sole()->only(['name', 'label', 'status']))
+        ->toBe(['name' => 'KTT-TANPA-NAMA', 'label' => 'KELAS', 'status' => 'Dapat Dipakai']);
+
+    $updates = ['room_code' => ' ktt-edit ', 'label' => 'LAB', 'status' => 'Tidak Dapat Dipakai'] + $data;
+    $this->put(route('rooms.update', $room), $updates)
+        ->assertSessionHasNoErrors()->assertSessionHas('success', 'Data KTT-EDIT berhasil diperbarui.');
+    $this->put(route('rooms.update', $room), $updates + ['name' => ' '])->assertSessionHasNoErrors();
+
+    expect($room->fresh()->only(['room_code', 'name', 'label', 'status']))
+        ->toBe(['room_code' => 'KTT-EDIT', 'name' => $existingName, 'label' => 'LAB', 'status' => 'Tidak Dapat Dipakai']);
 });
 
 test('editing a room returns to the originating filtered page after saving or cancelling', function () {
@@ -92,10 +119,27 @@ test('editing a room returns to the originating filtered page after saving or ca
 
     $this->actingAs($actor)->get($listUrl)->assertOk()->assertSee($editUrl);
     $this->get($editUrl)->assertOk()->assertSee($updateUrl)->assertSee($listUrl);
-    $this->from($editUrl)->put($updateUrl, $attributes + ['room_code' => 'URUT-0', 'name' => ''])
-        ->assertSessionHasErrors('name')->assertRedirect($editUrl);
+    $this->from($editUrl)->put($updateUrl, ['room_code' => 'URUT-0', 'capacity' => 0] + $attributes)
+        ->assertSessionHasErrors('capacity')->assertRedirect($editUrl);
     $this->get($editUrl)->assertOk()->assertSee($updateUrl);
-    $this->put($updateUrl, ['status' => 'Tidak Dapat Dipakai', 'room_code' => 'URUT-0', 'name' => 'Kelas Uji Diperbarui'] + $attributes)
+    $this->put($updateUrl, ['status' => 'Tidak Dapat Dipakai', 'room_code' => 'URUT-0'] + $attributes)
         ->assertSessionHasNoErrors()->assertRedirect($listUrl);
     expect($room->fresh()->status)->toBe('Tidak Dapat Dipakai');
+});
+
+test('room pages have a stable order when an import creates rooms with identical timestamps', function () {
+    $actor = $this->s['reviewer'];
+    $actor->givePermissionTo(Permission::findOrCreate('room_read', 'web'));
+    $codes = collect(range(1, 50))->map(fn (int $number) => sprintf('PAG-%02d', $number));
+    foreach ($codes as $code) {
+        Room::create(['room_code' => $code, 'name' => $code, 'building' => 'Gedung Paginasi', 'capacity' => 20]);
+    }
+    $expectedPages = $codes->reverse()->values()->chunk(15);
+
+    $this->actingAs($actor);
+    foreach (range(1, 4) as $page) {
+        $response = $this->get(route('rooms.index', ['gedung' => 'Gedung Paginasi', 'page' => $page]))->assertOk();
+        expect($response->viewData('rooms')->pluck('room_code')->all())
+            ->toBe($expectedPages[$page - 1]->values()->all());
+    }
 });

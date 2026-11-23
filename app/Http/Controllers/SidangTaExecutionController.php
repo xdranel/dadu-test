@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\SidangTaRegistration;
 use App\Services\SidangTaExecutionInfoService;
+use App\Services\SidangTaHistoryPresenter;
 use App\Services\SidangTaStudentContext;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
@@ -36,14 +37,15 @@ class SidangTaExecutionController extends Controller
         $history = $registrations->filter(fn ($r) => $r->roomSchedule !== null)
             ->map(fn ($r) => ['registration' => $r, 'info' => $info->forRegistration($r, true)]);
 
-        return view('sidang_ta_execution.student.index', compact('currentInfo', 'history'));
+        return view('sidang_ta_execution.student.index', compact('current', 'currentInfo', 'history'));
     }
 
     public function show(Request $request, SidangTaRegistration $sidang_ta_registration, SidangTaExecutionInfoService $service)
     {
         abort_unless($sidang_ta_registration->student_number === $this->student($request)->student_number, 403);
         $info = $service->forRegistration($sidang_ta_registration, true);
+        $events = app(SidangTaHistoryPresenter::class)->forExecution($sidang_ta_registration);
 
-        return view('sidang_ta_execution.student.show', compact('info'));
+        return view('sidang_ta_execution.student.show', compact('info', 'events'));
     }
 }

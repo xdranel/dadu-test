@@ -20,6 +20,7 @@ class RoomController extends Controller
             ->filterBuilding($request->gedung)
             ->filterStatus($request->status)
             ->latest()
+            ->orderByDesc('id')
             ->paginate(15)
             ->withQueryString();
 
@@ -121,7 +122,9 @@ class RoomController extends Controller
 
     public function store(StoreRoomRequest $request)
     {
-        Room::create($request->validated());
+        $data = $request->validated();
+        $data['name'] ??= $data['room_code'];
+        Room::create($data);
 
         return redirect()->route('rooms.index')
             ->with('success', 'Ruangan berhasil ditambahkan.');
@@ -136,10 +139,14 @@ class RoomController extends Controller
 
     public function update(UpdateRoomRequest $request, Room $room)
     {
-        $room->update($request->validated());
+        $data = $request->validated();
+        if (! isset($data['name'])) {
+            unset($data['name']);
+        }
+        $room->update($data);
 
         return redirect()->route('rooms.index', $this->listQuery($request->query('list')))
-            ->with('success', "Data {$room->name} berhasil diperbarui.");
+            ->with('success', "Data {$room->room_code} berhasil diperbarui.");
     }
 
     private function listQuery(mixed $query): array

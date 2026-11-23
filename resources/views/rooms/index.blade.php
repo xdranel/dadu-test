@@ -10,9 +10,9 @@
                 class="flex flex-wrap gap-2.5 items-end flex-1">
 
                 <div class="min-w-[150px] max-w-[220px] flex-1">
-                    <label class="campus-label">Cari Kode / Nama</label>
-                    <input type="text" name="search" value="{{ request('search') }}"
-                        placeholder="Ketik kode atau nama..."
+                    <label for="room-search" class="campus-label">Cari Kode Ruang</label>
+                    <input type="text" id="room-search" name="search" value="{{ request('search') }}"
+                        placeholder="Ketik kode ruang..."
                         class="campus-input">
                 </div>
 
@@ -99,7 +99,6 @@
                 <thead>
                     <tr>
                         <th>Kode Ruang</th>
-                        <th>Nama Ruangan</th>
                         <th>Lokasi Gedung</th>
                         <th>Kapasitas</th>
                         <th>Label</th>
@@ -112,9 +111,6 @@
                         <tr>
                             <td class="font-bold text-slate-800 whitespace-nowrap">
                                 {{ $r->room_code }}
-                            </td>
-                            <td class="text-slate-800">
-                                {{ $r->name ?: '—' }}
                             </td>
                             <td class="whitespace-nowrap text-slate-500">
                                 {{ $r->building ?: '—' }}
@@ -149,7 +145,7 @@
                                      {{-- Tombol Hapus --}}
                                      @can('room_delete')
                                      <button type="button"
-                                             @click="$dispatch('open-delete-modal', { url: '{{ route('rooms.destroy', $r->id) }}', name: '{{ addslashes($r->name) }}' })"
+                                             @click="$dispatch('open-delete-modal', { url: @js(route('rooms.destroy', $r->id)), code: @js($r->room_code) })"
                                              class="inline-flex items-center justify-center w-8 h-8 rounded-lg text-gray-400 hover:text-rose-600 hover:bg-rose-50 transition-all duration-200"
                                              title="Hapus">
                                          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -162,7 +158,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="7" class="empty-state">
+                            <td colspan="6" class="empty-state">
                                 <div class="empty-state-icon">
                                     <svg class="w-12 h-12 mx-auto text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
@@ -224,9 +220,9 @@
     </div>
 
     <!-- Modal Konfirmasi Hapus -->
-    <div x-data="{ openDelete: false, deleteUrl: '', roomName: '' }"
+    <div x-data="{ openDelete: false, deleteUrl: '', roomCode: '' }"
          x-show="openDelete"
-         @open-delete-modal.window="openDelete = true; deleteUrl = $event.detail.url; roomName = $event.detail.name;"
+         @open-delete-modal.window="openDelete = true; deleteUrl = $event.detail.url; roomCode = $event.detail.code;"
          class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
          style="display: none;"
          x-transition>
@@ -239,7 +235,7 @@
                     </svg>
                 </div>
                 <h3 class="text-lg font-bold text-slate-800 mb-2">Konfirmasi Hapus</h3>
-                <p class="text-sm text-slate-500 mb-6 font-normal">Apakah Anda yakin ingin menghapus data ruangan <span class="font-semibold text-slate-800" x-text="roomName"></span>?</p>
+                <p class="text-sm text-slate-500 mb-6 font-normal">Apakah Anda yakin ingin menghapus data ruangan <span class="font-semibold text-slate-800" x-text="roomCode"></span>?</p>
             </div>
             <div class="flex justify-end gap-3">
                 <button type="button" @click="openDelete = false"

@@ -55,8 +55,8 @@ test('program reader sees only their program counts and no editable program filt
         ->assertViewHas('registrations', fn ($rows) => $rows->total() === 1 && $rows->first()->id === $this->own->id)
         ->assertSee('105001')->assertDontSee('105002');
     $crawler = new Crawler($response->getContent());
-    expect($crawler->filter('select[name="study_program"]')->count())->toBe(0)
-        ->and($crawler->filter('[data-ta-program-scope]')->text())->toContain('Informatika')
+    expect($crawler->filter('[data-ta-filters] input[name], [data-ta-filters] select[name]')->each(fn (Crawler $field) => $field->attr('name')))
+        ->toBe(['search', 'period', 'status'])
         ->and($crawler->filter('[data-ta-export], [data-ta-export-empty]')->count())->toBe(0)
         ->and($crawler->filter('a[data-ta-doc]')->count())->toBeGreaterThan(0);
     expect($crawler->filter('aside a')->reduce(fn ($n) => $n->attr('href') === route('admin.sidang-ta-registrations.index'))->count())->toBe(1);
@@ -72,7 +72,8 @@ test('forged program filter and OR search cannot expand lecturer scope', functio
 test('reader sees document notes history and previews but no review or decision inputs', function () {
     $html = $this->get(route('admin.sidang-ta-registrations.show', $this->own))->assertOk()
         ->assertSee('Catatan petugas tetap dibaca')->assertSee('Perbaiki halaman pengesahan')
-        ->assertSee('Riwayat revisi tetap dibaca')->getContent();
+        ->assertSee('Riwayat revisi tetap dibaca')
+        ->assertDontSee('Akses baca prodi dosen.')->getContent();
     $crawler = new Crawler($html);
     expect($crawler->filter('[data-doc-review-form], textarea[name="notes"], textarea[name="review_notes"]')->count())->toBe(0)
         ->and($crawler->filter('[data-document-preview]')->count())->toBe(1);

@@ -227,15 +227,15 @@ test('single_revision_owner_with_create_only_cannot_start_save_or_discard_a_revi
     expect(Storage::disk('local')->allFiles())->toBe($paths);
 });
 
-test('single_staff_history_stays_collapsed_and_escaped_including_an_empty_history', function (bool $empty) {
+test('single_staff_history_shows_an_escaped_timeline_including_an_empty_history', function (bool $empty) {
     $registration = ($this->submittedSource)('automatic');
     if ($empty) $registration->logs()->delete();
     else $registration->logAction('document_rejected', 'submitted', 'submitted', '<script>history</script>', $this->user->id);
     ($this->asReviewer)();
     $crawler = new Crawler($this->get(route('admin.sidang-ta-registrations.show', $registration))->assertOk()->getContent());
-    $history = $crawler->filter('details[data-staff-registration-history]');
+    $history = $crawler->filter('section[data-staff-registration-history]');
     expect($history->count())->toBe(1);
-    expect($history->getNode(0)->hasAttribute('open'))->toBeFalse();
+    expect($history->filter('ol')->count())->toBe(1);
     expect($history->filter('script')->count())->toBe(0);
     expect($history->text(null, true))->toContain($empty ? 'Belum ada riwayat status.' : '<script>history</script>');
 })->with([true, false]);

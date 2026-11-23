@@ -45,7 +45,7 @@ class SidangTaExecutionInfoService
             'date' => $date,
             'start_time' => $this->time($confirmed ? $occurrence->start_time : $context?->preferred_start_time),
             'end_time' => $this->time($confirmed ? $occurrence->end_time : $context?->preferred_end_time),
-            'room' => $confirmed ? ($booking->room?->room_code ?? $booking->room?->name) : null,
+            'room' => $confirmed ? $booking->room?->room_code : null,
             'room_id' => $confirmed ? $booking->room_id : null,
             'is_confirmed' => $confirmed,
             'result_status' => $result,

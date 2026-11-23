@@ -58,11 +58,14 @@ test('p2a_all_status_cards_match_full_unfiltered_result', function () {
         ($this->makeRegistration)(['status' => $status]);
     }
     $response = ($this->listing)();
-    $response->assertViewHas('counts', ['total' => 4, 'submitted' => 1, 'needs_review' => 1, 'approved' => 1, 'rejected' => 1]);
+    $response->assertViewHas('counts', ['total' => 4, 'submitted' => 1, 'needs_review' => 1, 'approved' => 1, 'rejected' => 1])
+        ->assertDontSee('Ringkasan hasil filter')->assertDontSee('Ikon berkas:');
     $crawler = new Crawler($response->getContent());
     expect($crawler->filter('[data-ta-stat]')->count())->toBe(5);
     expect($crawler->filter('[data-ta-stat="total"]')->text())->toBe('4');
     expect($crawler->filter('[data-ta-row]')->count())->toBe(4);
+    expect($crawler->filter('[data-ta-filters] input[name], [data-ta-filters] select[name]')->each(fn (Crawler $field) => $field->attr('name')))
+        ->toBe(['search', 'period', 'status', 'study_program']);
 });
 
 test('p2a_combined_filters_group_name_nim_search_without_leaking_other_matches', function () {

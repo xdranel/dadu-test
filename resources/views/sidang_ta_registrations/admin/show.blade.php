@@ -3,11 +3,6 @@
 
     @php
         $statusLabels = \App\Services\SidangTaReviewQuery::STATUSES;
-        $documentLabels = [
-            'pending' => 'Menunggu verifikasi',
-            'verified' => 'Terverifikasi',
-            'rejected' => 'Perlu perbaikan'
-            ];
         $actionLabels = [
             'submitted' => 'Pendaftaran dikirim',
             'resubmitted' => 'Revisi dikirim',
@@ -18,20 +13,20 @@
             'reopened' => 'Pengajuan dibuka kembali',
             'document_verified' => 'Dokumen diverifikasi',
             'document_rejected' => 'Dokumen diminta perbaikan',
-            ];
+        ];
+        $events = $registration->logs->map(fn ($log) => [
+            'action' => $log->action,
+            'label' => $actionLabels[$log->action] ?? ucfirst(str_replace('_', ' ', $log->action)),
+            'time' => $log->performed_at ? $log->performed_at->timezone('Asia/Jakarta')->format('d/m/Y H:i').' WIB' : null,
+            'actor' => $log->actor?->name ?? 'Sistem',
+            'notes' => $log->notes,
+        ]);
     @endphp
     <div class="mx-auto max-w-6xl space-y-5">
         <div class="campus-card p-4">@include('sidang_ta_registrations.partials.period-schedule', ['schedulePeriod' => $registration->period])</div>
-        <header class="flex flex-wrap items-start justify-between gap-3">
-            <div>
-                <p class="text-xs font-semibold text-[#DA2D3B]">
-                    {{ $registration->period?->name ?? 'Periode tidak tersedia' }}
-                </p>
-                <p data-ta-review-window class="mt-1 text-xs text-slate-500">
-                    Dibuka {{ $registration->period?->open_at?->format('d/m/Y H:i') ?? '-' }} ·
-                    Tenggat {{ $registration->period?->close_at?->format('d/m/Y H:i') ?? '-' }}
-                </p>
-                <h2 class="mt-1 break-words text-xl font-bold text-slate-900">
+        <header class="flex flex-wrap items-center justify-between gap-3">
+            <div class="min-w-0">
+                <h2 class="break-words text-xl font-bold text-slate-900">
                     {{ $registration->student_name }}
                 </h2>
                 <p class="mt-1 text-sm text-slate-500">
@@ -72,11 +67,6 @@
                 @endunless
             </dl>
         </section>
-        @cannot('sidang_ta_registration_review')
-            <p data-ta-read-only role="status" class="rounded-xl bg-slate-50 p-4 text-sm text-slate-600">
-                Akses baca prodi dosen. Berkas, catatan petugas, dan riwayat dapat dilihat.
-            </p>
-        @endcannot
         @if($readonlyNeedsReview)
             <p data-meet-review-locked role="status" class="rounded-xl bg-amber-50 p-4 text-sm text-amber-900">
                 Pengajuan sedang menunggu revisi mahasiswa. Berkas dapat dilihat; perubahan peninjauan dikunci.
@@ -104,35 +94,10 @@
                 </p>
             </section>
         @endif
-        <details data-staff-registration-history class="campus-card group p-5">
-            <summary class="flex cursor-pointer list-none items-center justify-between gap-3 font-bold text-slate-800 [&::-webkit-details-marker]:hidden">
-                <span>Riwayat status</span>
-                <svg aria-hidden="true" class="h-5 w-5 shrink-0 transition-transform group-open:rotate-180" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="m6 9 6 6 6-6" />
-                </svg>
-            </summary>
-            <ol class="mt-4 space-y-3">
-                @forelse($registration->logs as $log)
-                    <li class="border-l-2 border-rose-200 pl-3">
-                        <p class="text-sm font-semibold text-slate-800">
-                            {{ $actionLabels[$log->action] ?? ucfirst(str_replace('_', ' ', $log->action)) }}
-                        </p>
-                        <p class="mt-1 text-xs text-slate-500">
-                            {{ $log->performed_at?->timezone('Asia/Jakarta')->format('d/m/Y H:i') }} WIB · {{ $log->actor?->name ?? 'Sistem' }}
-                        </p>
-                        @if(filled($log->notes))
-                            <p class="mt-1 whitespace-pre-line break-words text-sm text-slate-600">
-                                {{ $log->notes }}
-                            </p>
-                        @endif
-                    </li>
-                @empty
-                    <li class="text-sm text-slate-500">
-                        Belum ada riwayat status.
-                    </li>
-                @endforelse
-            </ol>
-        </details>
+        <section data-staff-registration-history class="campus-card space-y-5 p-5 sm:p-6">
+            <h3 class="font-bold text-slate-800">Riwayat status</h3>
+            <x-sidang-ta.status-timeline :events="$events" empty-message="Belum ada riwayat status." />
+        </section>
     </div>
     @include('sidang_ta_registrations.partials.document-preview-modal')
 </x-app-layout>

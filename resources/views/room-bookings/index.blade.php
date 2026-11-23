@@ -39,12 +39,9 @@
                 <article class="campus-card p-5">
                     <div class="flex flex-wrap items-start justify-between gap-3">
                         <div>
-                            <div class="flex items-center gap-2">
-                                <h4 class="font-bold text-base text-slate-800">{{ $booking->room->name }}</h4>
-                                <span class="text-xs px-2 py-0.5 rounded bg-slate-100 text-slate-600 font-medium">{{ $booking->room->room_code }}</span>
-                            </div>
+                            <h4 class="font-bold text-base text-slate-800">{{ $booking->room->room_code }}</h4>
                             <p class="text-xs text-slate-400 mt-0.5">
-                                Gedung: {{ $booking->room->building ?? '-' }} · Kapasitas: {{ $booking->room->capacity }} orang
+                                Gedung: {{ $booking->room->building ?: '—' }} · Kapasitas: {{ $booking->room->capacity ? $booking->room->capacity.' orang' : '—' }}
                             </p>
                         </div>
 

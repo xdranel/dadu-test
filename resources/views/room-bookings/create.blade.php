@@ -219,7 +219,7 @@
                 result.rooms.forEach(item => {
                     const option = document.createElement('option');
                     option.value = item.id;
-                    option.textContent = item.name + ' · ' + item.code + ' · ' + (item.building || 'Lokasi belum diisi') + ' · kapasitas ' + item.capacity;
+                    option.textContent = `${item.code} · ${item.building || 'Lokasi belum diisi'} · Kapasitas ${item.capacity || '—'}`;
                     room.append(option);
                 });
                 checkedRange = range;

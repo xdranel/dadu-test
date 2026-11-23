@@ -26,7 +26,7 @@ class UpdateRoomRequest extends FormRequest
 
         return [
             'room_code' => ['required', 'string', 'max:20', Rule::unique('rooms', 'room_code')->ignore($id)],
-            'name' => ['required', 'string', 'max:255'],
+            'name' => ['nullable', 'string', 'max:255'],
             'building' => ['required', 'string', 'max:100'],
             'capacity' => ['required', 'integer', 'min:1', 'max:1000'],
             'label' => ['nullable', 'string', Rule::in(Room::LABELS)],
@@ -36,9 +36,9 @@ class UpdateRoomRequest extends FormRequest
 
     protected function prepareForValidation(): void
     {
-        $this->merge([
-            'room_code' => strtoupper(trim($this->room_code)),
-            'name' => trim($this->name),
-        ]);
+        $roomCode = $this->input('room_code');
+        if (is_string($roomCode)) {
+            $this->merge(['room_code' => strtoupper(trim($roomCode))]);
+        }
     }
 }
