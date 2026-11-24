@@ -3,22 +3,23 @@
 namespace App\Services;
 
 use App\Models\QueueTicket;
+use App\Models\RoomBookingRequest;
+use App\Models\User;
 use Illuminate\Support\Facades\Cache;
 
 class SidebarBadgeService
 {
     /**
-     * Cache TTL (detik) untuk semua badge counter.
+     * Cache TTL (detik) untuk badge antrian.
      */
     protected const TTL = 60;
 
     /**
      * Hitung angka badge untuk key tertentu.
      *
-     * Sidebar dirender di setiap halaman, jadi hasil di-cache singkat
-     * via Cache::remember() supaya tidak query berat tiap request.
+     * Antrian menggunakan cache singkat. Peminjaman dihitung saat sidebar dirender.
      */
-    public function count(string $key): int
+    public function count(string $key, ?User $actor = null): int
     {
         return match ($key) {
             'queue_pending' => $this->cached(
@@ -27,8 +28,21 @@ class SidebarBadgeService
                     ->where('status', 'waiting')
                     ->count()
             ),
+            'room_booking_pending' => $this->pendingRoomBookings($actor),
             default => 0,
         };
+    }
+
+    private function pendingRoomBookings(?User $actor): int
+    {
+        if (! $actor || (! $actor->hasRole('Akademik') && ! $actor->can('room_booking_review'))) {
+            return 0;
+        }
+
+        return RoomBookingRequest::awaitingUse()
+            ->where('status', 'pending')
+            ->when(! $actor->can('sidang_ta_registration_review'), fn ($query) => $query->whereNull('sidang_ta_registration_id'))
+            ->count();
     }
 
     /**

@@ -96,14 +96,27 @@
 {{-- Accordion groups (single-open) --}}
 <div x-data="{ openGroup: @js($activeGroupKey) }" class="space-y-0.5">
     @foreach($visibleGroups as $key => $group)
-        @php $groupIcons = (array) ($group['icon'] ?? []); @endphp
+        @php
+            $groupIcons = (array) ($group['icon'] ?? []);
+            $badges = [];
+            $groupBellCount = 0;
+            foreach ($group['items'] as $item) {
+                $badgeKey = $item['badge_key'] ?? null;
+                if ($badgeKey) {
+                    $badges[$badgeKey] ??= $badgeService->count($badgeKey, $user);
+                    if ($item['badge_bell'] ?? false) {
+                        $groupBellCount += $badges[$badgeKey];
+                    }
+                }
+            }
+        @endphp
 
         {{-- Group Header --}}
         <div class="pb-1 {{ ($loop->first && count($standaloneItems) === 0) ? '' : 'pt-4' }}">
             <button type="button"
                     :aria-expanded="(openGroup === '{{ $key }}' && sidebarOpen).toString()"
                     @click="if (!sidebarOpen) { sidebarOpen = true; openGroup = '{{ $key }}'; } else { openGroup = (openGroup === '{{ $key }}' ? null : '{{ $key }}'); }"
-                    class="w-full flex items-center focus:outline-none hover:text-[#DA2D3B] hover:bg-slate-50 rounded-lg transition-colors"
+                    class="relative w-full flex items-center focus:outline-none hover:text-[#DA2D3B] hover:bg-slate-50 rounded-lg transition-colors"
                     :class="sidebarOpen ? 'justify-between px-3 py-2.5' : 'justify-center py-3'">
                 <span class="flex items-center" :class="sidebarOpen ? 'gap-2' : ''">
                     <svg class="flex-shrink-0 shrink-0 text-slate-400 transition-colors" :class="sidebarOpen ? 'w-[18px] h-[18px]' : 'w-5 h-5'" width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -113,6 +126,12 @@
                     </svg>
                     <span x-show="sidebarOpen" x-cloak class="text-sm font-medium text-slate-700">{{ $group['label'] }}</span>
                 </span>
+                @if($groupBellCount > 0)
+                    <span x-show="!sidebarOpen || openGroup !== '{{ $key }}'" x-cloak
+                          :class="sidebarOpen ? 'ml-auto mr-2' : 'absolute right-0 top-0'">
+                        @include('components.sidebar-bell-count', ['count' => $groupBellCount])
+                    </span>
+                @endif
                 {{-- Chevron: menghadap kanan saat tertutup, rotasi ke bawah saat grup terbuka --}}
                 <svg x-show="sidebarOpen" x-cloak class="w-3 h-3 shrink-0 text-slate-400 transition-transform duration-200" :class="openGroup === '{{ $key }}' ? 'rotate-90' : ''" width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7"/>
@@ -125,14 +144,17 @@
             @foreach($group['items'] as $item)
                 @php
                     $isActive = request()->routeIs(...(array) ($item['active'] ?? $item['route']));
-                    $badge = ! empty($item['badge_key']) ? $badgeService->count($item['badge_key']) : 0;
+                    $badge = $badges[$item['badge_key'] ?? ''] ?? 0;
+                    $hasBell = ($item['badge_bell'] ?? false) && $badge > 0;
                 @endphp
                 <a href="{{ route($item['route']) }}"
                    @if($isActive) aria-current="page" @endif
                    class="flex items-center pl-8 pr-3 py-2.5 rounded-lg text-sm font-medium
                           {{ $isActive ? 'bg-[#DA2D3B]/10 text-[#DA2D3B] font-semibold' : 'text-slate-500 hover:bg-slate-50 hover:text-[#DA2D3B]' }}">
-                    <span x-show="sidebarOpen" x-cloak class="truncate flex-1">{{ $item['label'] }}</span>
-                    @if($badge > 0)
+                    <span x-show="sidebarOpen" x-cloak class="min-w-0 flex-1 {{ $hasBell ? 'break-words pr-2' : 'truncate' }}">{{ $item['label'] }}</span>
+                    @if($hasBell)
+                        @include('components.sidebar-bell-count', ['count' => $badge])
+                    @elseif($badge > 0)
                         <span x-show="sidebarOpen"
                               x-cloak
                               class="ml-auto text-[10px] font-bold bg-[#DA2D3B] text-white rounded-full px-1.5 py-0.5 leading-none">{{ $badge }}</span>

@@ -6,6 +6,7 @@ use App\Models\Room;
 use App\Models\RoomBookingHistory;
 use App\Models\RoomBookingRequest;
 use App\Models\RoomScheduleSource;
+use App\Models\Unit;
 use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -62,9 +63,11 @@ afterEach(function () {
 // 1. REVIEW PEMINJAMAN RUANGAN (ADMIN AKADEMIK)
 // =========================================================================
 
-test('academic admin can access the import notice and booking cards without a calendar', function () {
+test('academic admin reviews booking cards with room, program and date without the import notice', function () {
     $room = $this->scenario['rooms']['a'];
     $room->update(['room_code' => 'KTT-REVIEW-01']);
+    Lecturer::create(['name' => 'Dosen Uji', 'email_domain' => $this->lecturer->email,
+        'nip_ypt' => 'NIP-UJI-01', 'lecturer_code' => 'ABC', 'study_program' => 'S1 Informatika']);
     $booking = RoomBookingRequest::create([
         'user_id' => $this->lecturer->id,
         'room_id' => $this->scenario['rooms']['a']->id,
@@ -90,9 +93,48 @@ test('academic admin can access the import notice and booking cards without a ca
     $response->assertSee('Review Peminjaman Ruangan');
     $response->assertSee('Rapat Koordinasi Dosen');
     $response->assertSee($room->room_code)->assertDontSee($room->name);
-    $response->assertSee('Import jadwal iGracias')->assertSee('Catatan admin')
+    $response->assertDontSee('Import jadwal iGracias')->assertSee('Catatan admin')
+        ->assertSee('S1 Informatika')->assertDontSee('NIP-UJI-01')->assertSee('Rabu, 25-Nov-2026')
+        ->assertSee(route('admin.room-bookings.history'))
         ->assertSee('Konfirmasi agenda dengan peminjam.')
         ->assertDontSee('Kalender Ketersediaan Ruangan')->assertDontSee('Rincian Penggunaan Ruangan');
+});
+
+test('review keeps ongoing multi-month bookings active and archives by the last use month', function () {
+    $room = $this->scenario['rooms']['a'];
+    $unit = Unit::create(['name' => 'Layanan Akademik']);
+    $this->admin->update(['unit_id' => $unit->id]);
+    $make = function (string $purpose, array $dates, string $status) use ($room) {
+        $booking = RoomBookingRequest::create([
+            'user_id' => $this->admin->id, 'room_id' => $room->id, 'type' => 'recurring',
+            'start_date' => $dates[0], 'end_date' => end($dates), 'start_time' => '07:00:00', 'end_time' => '08:00:00',
+            'purpose' => $purpose, 'participants' => 2, 'status' => $status,
+        ]);
+        foreach ($dates as $date) {
+            $booking->occurrences()->create(['usage_date' => $date, 'start_time' => '07:00:00', 'end_time' => '08:00:00']);
+        }
+
+        return $booking;
+    };
+    $previous = $make('Arsip Oktober', ['2026-10-25'], 'rejected');
+    $finished = $make('Selesai pagi ini', ['2026-11-19'], 'approved');
+    $ongoing = $make('Peminjaman lintas bulan', ['2026-11-18', '2026-12-02'], 'approved');
+    $newest = $make('Pengajuan terbaru', ['2026-11-20'], 'pending');
+
+    $active = $this->actingAs($this->admin)->get(route('admin.room-bookings.review'))->assertOk()
+        ->assertViewHas('bookings', fn ($bookings) => $bookings->getCollection()->modelKeys() === [$newest->id, $ongoing->id])
+        ->assertSee('Layanan Akademik')->assertSee('Batalkan Peminjaman')->assertSee('Konfirmasi pembatalan')
+        ->assertSee('class="btn btn-primary" aria-haspopup="dialog"', false)
+        ->assertSeeInOrder(['Peminjaman lintas bulan', 'Rabu, 18-Nov-2026', 'Rabu, 02-Des-2026', '07:00–08:00 WIB']);
+    expect(substr_count($active->getContent(), '07:00–08:00 WIB'))->toBe(2);
+
+    $history = '/dashboard/admin/room-bookings/history';
+    $this->get($history)->assertOk()->assertViewHas('month', '2026-11')
+        ->assertViewHas('bookings', fn ($bookings) => $bookings->getCollection()->modelKeys() === [$finished->id])
+        ->assertDontSee('Batalkan Peminjaman');
+    $this->get($history.'?month=2026-10')->assertOk()
+        ->assertViewHas('bookings', fn ($bookings) => $bookings->getCollection()->modelKeys() === [$previous->id]);
+    $this->actingAs($this->lecturer)->get($history)->assertForbidden();
 });
 
 test('academic admin can approve a pending room booking with or without a note', function (?string $note) {

@@ -24,6 +24,7 @@
 |                   multi-path seperti gear).
 |   'badge_key'  => kunci counter opsional (string). Dihitung oleh
 |                   App\Services\SidebarBadgeService.
+|   'badge_bell' => tampilkan lonceng pada item dan saat grup tertutup.
 |
 | Untuk role 'mahasiswa'      -> flat array of items.
 | Untuk 'admin_standalone'    -> flat array item mandiri (di atas grup).
@@ -104,7 +105,7 @@ return [
                 ['label' => 'Dashboard', 'route' => 'room-bookings.index', 'active' => 'room-bookings.index', 'permission' => 'room_booking_read'],
                 ['label' => 'Pengajuan Peminjaman Ruangan', 'route' => 'room-bookings.create', 'active' => 'room-bookings.create', 'permission' => 'room_booking_create'],
                 ['label' => 'Daftar Peminjaman Saya', 'route' => 'room-bookings.my', 'active' => 'room-bookings.my', 'permission' => 'room_booking_read'],
-                ['label' => 'Review Peminjaman Ruangan', 'route' => 'admin.room-bookings.review', 'active' => 'admin.room-bookings.*', 'permission' => 'room_booking_review'],
+                ['label' => 'Review Peminjaman Ruangan', 'route' => 'admin.room-bookings.review', 'active' => 'admin.room-bookings.*', 'permission' => 'room_booking_review', 'roles' => ['Akademik'], 'badge_key' => 'room_booking_pending', 'badge_bell' => true],
             ],
         ],
 

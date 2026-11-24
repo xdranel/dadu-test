@@ -41,10 +41,17 @@ export default function roomBookingDashboard() {
                 this.roomDescription = [room.building, room.capacity ? `Kapasitas ${room.capacity} orang` : '']
                     .filter(Boolean).join(' · ');
                 this.busy = [
-                    ...schedules.map(item => ({ ...item, kind: 'Perkuliahan' })),
+                    ...schedules.map(item => ({
+                        ...item,
+                        kind: 'Perkuliahan',
+                        identity: `${item.lecturer_code || 'Kode dosen belum tersedia'} · ${item.program_study || 'Prodi belum tersedia'}`,
+                    })),
                     ...bookings.map(item => ({
                         ...item,
                         kind: item.status === 'pending' ? 'Peminjaman · Menunggu persetujuan' : 'Peminjaman · Disetujui',
+                        identity: item.is_lecturer
+                            ? item.lecturer_code || 'Kode dosen belum tersedia'
+                            : `${item.user_name || 'Nama peminjam belum tersedia'} · ${item.unit_name || 'Unit belum tersedia'}`,
                     })),
                 ].sort((first, second) => first.start_time.localeCompare(second.start_time));
                 this.free = slots[0]?.free_slots ?? [];

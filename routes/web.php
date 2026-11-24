@@ -196,6 +196,7 @@ Route::middleware(['auth', 'password.changed'])->group(function () {
         Route::post('room-bookings', [RoomBookingController::class, 'store'])->middleware('permission:room_booking_create')->name('room-bookings.store');
         Route::post('room-bookings/{booking}/cancel', [RoomBookingController::class, 'cancel'])->middleware('permission:room_booking_update')->name('room-bookings.cancel');
         Route::get('admin/room-bookings', [RoomBookingController::class, 'review'])->name('admin.room-bookings.review');
+        Route::get('admin/room-bookings/history', [RoomBookingController::class, 'reviewHistory'])->name('admin.room-bookings.history');
         Route::post('admin/room-bookings/{booking}/decision', [RoomBookingController::class, 'decide'])->name('admin.room-bookings.decision');
         Route::post('admin/room-bookings/{booking}/cancel', [RoomBookingController::class, 'adminCancel'])->name('admin.room-bookings.cancel');
         Route::get('room-bookings/calendar-detail', [RoomBookingController::class, 'calendarDayDetail'])->middleware('permission:room_booking_read')->name('room-bookings.calendar.detail');

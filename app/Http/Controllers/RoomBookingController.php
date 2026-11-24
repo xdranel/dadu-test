@@ -3,7 +3,6 @@
 namespace App\Http\Controllers;
 
 use App\Models\AcademicPeriod;
-use App\Models\Lecturer;
 use App\Models\Room;
 use App\Models\RoomBookingHistory;
 use App\Models\RoomBookingRequest as Booking;
@@ -12,6 +11,7 @@ use App\Models\User;
 use App\Services\RoomAvailabilityService;
 use App\Services\RoomBookingTransitionService;
 use App\Support\RoomBookingAccess;
+use App\Support\RoomBookingIdentity;
 use App\Support\RoomFloorPlan;
 use App\Support\RoomTimeWindows;
 use App\Support\WeeklyRoomScheduleNormalizer;
@@ -68,12 +68,8 @@ class RoomBookingController extends Controller
             if (! $from || ! $to) {
                 continue;
             }
-            [$sh, $sm] = explode(':', substr((string) $from, 0, 5));
-            [$eh, $em] = explode(':', substr((string) $to, 0, 5));
-            $s = (int) $sh * 60 + (int) $sm;
-            $e = (int) $eh * 60 + (int) $em;
-            $clippedStart = max($s, $windowStartMin);
-            $clippedEnd = min($e, $windowEndMin);
+            $clippedStart = max(RoomTimeWindows::minutes($from), $windowStartMin);
+            $clippedEnd = min(RoomTimeWindows::minutes($to, true), $windowEndMin);
             if ($clippedStart < $clippedEnd) {
                 $intervals[] = [$clippedStart, $clippedEnd];
             }
@@ -116,6 +112,11 @@ class RoomBookingController extends Controller
         return $freeSlots;
     }
 
+    private function hasFreeHour(array $intervals): bool
+    {
+        return RoomTimeWindows::firstFit($intervals, [['start' => 390, 'end' => 1290]], 60) !== null;
+    }
+
     private function availabilityCalendar(array $busy, array $missingDates, iterable $rooms): array
     {
         $calendar = [];
@@ -127,8 +128,7 @@ class RoomBookingController extends Controller
             }
             $available = false;
             foreach ($rooms as $room) {
-                $slots = array_map(fn ($s) => ['start' => RoomTimeWindows::time($s['start']), 'end' => RoomTimeWindows::time($s['end'])], $byRoom[$room->id] ?? []);
-                if ($this->computeFreeSlots($slots)) {
+                if ($this->hasFreeHour($byRoom[$room->id] ?? [])) {
                     $available = true;
                     break;
                 }
@@ -204,11 +204,13 @@ class RoomBookingController extends Controller
                 return $plan;
             })->filter(fn (array $plan) => $plan['tiles'] !== []);
         $booked = $this->bookingsOnDate($selectedDate)->distinct()->pluck('req.room_id')->flip();
+        $sourceReady = ! in_array($selectedDate, $missingDates, true);
         $roomStates = $rooms->mapWithKeys(fn (Room $room) => [$room->id => match (true) {
-            $booked->has($room->id) => 'booked',
             ! $room->isBookableClassroom() => 'inactive',
+            $sourceReady && ! $this->hasFreeHour($busy[$selectedDate][$room->id] ?? []) => 'full',
+            $booked->has($room->id) => 'booked',
             isset($busy[$selectedDate][$room->id]) => 'teaching',
-            $calendar[$selectedDate] === 'unknown' => 'unknown',
+            ! $sourceReady => 'unknown',
             default => 'available',
         }]);
 
@@ -366,15 +368,35 @@ class RoomBookingController extends Controller
         return back()->with('success', 'Pengajuan dibatalkan.');
     }
 
-    public function review(Request $request)
+    public function review(Request $request, RoomBookingIdentity $identity)
     {
         abort_unless($this->isReviewer($request->user()), 403);
-        $bookings = Booking::with(['room', 'user', 'occurrences'])->latest()->orderByDesc('id')->paginate(20);
-        $lastImport = DB::table('room_import_logs')->where('rows_imported', '>', 0)->latest('created_at')->first();
-        $lecturersList = Lecturer::query()->get();
-        $lecturers = $lecturersList->keyBy(fn ($l) => mb_strtolower(trim($l->name)));
-        $lecturersByNip = $lecturersList->whereNotNull('nip_ypt')->keyBy(fn ($l) => trim($l->nip_ypt));
-        return view('room-bookings.review', compact('bookings', 'lastImport', 'lecturers', 'lecturersByNip'));
+        $bookings = Booking::with(['room', 'user.unit', 'occurrences'])->awaitingUse()->latest()->orderByDesc('id')->paginate(20);
+
+        return view('room-bookings.review', compact('bookings', 'identity'));
+    }
+
+    public function reviewHistory(Request $request, RoomBookingIdentity $identity)
+    {
+        abort_unless($this->isReviewer($request->user()), 403);
+        $data = $request->validate(['month' => ['nullable', 'date_format:Y-m']]);
+        $current = now('Asia/Jakarta')->startOfMonth();
+        $month = $data['month'] ?? $current->format('Y-m');
+        $earliestDate = Booking::min('start_date');
+        $periodStart = AcademicPeriod::current()?->start_date?->toDateString();
+        $first = Carbon::parse(min($earliestDate ?? $current->toDateString(), $periodStart ?? $current->toDateString()), 'Asia/Jakarta')->startOfMonth();
+        $months = [];
+        for ($cursor = $current->copy(); $cursor->gte($first); $cursor->subMonthNoOverflow()) {
+            $months[$cursor->format('Y-m')] = $cursor->locale('id')->translatedFormat('F Y');
+        }
+        abort_unless(isset($months[$month]), 404);
+        $selected = Carbon::createFromFormat('!Y-m', $month, 'Asia/Jakarta');
+        $bookings = Booking::with(['room', 'user.unit', 'occurrences'])
+            ->whereNot(fn ($query) => $query->awaitingUse())
+            ->lastUseInMonth($selected->toDateString(), $selected->copy()->endOfMonth()->toDateString())
+            ->latest()->orderByDesc('id')->paginate(20)->appends(['month' => $month]);
+
+        return view('room-bookings.review', compact('bookings', 'identity', 'month', 'months'));
     }
 
     public function decide(Request $request, Booking $booking)
@@ -417,7 +439,7 @@ class RoomBookingController extends Controller
             ->whereIn('req.status', ['pending', 'approved']);
     }
 
-    public function calendarDayDetail(Request $request): JsonResponse
+    public function calendarDayDetail(Request $request, RoomBookingIdentity $identity): JsonResponse
     {
         $data = $request->validate(['date' => ['required', 'date_format:Y-m-d'], 'room_id' => ['nullable', 'integer', 'min:1']]);
         $date = $data['date'];
@@ -431,42 +453,35 @@ class RoomBookingController extends Controller
             ->when($selectedRoom, fn ($query) => $query->where('req.room_id', $selectedRoom->id))
             ->join('rooms as r', 'r.id', '=', 'req.room_id')
             ->join('users as u', 'u.id', '=', 'req.user_id')
+            ->leftJoin('units', 'units.id', '=', 'u.unit_id')
             ->orderBy('o.start_time')
             ->get([
                 'r.id as room_id',
                 'r.name as room_name',
                 'r.room_code',
                 'u.name as user_name',
+                'u.email',
                 'u.employee_id',
+                'units.name as unit_name',
                 'o.start_time',
                 'o.end_time',
                 'req.purpose',
                 'req.status',
             ]);
 
-        // Mapping kode dosen jika ada dari tabel lecturers
-        $lecturers = Lecturer::query()->get(['name', 'nip_ypt', 'lecturer_code']);
-        $lecturerMap = [];
-        foreach ($lecturers as $l) {
-            if ($l->lecturer_code) {
-                if ($l->name) {
-                    $lecturerMap[mb_strtolower(trim($l->name))] = $l->lecturer_code;
-                }
-                if ($l->nip_ypt) {
-                    $lecturerMap[trim($l->nip_ypt)] = $l->lecturer_code;
-                }
-            }
-        }
-
         $formattedBookings = [];
         foreach ($bookings as $b) {
-            $code = $lecturerMap[mb_strtolower(trim($b->user_name))] ?? $lecturerMap[trim($b->employee_id ?? '')] ?? $b->employee_id ?? '-';
+            $lecturer = $identity->lecturer($b->email, $b->employee_id);
+            $code = trim($lecturer?->lecturer_code ?? '');
+            $code = $code !== '' && $code !== '-' ? $code : null;
             $formattedBookings[] = [
                 'room_id' => $b->room_id,
                 'room_name' => $b->room_name,
                 'room_code' => $b->room_code,
-                'user_name' => $b->user_name,
+                'user_name' => $lecturer ? $code : $b->user_name,
                 'lecturer_code' => $code,
+                'is_lecturer' => $lecturer !== null,
+                'unit_name' => $lecturer ? null : $b->unit_name,
                 'start_time' => substr($b->start_time, 0, 5),
                 'end_time' => substr($b->end_time, 0, 5),
                 'purpose' => $b->purpose,
@@ -483,6 +498,7 @@ class RoomBookingController extends Controller
                 'room_code' => $s->room_code,
                 'user_name' => $s->lecturer_code ?: 'Dosen Perkuliahan',
                 'lecturer_code' => $s->lecturer_code ?: '-',
+                'program_study' => $identity->programForCode($s->lecturer_code),
                 'start_time' => substr($s->start_time, 0, 5),
                 'end_time' => substr($s->end_time, 0, 5),
                 'purpose' => $s->description ?? 'Jadwal Perkuliahan',

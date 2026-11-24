@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 
 class RoomBookingRequest extends Model
@@ -9,6 +10,28 @@ class RoomBookingRequest extends Model
     protected $guarded = [];
 
     protected $casts = ['start_date' => 'date', 'end_date' => 'date', 'cancelled_at' => 'datetime'];
+
+    public function scopeAwaitingUse(Builder $query): Builder
+    {
+        $now = now('Asia/Jakarta');
+        $endsLater = fn (Builder $q, string $dateColumn) => $q
+            ->whereDate($dateColumn, '>', $now->toDateString())
+            ->orWhere(fn (Builder $sameDay) => $sameDay->whereDate($dateColumn, $now->toDateString())
+                ->whereTime('end_time', '>', $now->toTimeString()));
+
+        return $query->where(fn (Builder $q) => $q
+            ->whereHas('occurrences', fn (Builder $occurrences) => $endsLater($occurrences, 'usage_date'))
+            ->orWhere(fn (Builder $legacy) => $legacy->doesntHave('occurrences')
+                ->where(fn (Builder $dates) => $endsLater($dates, 'end_date'))));
+    }
+
+    public function scopeLastUseInMonth(Builder $query, string $first, string $last): Builder
+    {
+        $lastOccurrence = RoomBookingOccurrence::query()->selectRaw('max(usage_date)')
+            ->whereColumn('request_id', 'room_booking_requests.id');
+
+        return $query->whereRaw('date(coalesce(('.$lastOccurrence->toSql().'), room_booking_requests.end_date)) between ? and ?', [$first, $last]);
+    }
 
     public function registration()
     {

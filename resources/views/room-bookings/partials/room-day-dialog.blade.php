@@ -24,6 +24,7 @@
                                 <p class="font-semibold" x-text="item.start_time + '–' + item.end_time + ' WIB'"></p>
                                 <p class="break-words" x-text="item.purpose"></p>
                                 <p class="text-xs" x-text="item.kind"></p>
+                                <p class="mt-1 break-words text-xs font-medium" x-text="item.identity"></p>
                             </li>
                         </template>
                     </ul>

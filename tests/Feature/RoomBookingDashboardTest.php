@@ -1,8 +1,10 @@
 <?php
 
-use App\Models\RoomBookingRequest;
+use App\Models\Lecturer;
 use App\Models\Room;
+use App\Models\RoomBookingRequest;
 use App\Models\RoomWeeklyPattern;
+use App\Models\Unit;
 use App\Models\User;
 use Carbon\Carbon;
 use Spatie\Permission\Models\Permission;
@@ -85,10 +87,11 @@ it('shows the workbook room A-1.04 on floor two and omits obsolete rooms outside
 
 it('shows only the selected room and date in the calendar detail response', function () {
     $scenario = $this->scenario;
+    Lecturer::create(['name' => 'Dosen Jadwal', 'email_domain' => $this->actor->email, 'study_program' => 'S1 Informatika', 'lecturer_code' => 'ABC']);
     foreach (['a', 'b'] as $key) {
         $room = $scenario['rooms'][$key];
         RoomWeeklyPattern::create(['academic_period_id' => $scenario['academic']->id, 'room_id' => $room->id,
-            'weekday' => 2, 'start_time' => '08:00:00', 'end_time' => '09:00:00',
+            'weekday' => 2, 'start_time' => '08:00:00', 'end_time' => '09:00:00', 'lecturer_code' => 'ABC',
             'reference_date' => '2026-11-24', 'source_identity' => $key]);
         $booking = RoomBookingRequest::create(['user_id' => $this->actor->id, 'room_id' => $room->id,
             'type' => 'single', 'start_date' => '2026-11-24', 'end_date' => '2026-11-25',
@@ -103,11 +106,33 @@ it('shows only the selected room and date in the calendar detail response', func
     $this->actingAs($this->actor)->getJson($url)->assertOk()
         ->assertJsonPath('room.room_code', 'KTT1.02')->assertJsonPath('date', '2026-11-24')
         ->assertJsonCount(1, 'schedules')->assertJsonPath('schedules.0.room_id', $room->id)
+        ->assertJsonPath('schedules.0.program_study', 'S1 Informatika')
         ->assertJsonCount(1, 'bookings')->assertJsonPath('bookings.0.purpose', 'Peminjaman a')
+        ->assertJsonPath('bookings.0.lecturer_code', 'ABC')->assertJsonPath('bookings.0.is_lecturer', true)
+        ->assertJsonMissing(['user_name' => $this->actor->name])
         ->assertJsonPath('bookings.0.start_time', '11:00')->assertJsonCount(1, 'available_slots')
         ->assertJsonPath('available_slots.0.free_slots.1', '09:00 - 11:00 WIB');
     $this->getJson(route('room-bookings.calendar.detail', ['date' => '2026-11-24']))->assertOk()
         ->assertJsonMissingPath('room')->assertJsonCount(2, 'bookings');
     $this->get(route('room-bookings.index'))->assertOk()->assertViewHas('roomStates', fn ($states) => $states[$room->id] === 'booked');
     $this->actingAs(User::factory()->create())->getJson($url)->assertForbidden();
+});
+
+it('marks a full room red and shows staff name and unit on its booking', function () {
+    $unit = Unit::create(['name' => 'Layanan Akademik']);
+    $staff = $this->scenario['reviewer'];
+    $staff->update(['unit_id' => $unit->id, 'employee_id' => 'ID-PEGAWAI-UJI']);
+    $room = $this->scenario['rooms']['a'];
+    $booking = RoomBookingRequest::create(['user_id' => $staff->id, 'room_id' => $room->id,
+        'type' => 'single', 'start_date' => '2026-11-24', 'end_date' => '2026-11-24',
+        'start_time' => '06:30:00', 'end_time' => '21:30:00', 'purpose' => 'Kegiatan Akademik', 'participants' => 4, 'status' => 'approved']);
+    $booking->occurrences()->create(['usage_date' => '2026-11-24', 'start_time' => '06:30:00', 'end_time' => '21:30:00']);
+
+    $this->actingAs($this->actor)->get(route('room-bookings.index'))->assertOk()
+        ->assertViewHas('roomStates', fn ($states) => $states[$room->id] === 'full')
+        ->assertSee('aria-label="KTT1.02 · Penuh"', false);
+    $this->getJson(route('room-bookings.calendar.detail', ['date' => '2026-11-24', 'room_id' => $room->id]))->assertOk()
+        ->assertJsonPath('bookings.0.user_name', $staff->name)->assertJsonPath('bookings.0.unit_name', 'Layanan Akademik')
+        ->assertJsonPath('bookings.0.lecturer_code', null)->assertJsonPath('bookings.0.is_lecturer', false)
+        ->assertJsonCount(0, 'available_slots.0.free_slots')->assertDontSee('ID-PEGAWAI-UJI');
 });

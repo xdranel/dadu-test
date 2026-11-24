@@ -14,6 +14,7 @@
             'available' => ['Kosong', 'border-emerald-300 bg-emerald-50 text-emerald-900'],
             'teaching' => ['Perkuliahan', 'border-sky-300 bg-sky-50 text-sky-900'],
             'booked' => ['Peminjaman', 'border-amber-400 bg-amber-100 text-amber-950'],
+            'full' => ['Penuh', 'border-rose-300 bg-rose-100 text-rose-950'],
             'unknown' => ['Jadwal belum tersedia', 'border-slate-300 bg-slate-100 text-slate-700'],
             'inactive' => ['Tidak dapat dipakai', 'border-slate-300 bg-white text-slate-500'],
         ];
