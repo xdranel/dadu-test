@@ -48,6 +48,19 @@ it('defaults to today and offers dates from the navigated month even without a s
         ->assertViewHas('selectedDate', '2026-10-12');
 });
 
+it('greys out past dates without disabling selection and leaves booking navigation in the sidebar', function () {
+    $this->actor->givePermissionTo(Permission::findOrCreate('room_booking_create', 'web'));
+    $response = $this->actingAs($this->actor)->get(route('room-bookings.index'))->assertOk()
+        ->assertSee(route('room-bookings.my'))->assertSee(route('room-bookings.create'))
+        ->assertDontSee('>Daftar Peminjaman Saya</a>', false)->assertDontSee('>Ajukan Peminjaman</a>', false);
+    expect($response->getContent())->toMatch('/data-calendar-date="2026-11-23"[^>]*\bbg-slate-100\b/')
+        ->toMatch('/data-calendar-date="2026-11-24"[^>]*\bbg-emerald-50\b/');
+
+    $response = $this->get(route('room-bookings.index', ['month' => '2026-10', 'date' => '2026-10-12']))->assertOk()
+        ->assertViewHas('selectedDate', '2026-10-12');
+    expect($response->getContent())->toMatch('/data-calendar-date="2026-10-12"[^>]*aria-current="true"[^>]*\bbg-slate-100\b/');
+});
+
 it('filters clickable rooms by partial normalized code, building and mapped floor', function () {
     $this->actingAs($this->actor)->get(route('room-bookings.index', ['search' => 'ktt 1.', 'building' => 'TUS-GEDUNG A', 'floor' => '1']))
         ->assertOk()->assertSee('data-room-code="KTT1.02"', false)->assertDontSee('data-room-code="KTT2.02"', false)

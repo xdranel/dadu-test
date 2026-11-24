@@ -5,6 +5,7 @@
         $monthKey = $month->format('Y-m');
         $dateLabel = \Carbon\Carbon::parse($selectedDate, 'Asia/Jakarta')->locale('id')->translatedFormat('l, d F Y');
         $days = [
+            'past' => ['Lewat', 'border-slate-200 bg-slate-100 text-slate-600'],
             'available' => ['Ada slot', 'border-emerald-200 bg-emerald-50 text-emerald-900'],
             'unavailable' => ['Penuh', 'border-rose-200 bg-rose-50 text-rose-900'],
             'unknown' => ['Jadwal belum tersedia', 'border-slate-200 bg-slate-50 text-slate-600'],
@@ -49,7 +50,7 @@
                     <span aria-hidden="true"></span>
                 @endfor
                 @foreach($calendar as $date => $availability)
-                    @php([$dayLabel, $dayColor] = $days[$availability])
+                    @php([$dayLabel, $dayColor] = $days[$date < $today ? 'past' : $availability])
                     <a href="{{ route('room-bookings.index', ['month' => $monthKey, 'date' => $date] + $roomFilters) }}"
                        data-calendar-date="{{ $date }}" @if($date === $selectedDate) aria-current="true" @endif
                        title="{{ $date }} · {{ $dayLabel }}"
@@ -117,13 +118,6 @@
                 <p class="rounded-lg border border-dashed border-slate-200 p-4 text-sm text-slate-600">Tidak ada ruangan yang cocok dengan filter.</p>
             @endforelse
         </section>
-
-        <div class="flex flex-wrap gap-2">
-            <a class="btn btn-secondary" href="{{ route('room-bookings.my') }}">Daftar Peminjaman Saya</a>
-            @can('room_booking_create')
-                <a class="btn btn-primary" href="{{ route('room-bookings.create') }}">Ajukan Peminjaman</a>
-            @endcan
-        </div>
 
         @include('room-bookings.partials.room-day-dialog')
     </div>
