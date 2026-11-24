@@ -65,14 +65,16 @@ class RoomAvailabilityService
         return $this->intervals($from, $until);
     }
 
-    public function teachingOccurrences(string $date): array
+    public function teachingOccurrences(string $date, ?int $roomId = null): array
     {
         $days = $this->dates($date, $date);
         $weekday = $days[$date]->dayOfWeekIso;
         $weekly = DB::table('room_weekly_patterns as p')->join('academic_periods as a', 'a.id', '=', 'p.academic_period_id')->join('rooms as r', 'r.id', '=', 'p.room_id')
             ->where('p.weekday', $weekday)->whereDate('a.start_date', '<=', $date)->whereDate('a.end_date', '>=', $date)
+            ->when($roomId !== null, fn ($query) => $query->where('p.room_id', $roomId))
             ->get(['r.id as room_id', 'r.name as room_name', 'r.room_code', 'p.start_time', 'p.end_time', 'p.description', 'p.lecturer_code']);
         $dated = DB::table('room_schedules as p')->join('rooms as r', 'r.id', '=', 'p.room_id')->whereDate('p.usage_date', $date)
+            ->when($roomId !== null, fn ($query) => $query->where('p.room_id', $roomId))
             ->get(['r.id as room_id', 'r.name as room_name', 'r.room_code', 'p.start_time', 'p.end_time', 'p.description', 'p.lecturer_code']);
 
         return $weekly->concat($dated)->unique(fn ($s) => json_encode([$s->room_id, $s->start_time, $s->end_time, $s->description, $s->lecturer_code]))->values()->all();

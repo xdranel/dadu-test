@@ -11,12 +11,16 @@ use App\Models\RoomScheduleSource;
 use App\Models\User;
 use App\Services\RoomAvailabilityService;
 use App\Services\RoomBookingTransitionService;
-use App\Support\RoomTimeWindows;
 use App\Support\RoomBookingAccess;
+use App\Support\RoomFloorPlan;
+use App\Support\RoomTimeWindows;
+use App\Support\WeeklyRoomScheduleNormalizer;
 use Carbon\Carbon;
+use Illuminate\Database\Query\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
 class RoomBookingController extends Controller
@@ -112,15 +116,11 @@ class RoomBookingController extends Controller
         return $freeSlots;
     }
 
-    private function availabilityCalendar(string $start, string $end): array
+    private function availabilityCalendar(array $busy, array $missingDates, iterable $rooms): array
     {
-        $service = app(RoomAvailabilityService::class);
-        $busy = $service->forRange($start, $end);
-        $coverage = $service->coverage($start, $end);
-        $rooms = Room::bookableClassrooms()->get();
         $calendar = [];
         foreach ($busy as $date => $byRoom) {
-            if (in_array($date, $coverage['missing_dates'], true)) {
+            if (in_array($date, $missingDates, true)) {
                 $calendar[$date] = 'unknown';
 
                 continue;
@@ -165,30 +165,60 @@ class RoomBookingController extends Controller
         }
 
         abort_unless($this->canBorrow($user) && $user->can('room_booking_read'), 403);
-        $monthInput = $request->input('month');
-        if ($monthInput && preg_match('/^\d{4}-\d{2}$/', $monthInput)) {
-            $month = Carbon::createFromFormat('!Y-m', $monthInput, 'Asia/Jakarta');
-        } elseif ($monthInput && preg_match('/^\d{4}-\d{2}-\d{2}$/', $monthInput)) {
-            $month = Carbon::createFromFormat('!Y-m-d', $monthInput, 'Asia/Jakarta');
-        } else {
-            $month = now('Asia/Jakarta');
-        }
-
-        // Jangan izinkan navigasi ke bulan sebelum bulan saat ini
-        $currentMonthStart = now('Asia/Jakarta')->startOfMonth();
-        if ($month->startOfMonth()->lt($currentMonthStart)) {
-            $month = $currentMonthStart->copy();
-        }
-
-        $start = $month->copy()->startOfMonth()->toDateString();
-        $end = $month->copy()->endOfMonth()->toDateString();
-        $calendar = $this->availabilityCalendar($start, $end);
+        $filters = $request->validate([
+            'month' => ['nullable', 'date_format:Y-m,Y-m-d'],
+            'date' => ['nullable', 'date_format:Y-m-d'],
+            'search' => ['nullable', 'string', 'max:50'],
+            'building' => ['nullable', 'string', 'max:100'],
+            'floor' => ['nullable', Rule::in(['1', '2'])],
+        ]);
         $today = now('Asia/Jakarta')->toDateString();
-        $bookings = Booking::with(['room', 'user', 'occurrences'])->whereIn('status', ['pending', 'approved'])
-            ->latest()->paginate(10)->withQueryString();
-        $hasImported = $this->hasSuccessfulImport();
+        $requestedDate = $filters['date'] ?? null;
+        $monthKey = substr($filters['month'] ?? $requestedDate ?? $today, 0, 7);
+        $month = Carbon::createFromFormat('!Y-m', $monthKey, 'Asia/Jakarta');
+        $selectedDate = match (true) {
+            $requestedDate !== null && str_starts_with($requestedDate, $monthKey.'-') => $requestedDate,
+            str_starts_with($today, $monthKey.'-') => $today,
+            default => $month->toDateString(),
+        };
 
-        return view('room-bookings.dashboard', compact('calendar', 'month', 'bookings', 'hasImported', 'today'));
+        $start = $month->toDateString();
+        $end = $month->copy()->endOfMonth()->toDateString();
+        $availability = app(RoomAvailabilityService::class);
+        $busy = $availability->forRange($start, $end);
+        $missingDates = $availability->coverage($start, $end)['missing_dates'];
+        $rooms = Room::where('label', Room::LABEL_CLASSROOM)->orderBy('room_code')->get();
+        $calendar = $this->availabilityCalendar($busy, $missingDates, $rooms->filter(fn (Room $room) => $room->isBookableClassroom()));
+        $buildings = $rooms->pluck('building')->filter()->unique()->sort()->values();
+        $floors = $rooms->map(fn (Room $room) => RoomFloorPlan::floor($room))->filter()->unique()->sort()->values();
+
+        $roomFilters = array_filter($request->only('search', 'building', 'floor'), fn ($value) => filled($value));
+        $roomKey = WeeklyRoomScheduleNormalizer::roomKey(...);
+        $search = $roomKey($roomFilters['search'] ?? '');
+        $filteredIds = $rooms->filter(fn (Room $room) => str_contains($roomKey($room->room_code), $search)
+            && (! isset($roomFilters['building']) || $room->building === $roomFilters['building'])
+            && (! isset($roomFilters['floor']) || RoomFloorPlan::floor($room) === (string) $roomFilters['floor']))
+            ->pluck('id')->flip();
+
+        $arrangement = RoomFloorPlan::arrange($rooms);
+        $plans = collect($arrangement['plans'])->map(function (array $plan) use ($filteredIds) {
+            $plan['tiles'] = array_filter($plan['tiles'], fn (array $tile) => $filteredIds->has($tile['room']->id));
+
+            return $plan;
+        })->filter(fn (array $plan) => $plan['tiles'] !== []);
+        $unmappedRooms = $arrangement['unmapped']->filter(fn (Room $room) => $filteredIds->has($room->id));
+        $booked = $this->bookingsOnDate($selectedDate)->distinct()->pluck('req.room_id')->flip();
+        $roomStates = $rooms->mapWithKeys(fn (Room $room) => [$room->id => match (true) {
+            $booked->has($room->id) => 'booked',
+            ! $room->isBookableClassroom() => 'inactive',
+            isset($busy[$selectedDate][$room->id]) => 'teaching',
+            $calendar[$selectedDate] === 'unknown' => 'unknown',
+            default => 'available',
+        }]);
+
+        return view('room-bookings.dashboard', compact(
+            'calendar', 'month', 'selectedDate', 'today', 'roomFilters', 'buildings', 'floors', 'plans', 'unmappedRooms', 'roomStates',
+        ));
     }
 
     public function create(Request $request)
@@ -343,19 +373,12 @@ class RoomBookingController extends Controller
     public function review(Request $request)
     {
         abort_unless($this->isReviewer($request->user()), 403);
-        $filters = $request->validate(['month' => ['nullable', 'date_format:Y-m']]);
-        $bookings = Booking::with(['room', 'user', 'occurrences'])->latest()->paginate(20)->withQueryString();
+        $bookings = Booking::with(['room', 'user', 'occurrences'])->latest()->orderByDesc('id')->paginate(20);
         $lastImport = DB::table('room_import_logs')->where('rows_imported', '>', 0)->latest('created_at')->first();
         $lecturersList = Lecturer::query()->get();
         $lecturers = $lecturersList->keyBy(fn ($l) => mb_strtolower(trim($l->name)));
         $lecturersByNip = $lecturersList->whereNotNull('nip_ypt')->keyBy(fn ($l) => trim($l->nip_ypt));
-        $month = isset($filters['month'])
-            ? Carbon::createFromFormat('!Y-m', $filters['month'], 'Asia/Jakarta')
-            : now('Asia/Jakarta');
-        $calendar = $this->availabilityCalendar($month->copy()->startOfMonth()->toDateString(), $month->copy()->endOfMonth()->toDateString());
-        $today = now('Asia/Jakarta')->toDateString();
-
-        return view('room-bookings.review', compact('bookings', 'lastImport', 'lecturers', 'lecturersByNip', 'calendar', 'month', 'today'));
+        return view('room-bookings.review', compact('bookings', 'lastImport', 'lecturers', 'lecturersByNip'));
     }
 
     public function decide(Request $request, Booking $booking)
@@ -390,20 +413,28 @@ class RoomBookingController extends Controller
         ]);
     }
 
+    private function bookingsOnDate(string $date): Builder
+    {
+        return DB::table('room_booking_occurrences as o')
+            ->join('room_booking_requests as req', 'req.id', '=', 'o.request_id')
+            ->whereDate('o.usage_date', $date)
+            ->whereIn('req.status', ['pending', 'approved']);
+    }
+
     public function calendarDayDetail(Request $request): JsonResponse
     {
-        $date = $request->validate(['date' => ['required', 'date_format:Y-m-d']])['date'];
+        $data = $request->validate(['date' => ['required', 'date_format:Y-m-d'], 'room_id' => ['nullable', 'integer', 'min:1']]);
+        $date = $data['date'];
+        $selectedRoom = isset($data['room_id']) ? Room::where('label', Room::LABEL_CLASSROOM)->findOrFail($data['room_id']) : null;
 
         // Jadwal iGracias pada tanggal tersebut
-        $schedules = collect(app(RoomAvailabilityService::class)->teachingOccurrences($date));
+        $schedules = collect(app(RoomAvailabilityService::class)->teachingOccurrences($date, $selectedRoom?->id));
 
         // Peminjaman internal (pending / approved)
-        $bookings = DB::table('room_booking_occurrences as o')
-            ->join('room_booking_requests as req', 'req.id', '=', 'o.request_id')
+        $bookings = $this->bookingsOnDate($date)
+            ->when($selectedRoom, fn ($query) => $query->where('req.room_id', $selectedRoom->id))
             ->join('rooms as r', 'r.id', '=', 'req.room_id')
             ->join('users as u', 'u.id', '=', 'req.user_id')
-            ->where('o.usage_date', $date)
-            ->whereIn('req.status', ['pending', 'approved'])
             ->orderBy('o.start_time')
             ->get([
                 'r.id as room_id',
@@ -475,7 +506,9 @@ class RoomBookingController extends Controller
 
         // Hitung slot yang masih tersedia (≥ 1 jam) per ruangan
         $sourceReady = app(RoomAvailabilityService::class)->coverage($date, $date)['ready'];
-        $rooms = $sourceReady ? Room::bookableClassrooms()->orderBy('name')->get() : collect();
+        $rooms = $sourceReady
+            ? Room::bookableClassrooms()->when($selectedRoom, fn ($query) => $query->whereKey($selectedRoom->id))->orderBy('name')->get()
+            : collect();
         $availableSlots = [];
         foreach ($rooms as $room) {
             $free = $this->computeFreeSlots($roomSlots[$room->id] ?? [], 390, 1290, 60);
@@ -495,6 +528,6 @@ class RoomBookingController extends Controller
             'schedules' => $formattedSchedules,
             'bookings' => $formattedBookings,
             'available_slots' => $availableSlots,
-        ]);
+        ] + ($selectedRoom ? ['room' => $selectedRoom->only(['room_code', 'building', 'capacity', 'status'])] : []));
     }
 }

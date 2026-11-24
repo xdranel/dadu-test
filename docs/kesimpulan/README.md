@@ -132,3 +132,4 @@ Satu ringkasan per nomor progres; sub-checkpoint huruf digabung pada nomor utama
 - [127 — Diagnosis dan akses peminjaman ruangan](127-diagnosis-dan-akses-peminjaman-ruangan.md)
 
 - [128 — Semua master kelas, status tetap](128-semua-master-kelas-status-tetap.md)
+- [135 — Dashboard dan Review Peminjaman Ruangan](135-dashboard-peminjaman-denah-ruangan.md)

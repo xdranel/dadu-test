@@ -62,7 +62,7 @@ afterEach(function () {
 // 1. REVIEW PEMINJAMAN RUANGAN (ADMIN AKADEMIK)
 // =========================================================================
 
-test('academic admin can access review page with list of bookings and calendar', function () {
+test('academic admin can access the import notice and booking cards without a calendar', function () {
     $room = $this->scenario['rooms']['a'];
     $room->update(['room_code' => 'KTT-REVIEW-01']);
     $booking = RoomBookingRequest::create([
@@ -74,6 +74,7 @@ test('academic admin can access review page with list of bookings and calendar',
         'start_time' => '09:00:00',
         'end_time' => '11:00:00',
         'purpose' => 'Rapat Koordinasi Dosen',
+        'admin_note' => 'Konfirmasi agenda dengan peminjam.',
         'participants' => 0,
         'status' => 'pending',
         'booking_origin' => 'ordinary',
@@ -89,6 +90,9 @@ test('academic admin can access review page with list of bookings and calendar',
     $response->assertSee('Review Peminjaman Ruangan');
     $response->assertSee('Rapat Koordinasi Dosen');
     $response->assertSee($room->room_code)->assertDontSee($room->name);
+    $response->assertSee('Import jadwal iGracias')->assertSee('Catatan admin')
+        ->assertSee('Konfirmasi agenda dengan peminjam.')
+        ->assertDontSee('Kalender Ketersediaan Ruangan')->assertDontSee('Rincian Penggunaan Ruangan');
 });
 
 test('academic admin can approve a pending room booking with or without a note', function (?string $note) {
