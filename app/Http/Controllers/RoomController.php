@@ -85,7 +85,8 @@ class RoomController extends Controller
 
                     $label = strtoupper($normalized['label'] ?? '');
                     if ($label !== '' && ! in_array($label, Room::LABELS, true)) {
-                        throw new \InvalidArgumentException("Label ruang {$code} harus KELAS, LAB, atau kosong.");
+                        $labels = implode(', ', Room::LABELS);
+                        throw new \InvalidArgumentException("Label ruang {$code} harus salah satu dari {$labels} atau kosong.");
                     }
 
                     $room = $matches?->first() ?? new Room(['name' => '', 'building' => '', 'capacity' => 0]);

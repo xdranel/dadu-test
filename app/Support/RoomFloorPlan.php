@@ -38,19 +38,11 @@ final class RoomFloorPlan
         ],
     ];
 
-    public static function floor(Room $room): ?string
-    {
-        $position = self::positions()[WeeklyRoomScheduleNormalizer::roomKey($room->room_code)] ?? null;
-
-        return $position === null ? null : self::PLANS[$position['plan']]['floor'];
-    }
-
     public static function arrange(Collection $rooms): array
     {
         $roomKey = fn (Room $room) => WeeklyRoomScheduleNormalizer::roomKey($room->room_code);
         $byCode = $rooms->groupBy($roomKey);
         $plans = [];
-        $mapped = [];
 
         foreach (self::positions() as $code => $position) {
             $matches = $byCode->get($code);
@@ -59,16 +51,12 @@ final class RoomFloorPlan
             }
 
             $plan = $position['plan'];
-            $plans[$plan] ??= ['key' => $plan] + array_intersect_key(self::PLANS[$plan], array_flip(['label', 'width', 'height']));
+            $plans[$plan] ??= ['key' => $plan] + array_intersect_key(self::PLANS[$plan], array_flip(['label', 'floor', 'width', 'height']));
             unset($position['plan']);
             $plans[$plan]['tiles'][] = ['room' => $matches->first()] + $position;
-            $mapped[$code] = true;
         }
 
-        return [
-            'plans' => array_values($plans),
-            'unmapped' => $rooms->reject(fn (Room $room) => isset($mapped[$roomKey($room)]))->values(),
-        ];
+        return array_values($plans);
     }
 
     private static function positions(): array

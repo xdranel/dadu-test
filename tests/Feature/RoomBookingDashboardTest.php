@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\RoomBookingRequest;
+use App\Models\Room;
 use App\Models\RoomWeeklyPattern;
 use App\Models\User;
 use Carbon\Carbon;
@@ -53,6 +54,20 @@ it('filters clickable rooms by partial normalized code, building and mapped floo
         ->assertDontSee('data-room-code="LAB"', false);
     $this->get(route('room-bookings.index', ['floor' => '2']))->assertOk()
         ->assertSee('data-room-code="KTT2.02"', false)->assertDontSee('data-room-code="KTT1.02"', false);
+});
+
+it('shows the workbook room A-1.04 on floor two and omits obsolete rooms outside the floor plan', function () {
+    $attributes = ['name' => '', 'capacity' => 40, 'label' => 'KELAS', 'status' => 'Dapat Dipakai'];
+    Room::create(['room_code' => 'KTT A-1.04', 'building' => 'TUS-GEDUNG A'] + $attributes);
+    Room::create(['room_code' => 'KELAS-LAMA', 'building' => 'Gedung Lama'] + $attributes);
+
+    $this->actingAs($this->actor)->get(route('room-bookings.index'))->assertOk()
+        ->assertSee('data-room-code="KTT A-1.04"', false)
+        ->assertDontSee('Ruangan di luar denah')->assertDontSee('KELAS-LAMA')->assertDontSee('Gedung Lama');
+    $this->get(route('room-bookings.index', ['search' => 'A-1.04', 'floor' => '2']))->assertOk()
+        ->assertSee('Gedung A · Lantai 2')->assertSee('data-room-code="KTT A-1.04"', false);
+    $this->get(route('room-bookings.index', ['search' => 'A-1.04', 'floor' => '1']))->assertOk()
+        ->assertDontSee('data-room-code="KTT A-1.04"', false);
 });
 
 it('shows only the selected room and date in the calendar detail response', function () {

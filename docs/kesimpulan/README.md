@@ -133,3 +133,4 @@ Satu ringkasan per nomor progres; sub-checkpoint huruf digabung pada nomor utama
 
 - [128 — Semua master kelas, status tetap](128-semua-master-kelas-status-tetap.md)
 - [135 — Dashboard dan Review Peminjaman Ruangan](135-dashboard-peminjaman-denah-ruangan.md)
+- [136 — Koreksi denah dan master ruangan](136-koreksi-denah-dan-master-ruangan.md)

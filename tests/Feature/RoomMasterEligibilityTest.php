@@ -39,6 +39,7 @@ test('XLSX master import keeps coded rooms with incomplete details and preserves
         ['Kode Ruang' => 'KTT 1.27 B', 'Nama Ruang' => 'KELAS 1.27 B', 'Lokasi Gedung' => 'Gedung Utama', 'Kapasitas' => 80, 'Status' => 'Aktif', 'Label' => 'KELAS'],
         ['Kode Ruang' => 'MANSYS LAB', 'Nama Ruang' => '', 'Lokasi Gedung' => '', 'Kapasitas' => '', 'Status' => 'Aktif', 'Label' => 'lab'],
         ['Kode Ruang' => 'KTT A-1.03', 'Nama Ruang' => 'KELAS A-1.03', 'Lokasi Gedung' => 'Gedung AB', 'Kapasitas' => 45, 'Status' => 'Non Aktif', 'Label' => ''],
+        ['Kode Ruang' => 'KTT AULA', 'Nama Ruang' => '', 'Lokasi Gedung' => 'TUS-GEDUNG SBS', 'Kapasitas' => 1, 'Status' => 'Non Aktif', 'Label' => 'AULA'],
     ];
     Storage::fake('local');
     $path = Storage::disk('local')->path('rooms.xlsx');
@@ -49,9 +50,12 @@ test('XLSX master import keeps coded rooms with incomplete details and preserves
         ->assertSessionHas('success');
     $lab = Room::where('room_code', 'MANSYS LAB')->sole();
     $unlabelled = Room::where('room_code', 'KTT A-1.03')->sole();
+    $hall = Room::where('room_code', 'KTT AULA')->sole();
     expect($lab->id)->toBe($oldLab->id)->and($lab->label)->toBe('LAB')->and($lab->status)->toBe('Dapat Dipakai')
         ->and($unlabelled->label)->toBeNull()->and($unlabelled->status)->toBe('Tidak Dapat Dipakai')
         ->and(Room::where('room_code', 'KTT 1.27 B')->sole()->label)->toBe('KELAS');
+    expect($hall->label)->toBe('AULA')->and($hall->status)->toBe('Tidak Dapat Dipakai')
+        ->and($hall->isBookableClassroom())->toBeFalse();
     $lab->update(['name' => 'Nama Lab Terverifikasi', 'building' => 'Gedung Lab', 'capacity' => 32]);
     $unlabelled->update(['label' => 'KELAS']);
 

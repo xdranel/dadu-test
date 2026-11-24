@@ -187,26 +187,22 @@ class RoomBookingController extends Controller
         $availability = app(RoomAvailabilityService::class);
         $busy = $availability->forRange($start, $end);
         $missingDates = $availability->coverage($start, $end)['missing_dates'];
-        $rooms = Room::where('label', Room::LABEL_CLASSROOM)->orderBy('room_code')->get();
+        $plans = collect(RoomFloorPlan::arrange(Room::where('label', Room::LABEL_CLASSROOM)->get()));
+        $rooms = $plans->flatMap(fn (array $plan) => array_column($plan['tiles'], 'room'));
         $calendar = $this->availabilityCalendar($busy, $missingDates, $rooms->filter(fn (Room $room) => $room->isBookableClassroom()));
         $buildings = $rooms->pluck('building')->filter()->unique()->sort()->values();
-        $floors = $rooms->map(fn (Room $room) => RoomFloorPlan::floor($room))->filter()->unique()->sort()->values();
+        $floors = $plans->pluck('floor')->unique()->sort()->values();
 
         $roomFilters = array_filter($request->only('search', 'building', 'floor'), fn ($value) => filled($value));
         $roomKey = WeeklyRoomScheduleNormalizer::roomKey(...);
         $search = $roomKey($roomFilters['search'] ?? '');
-        $filteredIds = $rooms->filter(fn (Room $room) => str_contains($roomKey($room->room_code), $search)
-            && (! isset($roomFilters['building']) || $room->building === $roomFilters['building'])
-            && (! isset($roomFilters['floor']) || RoomFloorPlan::floor($room) === (string) $roomFilters['floor']))
-            ->pluck('id')->flip();
+        $plans = $plans->filter(fn (array $plan) => ! isset($roomFilters['floor']) || $plan['floor'] === (string) $roomFilters['floor'])
+            ->map(function (array $plan) use ($roomFilters, $roomKey, $search) {
+                $plan['tiles'] = array_filter($plan['tiles'], fn (array $tile) => str_contains($roomKey($tile['room']->room_code), $search)
+                    && (! isset($roomFilters['building']) || $tile['room']->building === $roomFilters['building']));
 
-        $arrangement = RoomFloorPlan::arrange($rooms);
-        $plans = collect($arrangement['plans'])->map(function (array $plan) use ($filteredIds) {
-            $plan['tiles'] = array_filter($plan['tiles'], fn (array $tile) => $filteredIds->has($tile['room']->id));
-
-            return $plan;
-        })->filter(fn (array $plan) => $plan['tiles'] !== []);
-        $unmappedRooms = $arrangement['unmapped']->filter(fn (Room $room) => $filteredIds->has($room->id));
+                return $plan;
+            })->filter(fn (array $plan) => $plan['tiles'] !== []);
         $booked = $this->bookingsOnDate($selectedDate)->distinct()->pluck('req.room_id')->flip();
         $roomStates = $rooms->mapWithKeys(fn (Room $room) => [$room->id => match (true) {
             $booked->has($room->id) => 'booked',
@@ -217,7 +213,7 @@ class RoomBookingController extends Controller
         }]);
 
         return view('room-bookings.dashboard', compact(
-            'calendar', 'month', 'selectedDate', 'today', 'roomFilters', 'buildings', 'floors', 'plans', 'unmappedRooms', 'roomStates',
+            'calendar', 'month', 'selectedDate', 'today', 'roomFilters', 'buildings', 'floors', 'plans', 'roomStates',
         ));
     }
 

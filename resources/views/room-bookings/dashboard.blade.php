@@ -102,32 +102,20 @@
                 </div>
             </div>
 
-            @foreach($plans as $plan)
+            @forelse($plans as $plan)
                 <section aria-labelledby="plan-{{ $plan['key'] }}" class="space-y-2">
                     <h3 id="plan-{{ $plan['key'] }}" class="text-sm font-semibold text-slate-800">{{ $plan['label'] }}</h3>
                     <div class="overflow-x-auto rounded-xl border border-slate-200 bg-slate-50 p-2 sm:p-3">
                         <div class="relative min-w-[680px]" style="aspect-ratio: {{ $plan['width'] }} / {{ $plan['height'] }}">
                             @foreach($plan['tiles'] as $tile)
-                                @include('room-bookings.partials.room-tile', ['room' => $tile['room'], 'tile' => $tile])
+                                @include('room-bookings.partials.room-tile', ['room' => $tile['room']])
                             @endforeach
                         </div>
                     </div>
                 </section>
-            @endforeach
-
-            @if($unmappedRooms->isNotEmpty())
-                <section aria-labelledby="other-rooms-title" class="space-y-2">
-                    <h3 id="other-rooms-title" class="text-sm font-semibold text-slate-800">Ruangan di luar denah</h3>
-                    <div class="flex flex-wrap gap-2">
-                        @foreach($unmappedRooms as $room)
-                            @include('room-bookings.partials.room-tile', ['room' => $room, 'tile' => null])
-                        @endforeach
-                    </div>
-                </section>
-            @endif
-            @if($plans->isEmpty() && $unmappedRooms->isEmpty())
+            @empty
                 <p class="rounded-lg border border-dashed border-slate-200 p-4 text-sm text-slate-600">Tidak ada ruangan yang cocok dengan filter.</p>
-            @endif
+            @endforelse
         </section>
 
         <div class="flex flex-wrap gap-2">

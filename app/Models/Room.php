@@ -8,7 +8,7 @@ class Room extends Model
 {
     public const LABEL_CLASSROOM = 'KELAS';
 
-    public const LABELS = [self::LABEL_CLASSROOM, 'LAB'];
+    public const LABELS = [self::LABEL_CLASSROOM, 'LAB', 'AULA'];
 
     protected $fillable = [
         'room_code',
