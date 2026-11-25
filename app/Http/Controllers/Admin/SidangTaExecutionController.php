@@ -101,6 +101,11 @@ class SidangTaExecutionController extends Controller
         return $export->download($query->query($query->filters($request))->with('period', 'roomSchedule.booking.room', 'roomSchedule.booking.occurrences')->orderBy('student_number')->get());
     }
 
+    public function plottingTemplate(SidangTaExecutionExport $export)
+    {
+        return $export->downloadTemplate();
+    }
+
     public function update(SaveSidangTaExecutionRequest $request, SidangTaPeriod $period, SidangTaExecutionWindowService $service)
     {
         $data = array_merge($request->validated(), ['duration_minutes' => 90, 'break_start_time' => null, 'break_end_time' => null]);

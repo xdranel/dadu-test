@@ -65,7 +65,11 @@
                 <input id="plotting-file" type="file" name="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                        required class="campus-input mt-1 block min-w-0 !py-1 file:mr-2 file:rounded file:border-0 file:bg-slate-100 file:px-2 file:py-1 file:text-slate-700">
             </label>
-            <button type="submit" class="btn btn-primary">Impor plotting</button>
+            <div class="flex flex-wrap gap-2">
+                <button type="submit" class="btn btn-primary">Impor plotting</button>
+                <a class="btn btn-secondary" href="{{ route('admin.sidang-ta-execution.template') }}">Unduh Template</a>
+            </div>
+            <p class="text-xs text-slate-600 sm:col-span-full">Pertahankan dua baris header, lalu ganti baris contoh dengan data peserta dan nama periode yang dipilih.</p>
         </form>
     </details>
 @endif

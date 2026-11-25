@@ -15,6 +15,8 @@ use Throwable;
 
 class SidangTaPlottingImportService
 {
+    public const GROUP_HEADERS = [0 => 'Peserta TA', 9 => 'Plotting Jadwal'];
+
     public const HEADERS = ['Periode Sidang TA', 'NIM', 'Nama Mahasiswa', 'Program Studi', 'Status Pengajuan', 'Kelompok Keahlian', 'Judul TA', 'Kode Dosen Pembimbing 1', 'Kode Dosen Pembimbing 2', 'Hari', 'Tanggal', 'Jam Mulai', 'Jam Selesai', "Ruang\n(diisi oleh AKD)", 'Kode Penguji 1', 'Kode Penguji 2'];
 
     public function import(User $actor, SidangTaPeriod $period, string $path): array
@@ -42,14 +44,16 @@ class SidangTaPlottingImportService
                     $cells = $row->getCells();
                     $values = array_map(fn ($cell) => $cell->getValue(), $cells);
                     if ($number === 1) {
-                        if (($values[0] ?? null) !== 'Peserta TA' || ($values[9] ?? null) !== 'Plotting Jadwal') {
-                            $this->invalid('Gunakan template dua baris header plotting.');
+                        foreach (self::GROUP_HEADERS as $column => $title) {
+                            if (($values[$column] ?? null) !== $title) {
+                                $this->invalid('Gunakan template dua baris header plotting.');
+                            }
                         }
 
                         continue;
                     }
                     if ($number === 2) {
-                        if (count($values) !== 16) {
+                        if (count($values) !== count(self::HEADERS)) {
                             $this->invalid('Template plotting harus memiliki 16 kolom.');
                         }
                         foreach (self::HEADERS as $index => $header) {

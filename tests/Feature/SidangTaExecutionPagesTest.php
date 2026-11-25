@@ -4,7 +4,10 @@ use App\Models\Lecturer;
 use App\Models\RoomBookingRequest;
 use App\Models\User;
 use App\Services\SidangTaExecutionInfoService;
+use App\Services\SidangTaPlottingImportService;
 use Carbon\Carbon;
+use Illuminate\Http\UploadedFile;
+use OpenSpout\Reader\XLSX\Reader;
 use Spatie\Permission\Models\Permission;
 use Symfony\Component\DomCrawler\Crawler;
 use Tests\Support\TaRoomScenario;
@@ -17,7 +20,8 @@ beforeEach(function () {
 test('execution participant page and settings are separate pages', function () {
     $response = $this->actingAs($this->s['reviewer'])->get('/dashboard/admin/sidang-ta-execution')
         ->assertOk()->assertDontSee('Ringkasan hasil filter')->assertSee($this->s['student']->student_number)
-        ->assertSee('Impor plotting')->assertSee('Export Excel')->assertDontSee('Pilih periode dan file Excel plotting peserta.');
+        ->assertSee('Impor plotting')->assertSee('Unduh Template')->assertSee('Export Excel')
+        ->assertDontSee('Pilih periode dan file Excel plotting peserta.');
     $page = new Crawler($response->getContent());
     expect($page->filter('[data-execution-filters] [name]')->each(fn ($field) => $field->attr('name')))
         ->toBe(['search', 'period', 'status', 'study_program'])
@@ -84,7 +88,42 @@ test('program reader cannot expand execution filters or write results or export'
         ->assertDontSee('name="study_program"', false)->assertDontSee('Akses baca Program Studi');
     $this->get('/dashboard/admin/sidang-ta-execution/'.$foreign->getRouteKey())->assertForbidden();
     $this->get('/dashboard/admin/sidang-ta-execution/export')->assertForbidden();
+    $this->get('/dashboard/admin/sidang-ta-execution/template')->assertForbidden();
     $this->post('/dashboard/admin/sidang-ta-execution/'.$this->s['registration']->getRouteKey().'/outcome', ['status' => 'passed', 'context_version' => 0])->assertForbidden();
+});
+
+test('plotting template has two valid headers and one example row that the uploader accepts', function () {
+    $s = $this->s;
+    $response = $this->actingAs($s['reviewer'])->get('/dashboard/admin/sidang-ta-execution/template')
+        ->assertOk()->assertDownload('Template_Plotting_Sidang_TA.xlsx');
+    $path = $response->baseResponse->getFile()->getPathname();
+
+    try {
+        $reader = new Reader;
+        $reader->open($path);
+        try {
+            foreach ($reader->getSheetIterator() as $sheet) {
+                $rows = array_map(fn ($row) => $row->toArray(), iterator_to_array($sheet->getRowIterator(), false));
+                break;
+            }
+        } finally {
+            $reader->close();
+        }
+
+        expect($rows)->toHaveCount(3)
+            ->and($rows[0][0])->toBe('Peserta TA')->and($rows[0][9])->toBe('Plotting Jadwal')
+            ->and($rows[1])->toBe(SidangTaPlottingImportService::HEADERS)
+            ->and($rows[2])->toHaveCount(16)->and($rows[2][1])->toBe('0000000000');
+
+        $s['period']->update(['name' => $rows[2][0]]);
+        $s['registration']->update(['student_number' => $rows[2][1]]);
+        $file = new UploadedFile($path, 'Template_Plotting_Sidang_TA.xlsx', null, null, true);
+        $this->post(route('admin.sidang-ta-execution.import'), ['period' => $s['period']->getRouteKey(), 'file' => $file])
+            ->assertSessionHasNoErrors()->assertSessionHas('import_result', fn ($result) => count($result['processed']) === 1 && $result['errors'] === []);
+        expect(RoomBookingRequest::count())->toBe(0);
+    } finally {
+        unlink($path);
+    }
 });
 
 test('manual plotting import requires a file while system scheduling does not', function () {
