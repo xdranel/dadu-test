@@ -16,6 +16,7 @@ use App\Support\RoomFloorPlan;
 use App\Support\RoomTimeWindows;
 use App\Support\WeeklyRoomScheduleNormalizer;
 use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Builder as EloquentBuilder;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -371,15 +372,21 @@ class RoomBookingController extends Controller
     public function review(Request $request, RoomBookingIdentity $identity)
     {
         abort_unless($this->isReviewer($request->user()), 403);
-        $bookings = Booking::with(['room', 'user.unit', 'occurrences'])->awaitingUse()->latest()->orderByDesc('id')->paginate(20);
+        $data = $request->validate(['room_code' => ['nullable', 'string', 'max:50']]);
+        $roomCode = $data['room_code'] ?? '';
+        $bookings = $this->reviewBookings($roomCode)->awaitingUse()->paginate(20)->appends($data);
 
-        return view('room-bookings.review', compact('bookings', 'identity'));
+        return view('room-bookings.review', compact('bookings', 'identity', 'roomCode'));
     }
 
     public function reviewHistory(Request $request, RoomBookingIdentity $identity)
     {
         abort_unless($this->isReviewer($request->user()), 403);
-        $data = $request->validate(['month' => ['nullable', 'date_format:Y-m']]);
+        $data = $request->validate([
+            'month' => ['nullable', 'date_format:Y-m'],
+            'room_code' => ['nullable', 'string', 'max:50'],
+        ]);
+        $roomCode = $data['room_code'] ?? '';
         $current = now('Asia/Jakarta')->startOfMonth();
         $month = $data['month'] ?? $current->format('Y-m');
         $earliestDate = Booking::min('start_date');
@@ -391,12 +398,27 @@ class RoomBookingController extends Controller
         }
         abort_unless(isset($months[$month]), 404);
         $selected = Carbon::createFromFormat('!Y-m', $month, 'Asia/Jakarta');
-        $bookings = Booking::with(['room', 'user.unit', 'occurrences'])
+        $bookings = $this->reviewBookings($roomCode)
             ->whereNot(fn ($query) => $query->awaitingUse())
             ->lastUseInMonth($selected->toDateString(), $selected->copy()->endOfMonth()->toDateString())
-            ->latest()->orderByDesc('id')->paginate(20)->appends(['month' => $month]);
+            ->paginate(20)->appends(['month' => $month] + $data);
 
-        return view('room-bookings.review', compact('bookings', 'identity', 'month', 'months'));
+        return view('room-bookings.review', compact('bookings', 'identity', 'month', 'months', 'roomCode'));
+    }
+
+    private function reviewBookings(string $roomCode): EloquentBuilder
+    {
+        $query = Booking::with(['room', 'user.unit', 'occurrences'])->latest()->orderByDesc('id');
+        if ($roomCode === '') {
+            return $query;
+        }
+
+        $key = WeeklyRoomScheduleNormalizer::roomKey(...);
+        $search = $key($roomCode);
+        $rooms = $search === '' ? [] : Room::pluck('room_code', 'id')
+            ->filter(fn (string $code) => str_contains($key($code), $search))->keys();
+
+        return $query->whereIn('room_id', $rooms);
     }
 
     public function decide(Request $request, Booking $booking)

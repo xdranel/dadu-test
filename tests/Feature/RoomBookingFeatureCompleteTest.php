@@ -102,11 +102,14 @@ test('academic admin reviews booking cards with room, program and date without t
 
 test('review keeps ongoing multi-month bookings active and archives by the last use month', function () {
     $room = $this->scenario['rooms']['a'];
+    $otherRoom = $this->scenario['rooms']['b'];
+    $room->update(['room_code' => 'KTT A-1.04']);
+    $otherRoom->update(['room_code' => 'KTT2.37']);
     $unit = Unit::create(['name' => 'Layanan Akademik']);
     $this->admin->update(['unit_id' => $unit->id]);
-    $make = function (string $purpose, array $dates, string $status) use ($room) {
+    $make = function (string $purpose, array $dates, string $status, ?Room $bookingRoom = null) use ($room) {
         $booking = RoomBookingRequest::create([
-            'user_id' => $this->admin->id, 'room_id' => $room->id, 'type' => 'recurring',
+            'user_id' => $this->admin->id, 'room_id' => ($bookingRoom ?? $room)->id, 'type' => 'recurring',
             'start_date' => $dates[0], 'end_date' => end($dates), 'start_time' => '07:00:00', 'end_time' => '08:00:00',
             'purpose' => $purpose, 'participants' => 2, 'status' => $status,
         ]);
@@ -117,9 +120,10 @@ test('review keeps ongoing multi-month bookings active and archives by the last 
         return $booking;
     };
     $previous = $make('Arsip Oktober', ['2026-10-25'], 'rejected');
+    $otherPrevious = $make('Arsip ruangan lain', ['2026-10-24'], 'approved', $otherRoom);
     $finished = $make('Selesai pagi ini', ['2026-11-19'], 'approved');
     $ongoing = $make('Peminjaman lintas bulan', ['2026-11-18', '2026-12-02'], 'approved');
-    $newest = $make('Pengajuan terbaru', ['2026-11-20'], 'pending');
+    $newest = $make('Pengajuan terbaru', ['2026-11-20'], 'pending', $otherRoom);
 
     $active = $this->actingAs($this->admin)->get(route('admin.room-bookings.review'))->assertOk()
         ->assertViewHas('bookings', fn ($bookings) => $bookings->getCollection()->modelKeys() === [$newest->id, $ongoing->id])
@@ -127,13 +131,19 @@ test('review keeps ongoing multi-month bookings active and archives by the last 
         ->assertSee('class="btn btn-primary" aria-haspopup="dialog"', false)
         ->assertSeeInOrder(['Peminjaman lintas bulan', 'Rabu, 18-Nov-2026', 'Rabu, 02-Des-2026', '07:00–08:00 WIB']);
     expect(substr_count($active->getContent(), '07:00–08:00 WIB'))->toBe(2);
+    $this->get(route('admin.room-bookings.review', ['room_code' => 'a104']))->assertOk()
+        ->assertViewHas('bookings', fn ($bookings) => $bookings->getCollection()->modelKeys() === [$ongoing->id])
+        ->assertSee('name="room_code"', false)->assertSee('value="a104"', false);
 
     $history = '/dashboard/admin/room-bookings/history';
     $this->get($history)->assertOk()->assertViewHas('month', '2026-11')
         ->assertViewHas('bookings', fn ($bookings) => $bookings->getCollection()->modelKeys() === [$finished->id])
         ->assertDontSee('Batalkan Peminjaman');
     $this->get($history.'?month=2026-10')->assertOk()
-        ->assertViewHas('bookings', fn ($bookings) => $bookings->getCollection()->modelKeys() === [$previous->id]);
+        ->assertViewHas('bookings', fn ($bookings) => $bookings->getCollection()->modelKeys() === [$otherPrevious->id, $previous->id]);
+    $this->get($history.'?month=2026-10&room_code=ktt2.37')->assertOk()->assertViewHas('month', '2026-10')
+        ->assertViewHas('bookings', fn ($bookings) => $bookings->getCollection()->modelKeys() === [$otherPrevious->id])
+        ->assertSee('value="ktt2.37"', false)->assertSee($history.'?month=2026-10');
     $this->actingAs($this->lecturer)->get($history)->assertForbidden();
 });
 

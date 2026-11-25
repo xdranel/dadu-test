@@ -23,8 +23,13 @@
                 @endif
             </div>
 
-            @if(isset($month))
-                <form method="GET" action="{{ route('admin.room-bookings.history') }}" class="campus-card flex flex-wrap items-end gap-3 p-4">
+            @php($filterRoute = isset($month) ? 'admin.room-bookings.history' : 'admin.room-bookings.review')
+            <form method="GET" action="{{ route($filterRoute) }}" class="campus-card flex flex-wrap items-end gap-3 p-4">
+                <label class="campus-label !mb-0 w-full sm:w-64" for="booking-room-code">Kode Ruangan
+                    <input id="booking-room-code" name="room_code" value="{{ $roomCode }}" maxlength="50"
+                           class="campus-input mt-1" placeholder="Cari kode ruangan">
+                </label>
+                @if(isset($month))
                     <label class="campus-label !mb-0" for="booking-history-month">Bulan
                         <select id="booking-history-month" name="month" class="campus-select mt-1 min-w-48">
                             @foreach($months as $value => $label)
@@ -32,15 +37,18 @@
                             @endforeach
                         </select>
                     </label>
+                @endif
+                <div class="flex flex-wrap gap-2">
                     <button type="submit" class="btn btn-primary">Terapkan</button>
-                </form>
-            @endif
+                    <a class="btn btn-secondary" href="{{ route($filterRoute, isset($month) ? ['month' => $month] : []) }}">Reset</a>
+                </div>
+            </form>
 
             @forelse($bookings as $booking)
                 @include('room-bookings.partials.review-card', ['history' => isset($month)])
             @empty
                 <div class="campus-card empty-state py-10">
-                    <p class="empty-state-text">{{ isset($month) ? 'Belum ada riwayat peminjaman pada bulan ini.' : 'Belum ada pengajuan peminjaman.' }}</p>
+                    <p class="empty-state-text">{{ $roomCode !== '' ? 'Tidak ada peminjaman yang cocok dengan kode ruangan.' : (isset($month) ? 'Belum ada riwayat peminjaman pada bulan ini.' : 'Belum ada pengajuan peminjaman.') }}</p>
                 </div>
             @endforelse
 
