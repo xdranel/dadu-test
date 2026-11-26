@@ -54,7 +54,7 @@
                     <h2 class="font-semibold text-slate-800">1. Berurutan</h2>
                     <p class="mt-1">Digunakan untuk peminjaman ruangan pada beberapa tanggal secara berturut-turut dengan jam penggunaan yang sama.</p>
                     <p class="mt-1">Pilih tanggal mulai dan tanggal selesai dalam rentang semester aktif.</p>
-                    <p class="mt-1 text-slate-400">Contoh: Peminjaman pada 1–3 Februari, maka ruangan akan digunakan pada tanggal 1, 2, dan 3 Februari dengan jam yang sama.</p>
+                    <p class="mt-1 text-slate-500">Contoh: Peminjaman pada 1–3 Februari, maka ruangan akan digunakan pada tanggal 1, 2, dan 3 Februari dengan jam yang sama.</p>
                 </div>
                 <div>
                     <h2 class="font-semibold text-slate-800">2. Berulang</h2>
@@ -68,7 +68,7 @@
                         <li>Setiap Senin hingga pelaksanaan UTS.</li>
                         <li>Setiap Jumat selama dua minggu.</li>
                     </ul>
-                    <p class="mt-1 text-slate-400">Catatan: Batas akhir tanggal peminjaman untuk kedua opsi tersebut adalah tanggal berakhirnya semester berjalan.</p>
+                    <p class="mt-1 text-slate-500">Catatan: Batas akhir tanggal peminjaman untuk kedua opsi tersebut adalah tanggal berakhirnya semester berjalan.</p>
                 </div>
             </div>
         </details>
