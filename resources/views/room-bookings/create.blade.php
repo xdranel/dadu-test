@@ -32,12 +32,12 @@
                 <div>
                     <h2 class="font-semibold text-slate-800">Berurutan</h2>
                     <p class="mt-1">Pilih rentang tanggal dalam semester aktif.</p>
-                    <p class="mt-1">Untuk 1–3 Februari, ruangan diperlukan pada tanggal 1, 2, dan 3 di jam yang sama.</p>
+                    <p class="mt-1">Contoh untuk tanggal 1–3 Februari, diperlukan ruangan pada tanggal 1, 2, dan 3 di jam yang sama.</p>
                 </div>
                 <div>
                     <h2 class="font-semibold text-slate-800">Berulang</h2>
                     <p class="mt-1">Pilih tanggal mulai dan selesai, lalu centang hari pemakaian.</p>
-                    <p class="mt-1">Contohnya setiap Senin dan Rabu selama satu semester, setiap Senin sampai UTS, atau setiap Jumat selama dua minggu.</p>
+                    <p class="mt-1">Contoh setiap Senin dan Rabu selama satu semester, setiap Senin sampai UTS, atau setiap Jumat selama dua minggu.</p>
                 </div>
             </div>
         </details>
