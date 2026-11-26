@@ -21,7 +21,7 @@
     @endphp
 
     <div class="mx-auto grid max-w-6xl items-start gap-4 px-4 py-6 sm:px-6 lg:grid-cols-[minmax(14rem,1fr)_minmax(0,2.5fr)]">
-        <details class="campus-card group p-4">
+        <details open class="campus-card group p-4">
             <summary class="flex cursor-pointer list-none items-center justify-between gap-3 font-semibold text-slate-800">
                 Panduan peminjaman
                 <svg class="size-4 shrink-0 transition-transform group-open:rotate-180" viewBox="0 0 20 20" fill="none" aria-hidden="true">
