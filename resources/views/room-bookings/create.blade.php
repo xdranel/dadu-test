@@ -22,22 +22,53 @@
 
     <div class="mx-auto grid max-w-6xl items-start gap-4 px-4 py-6 sm:px-6 lg:grid-cols-[minmax(14rem,1fr)_minmax(0,2.5fr)]">
         <details open class="campus-card group p-4">
-            <summary class="flex cursor-pointer list-none items-center justify-between gap-3 font-semibold text-slate-800">
-                Panduan peminjaman
-                <svg class="size-4 shrink-0 transition-transform group-open:rotate-180" viewBox="0 0 20 20" fill="none" aria-hidden="true">
-                    <path d="m5 7.5 5 5 5-5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            <summary
+                class="flex cursor-pointer list-none items-center justify-between gap-3 font-semibold text-slate-800">
+                Panduan peminjaman Ruangan
+                <svg class="size-4 shrink-0 transition-transform group-open:rotate-180" viewBox="0 0 20 20" fill="none"
+                     aria-hidden="true">
+                    <path d="m5 7.5 5 5 5-5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"
+                          stroke-linejoin="round"/>
                 </svg>
             </summary>
             <div class="mt-4 space-y-4 border-t border-slate-200 pt-4 text-sm text-slate-700">
                 <div>
-                    <h2 class="font-semibold text-slate-800">Berurutan</h2>
-                    <p class="mt-1">Pilih rentang tanggal dalam semester aktif.</p>
-                    <p class="mt-1">Contoh untuk tanggal 1–3 Februari, diperlukan ruangan pada tanggal 1, 2, dan 3 di jam yang sama.</p>
+                    <h2 class="font-semibold text-slate-800">Ketentuan Umum</h2>
+                    <ul class="mt-2 ml-5 list-disc space-y-3">
+                        <li>
+                            Peminjaman ruangan melalui aplikasi DADU hanya berlaku pada jam dan masa perkuliahan aktif.
+                            Peminjaman di luar ketentuan tersebut, termasuk libur semester, hari libur nasional, dan akhir
+                            pekan, diajukan melalui Unit Logistik.
+                        </li>
+                        <li>
+                            Fitur peminjaman ruangan pada aplikasi DADU hanya diperuntukkan bagi dosen. Peminjaman oleh
+                            mahasiswa, Unit Kegiatan Mahasiswa (UKM), dan Organisasi Mahasiswa (Ormawa) diajukan melalui
+                            Unit Logistik.
+                        </li>
+                    </ul>
                 </div>
                 <div>
-                    <h2 class="font-semibold text-slate-800">Berulang</h2>
-                    <p class="mt-1">Pilih tanggal mulai dan selesai, lalu centang hari pemakaian.</p>
-                    <p class="mt-1">Contoh setiap Senin dan Rabu selama satu semester, setiap Senin sampai UTS, atau setiap Jumat selama dua minggu.</p>
+                    <h2 class="font-semibold text-slate-800 underline">Opsi Peminjaman</h2>
+                </div>
+                <div>
+                    <h2 class="font-semibold text-slate-800">1. Berurutan</h2>
+                    <p class="mt-1">Digunakan untuk peminjaman ruangan pada beberapa tanggal secara berturut-turut dengan jam penggunaan yang sama.</p>
+                    <p class="mt-1">Pilih tanggal mulai dan tanggal selesai dalam rentang semester aktif.</p>
+                    <p class="mt-1 text-slate-400">Contoh: Peminjaman pada 1–3 Februari, maka ruangan akan digunakan pada tanggal 1, 2, dan 3 Februari dengan jam yang sama.</p>
+                </div>
+                <div>
+                    <h2 class="font-semibold text-slate-800">2. Berulang</h2>
+                    <p class="mt-1">
+                        Digunakan untuk peminjaman ruangan pada hari-hari tertentu secara berkala dalam rentang waktu yang ditentukan.
+                        Pilih tanggal mulai dan tanggal selesai, kemudian centang hari penggunaan ruangan yang diinginkan.
+                    </p>
+                    <p class="mt-1">Contoh penggunaan:</p>
+                    <ul class="mt-2 ml-5 list-disc space-y-2">
+                        <li>Setiap Senin dan Rabu selama satu semester.</li>
+                        <li>Setiap Senin hingga pelaksanaan UTS.</li>
+                        <li>Setiap Jumat selama dua minggu.</li>
+                    </ul>
+                    <p class="mt-1 text-slate-400">Catatan: Batas akhir tanggal peminjaman untuk kedua opsi tersebut adalah tanggal berakhirnya semester berjalan.</p>
                 </div>
             </div>
         </details>
