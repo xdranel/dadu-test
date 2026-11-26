@@ -1,16 +1,84 @@
 <?php
 
+use App\Models\Lecturer;
 use App\Models\RoomBookingRequest;
+use App\Models\User;
 use App\Services\SidangTaStaffScheduling;
 use Carbon\Carbon;
+use Spatie\Permission\Models\Permission;
 use Tests\Support\TaRoomScenario;
 
 beforeEach(function () {
     $this->travelTo(Carbon::parse('2026-11-19 09:00', 'Asia/Jakarta'));
     $this->s = TaRoomScenario::make();
     $this->plottingUrl = route('admin.sidang-ta-execution.plotting', $this->s['registration']);
+    $this->roomOptionsUrl = route('admin.sidang-ta-execution.plotting-rooms', $this->s['registration']);
+    Lecturer::create(['lecturer_code' => 'P01', 'name' => 'Penguji Satu']);
+    Lecturer::create(['lecturer_code' => 'P02', 'name' => 'Penguji Dua']);
     $this->plottingData = ['context_version' => 0, 'date' => '2026-11-23', 'start_time' => '12:00', 'end_time' => '12:50',
         'room_id' => $this->s['rooms']['b']->id, 'examiner_1_code' => 'P01', 'examiner_2_code' => 'P02'];
+});
+
+test('plotting rejects both unknown examiner codes without saving anything', function () {
+    $data = ['examiner_1_code' => 'UNKNOWN', 'examiner_2_code' => 'ABSENT'] + $this->plottingData;
+    $this->actingAs($this->s['reviewer'])->postJson($this->plottingUrl, $data)
+        ->assertUnprocessable()->assertJsonValidationErrors(['examiner_1_code', 'examiner_2_code']);
+    expect($this->s['registration']->roomSchedule()->exists())->toBeFalse();
+});
+
+test('plotting options and save use the same exact room availability', function () {
+    $room = $this->s['rooms']['b'];
+    $busy = RoomBookingRequest::create(['user_id' => $this->s['reviewer']->id, 'room_id' => $room->id,
+        'type' => 'single', 'start_date' => '2026-11-23', 'end_date' => '2026-11-23', 'start_time' => '12:15', 'end_time' => '13:00',
+        'purpose' => 'Kegiatan lain', 'participants' => 1, 'status' => 'approved', 'booking_origin' => 'ordinary']);
+    $busy->occurrences()->create(['usage_date' => '2026-11-23', 'start_time' => '12:15', 'end_time' => '13:00']);
+    $getOptions = fn (array $slot) => $this->getJson($this->roomOptionsUrl.'?'.http_build_query($slot));
+    $slot = ['date' => '2026-11-23', 'start_time' => '12:00', 'end_time' => '12:50'];
+    $this->actingAs($this->s['reviewer']);
+    $getOptions($slot)->assertOk()->assertJsonMissing(['id' => $room->id])->assertJsonFragment(['id' => $this->s['rooms']['a']->id]);
+    $getOptions(['start_time' => '13:00', 'end_time' => '14:00'] + $slot)->assertOk()->assertJsonFragment(['id' => $room->id]);
+    $previewUrl = route('admin.sidang-ta-execution.preview', $this->s['registration']);
+    $this->postJson($previewUrl, $slot)->assertOk()->assertJsonMissing(['room_id' => $room->id])
+        ->assertJsonFragment(['room_id' => $this->s['rooms']['a']->id]);
+    $getOptions(['date' => '2026-11-22'] + $slot)->assertUnprocessable()->assertJsonValidationErrors('date');
+    $this->postJson($this->plottingUrl, $this->plottingData)->assertUnprocessable()->assertJsonValidationErrors('room_id');
+    expect($this->s['registration']->roomSchedule()->exists())->toBeFalse();
+
+    $scheduling = app(SidangTaStaffScheduling::class);
+    $preview = $scheduling->preview($this->s['reviewer'], $this->s['registration'], $slot['date'], $slot['start_time'], $slot['end_time']);
+    $booked = $scheduling->confirm($this->s['reviewer'], $this->s['registration'], $preview['options'][0]['token']);
+    $this->postJson($previewUrl, $slot)->assertOk()->assertJsonMissing(['room_id' => $room->id])
+        ->assertJsonFragment(['room_id' => $booked->booking->room_id]);
+});
+
+test('a lecturer with program read access sees detail but cannot see plotting options or submit plotting changes', function () {
+    Permission::findOrCreate('sidang_ta_registration_view_program', 'web');
+    $lecturer = User::factory()->create(['status' => 'active']);
+    $lecturer->givePermissionTo(['sidang_ta_registration_view_program', 'sidang_ta_period_read']);
+    Lecturer::create(['lecturer_code' => 'READ', 'name' => 'Dosen Pembaca', 'email_domain' => $lecturer->email, 'study_program' => 'Informatika']);
+    $this->actingAs($lecturer)->get(route('admin.sidang-ta-execution.index'))->assertOk()
+        ->assertDontSee('Kelola Pelaksanaan')->assertDontSee('Impor plotting')->assertDontSee('Export Excel');
+    $this->get(route('admin.sidang-ta-execution.show', $this->s['registration']))->assertOk()
+        ->assertSee('Plotting Jadwal')->assertDontSee('Edit Data')->assertDontSee('Cari ketersediaan');
+    $this->getJson($this->roomOptionsUrl.'?'.http_build_query($this->plottingData))->assertForbidden();
+    $this->postJson($this->plottingUrl, $this->plottingData)->assertForbidden();
+});
+
+test('execution cancellation appears in the admin status timeline without exposing internal notes to lecturers', function () {
+    Permission::findOrCreate('sidang_ta_registration_view_program', 'web');
+    $lecturer = User::factory()->create(['status' => 'active']);
+    $lecturer->givePermissionTo('sidang_ta_registration_view_program');
+    Lecturer::create(['lecturer_code' => 'READ', 'name' => 'Dosen Pembaca', 'email_domain' => $lecturer->email, 'study_program' => 'Informatika']);
+    $scheduling = app(SidangTaStaffScheduling::class);
+    $s = $this->s;
+    $preview = $scheduling->preview($s['reviewer'], $s['registration'], '2026-11-23', '12:00', '12:50');
+    $booked = $scheduling->confirm($s['reviewer'], $s['registration'], $preview['options'][0]['token']);
+    $this->actingAs($s['reviewer'])->post(route('admin.sidang-ta-bookings.cancel', $s['registration']), [
+        'context_version' => $booked->lock_version, 'reason' => 'Catatan internal pembatalan',
+    ])->assertSessionHasNoErrors()->assertRedirect();
+    $detail = route('admin.sidang-ta-execution.show', $s['registration']);
+    $this->get($detail)->assertOk()->assertSee('Pembatalan jadwal')->assertSee('Catatan internal pembatalan');
+    $this->actingAs($lecturer)->get($detail)->assertOk()->assertSee('Pembatalan jadwal')->assertDontSee('Catatan internal pembatalan');
 });
 
 test('staff edits all plotting fields on an unassigned submission without reserving a room', function () {

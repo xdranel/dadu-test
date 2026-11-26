@@ -537,6 +537,7 @@ Route::middleware(['auth', 'password.changed'])->group(function () {
             Route::post('sidang-ta-execution/import', [SidangTaExecutionController::class, 'import'])->middleware('permission:sidang_ta_registration_review')->name('sidang-ta-execution.import');
             Route::post('sidang-ta-execution/bulk-outcome', SidangTaExecutionBulkOutcomeController::class)->middleware('permission:sidang_ta_registration_review')->name('sidang-ta-execution.bulk-outcome');
             Route::get('sidang-ta-execution/{sidang_ta_registration}', [SidangTaExecutionController::class, 'show'])->whereUuid('sidang_ta_registration')->middleware('permission:sidang_ta_registration_review|sidang_ta_registration_view_program')->name('sidang-ta-execution.show');
+            Route::get('sidang-ta-execution/{sidang_ta_registration}/plotting-rooms', [SidangTaExecutionController::class, 'plottingRooms'])->whereUuid('sidang_ta_registration')->middleware('permission:sidang_ta_registration_review')->name('sidang-ta-execution.plotting-rooms');
             foreach (['preview', 'confirm', 'outcome', 'plotting'] as $operation) {
                 Route::post('sidang-ta-execution/{sidang_ta_registration}/'.$operation, [SidangTaExecutionController::class, $operation])->whereUuid('sidang_ta_registration')->middleware('permission:sidang_ta_registration_review')->name('sidang-ta-execution.'.$operation);
             }

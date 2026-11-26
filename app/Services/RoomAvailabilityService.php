@@ -6,6 +6,7 @@ use App\Models\AcademicPeriod;
 use App\Models\RoomWeeklyPattern;
 use App\Support\RoomTimeWindows;
 use Carbon\CarbonImmutable;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -74,6 +75,16 @@ class RoomAvailabilityService
     public function forRange(string $from, string $until): array
     {
         return $this->intervals($from, $until);
+    }
+
+    public function freeRooms(Collection $rooms, string $date, string $from, string $until, ?int $exceptBookingId = null): Collection
+    {
+        $busyByRoom = $this->intervals($date, $date, $exceptBookingId)[$date];
+        $start = RoomTimeWindows::minutes($from);
+        $end = RoomTimeWindows::minutes($until, true);
+
+        return $rooms->reject(fn ($room) => collect($busyByRoom[$room->id] ?? [])
+            ->contains(fn ($period) => $period['start'] < $end && $period['end'] > $start));
     }
 
     public function teachingOccurrences(string $date, ?int $roomId = null): array

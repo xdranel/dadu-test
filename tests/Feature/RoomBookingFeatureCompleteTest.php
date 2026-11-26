@@ -119,7 +119,7 @@ test('review keeps ongoing multi-month bookings active and archives by the last 
 
         return $booking;
     };
-    $previous = $make('Arsip Oktober', ['2026-10-25'], 'rejected');
+    $previous = $make('Arsip Oktober', ['2026-10-22', '2026-10-25'], 'rejected');
     $otherPrevious = $make('Arsip ruangan lain', ['2026-10-24'], 'approved', $otherRoom);
     $finished = $make('Selesai pagi ini', ['2026-11-19'], 'approved');
     $ongoing = $make('Peminjaman lintas bulan', ['2026-11-18', '2026-12-02'], 'approved');
@@ -144,6 +144,40 @@ test('review keeps ongoing multi-month bookings active and archives by the last 
     $this->get($history.'?month=2026-10&room_code=ktt2.37')->assertOk()->assertViewHas('month', '2026-10')
         ->assertViewHas('bookings', fn ($bookings) => $bookings->getCollection()->modelKeys() === [$otherPrevious->id])
         ->assertSee('value="ktt2.37"', false)->assertSee($history.'?month=2026-10');
+
+    $activeFilters = ['room_code' => 'a104', 'date' => '2026-11-18'];
+    $this->get(route('admin.room-bookings.review', $activeFilters))->assertOk()
+        ->assertViewHas('bookings', function ($bookings) use ($ongoing, $activeFilters) {
+            parse_str(parse_url($bookings->url(2), PHP_URL_QUERY), $query);
+
+            return $bookings->getCollection()->modelKeys() === [$ongoing->id]
+                && $query === $activeFilters + ['page' => '2'];
+        })
+        ->assertSee('name="date" value="2026-11-18"', false)
+        ->assertSee(route('admin.room-bookings.history', $activeFilters));
+    $this->get(route('admin.room-bookings.review', ['room_code' => 'a104', 'date' => '2026-11-20']))->assertOk()
+        ->assertViewHas('bookings', fn ($bookings) => $bookings->isEmpty());
+    $this->get(route('admin.room-bookings.review', ['date' => '2026-11-20']))->assertOk()
+        ->assertViewHas('bookings', fn ($bookings) => $bookings->getCollection()->modelKeys() === [$newest->id]);
+
+    $historyFilters = ['room_code' => 'a104', 'date' => '2026-10-22'];
+    $this->get(route('admin.room-bookings.history', $historyFilters))->assertOk()->assertViewHas('month', '2026-10')
+        ->assertViewHas('bookings', function ($bookings) use ($previous, $historyFilters) {
+            parse_str(parse_url($bookings->url(2), PHP_URL_QUERY), $query);
+
+            return $bookings->getCollection()->modelKeys() === [$previous->id]
+                && $query === ['month' => '2026-10'] + $historyFilters + ['page' => '2'];
+        })
+        ->assertSee(route('admin.room-bookings.review', $historyFilters));
+    $this->get(route('admin.room-bookings.history', ['month' => '2026-10', 'room_code' => 'a104', 'date' => '2026-10-23']))->assertOk()
+        ->assertViewHas('bookings', fn ($bookings) => $bookings->isEmpty());
+    $this->get(route('admin.room-bookings.history', ['month' => '2026-11'] + $historyFilters))->assertOk()->assertViewHas('month', '2026-11')
+        ->assertViewHas('bookings', fn ($bookings) => $bookings->isEmpty());
+    $this->get(route('admin.room-bookings.history', ['date' => '2026-12-02']))->assertOk()->assertViewHas('month', '2026-11')
+        ->assertViewHas('bookings', fn ($bookings) => $bookings->isEmpty());
+    $this->getJson(route('admin.room-bookings.review', ['date' => '2026-11-31']))->assertUnprocessable()->assertJsonValidationErrors('date');
+    $this->getJson(route('admin.room-bookings.history', ['date' => '2026-11-31']))->assertUnprocessable()->assertJsonValidationErrors('date');
+
     $this->actingAs($this->lecturer)->get($history)->assertForbidden();
 });
 

@@ -11,26 +11,31 @@
             </div>
         @endif
 
+        @php($bookingFilters = \Illuminate\Support\Arr::only($filters, ['room_code', 'date']))
         <section class="space-y-4" aria-labelledby="booking-requests-heading">
             <div class="flex flex-wrap items-center justify-between gap-3">
                 <h2 id="booking-requests-heading" class="text-lg font-bold text-slate-800">
                     {{ isset($month) ? 'Riwayat Peminjaman' : 'Daftar Pengajuan' }}
                 </h2>
                 @if(isset($month))
-                    <a class="btn btn-secondary" href="{{ route('admin.room-bookings.review') }}">Kembali ke Daftar Pengajuan</a>
+                    <a class="btn btn-secondary" href="{{ route('admin.room-bookings.review', $bookingFilters) }}">Kembali ke Daftar Pengajuan</a>
                 @else
-                    <a class="btn btn-secondary" href="{{ route('admin.room-bookings.history') }}">Riwayat</a>
+                    <a class="btn btn-secondary" href="{{ route('admin.room-bookings.history', $bookingFilters) }}">Riwayat</a>
                 @endif
             </div>
 
             @php($filterRoute = isset($month) ? 'admin.room-bookings.history' : 'admin.room-bookings.review')
             <form method="GET" action="{{ route($filterRoute) }}" class="campus-card flex flex-wrap items-end gap-3 p-4">
                 <label class="campus-label !mb-0 w-full sm:w-64" for="booking-room-code">Kode Ruangan
-                    <input id="booking-room-code" name="room_code" value="{{ $roomCode }}" maxlength="50"
+                    <input id="booking-room-code" name="room_code" value="{{ $filters['room_code'] ?? '' }}" maxlength="50"
                            class="campus-input mt-1" placeholder="Cari kode ruangan">
                 </label>
+                <label class="campus-label !mb-0" for="booking-usage-date">Tanggal Penggunaan
+                    <input id="booking-usage-date" type="date" name="date" value="{{ $filters['date'] ?? '' }}"
+                           class="campus-input mt-1">
+                </label>
                 @if(isset($month))
-                    <label class="campus-label !mb-0" for="booking-history-month">Bulan
+                    <label class="campus-label !mb-0" for="booking-history-month">Bulan Arsip
                         <select id="booking-history-month" name="month" class="campus-select mt-1 min-w-48">
                             @foreach($months as $value => $label)
                                 <option value="{{ $value }}" @selected($month === $value)>{{ $label }}</option>
@@ -48,7 +53,7 @@
                 @include('room-bookings.partials.review-card', ['history' => isset($month)])
             @empty
                 <div class="campus-card empty-state py-10">
-                    <p class="empty-state-text">{{ $roomCode !== '' ? 'Tidak ada peminjaman yang cocok dengan kode ruangan.' : (isset($month) ? 'Belum ada riwayat peminjaman pada bulan ini.' : 'Belum ada pengajuan peminjaman.') }}</p>
+                    <p class="empty-state-text">{{ filled($filters['room_code'] ?? null) || filled($filters['date'] ?? null) ? 'Tidak ada peminjaman yang cocok dengan filter.' : (isset($month) ? 'Belum ada riwayat peminjaman pada bulan ini.' : 'Belum ada pengajuan peminjaman.') }}</p>
                 </div>
             @endforelse
 

@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\SaveSidangTaExecutionRequest;
 use App\Models\AcademicPeriod;
+use App\Models\Lecturer;
 use App\Models\Room;
 use App\Models\SidangTaPeriod;
 use App\Models\SidangTaRegistration;
@@ -54,22 +55,21 @@ class SidangTaExecutionController extends Controller
     {
         $registration->load('period.executionSetting', 'roomSchedule.booking.occurrences', 'roomSchedule.booking.room');
         $info = $service->forRegistration($registration);
-        $events = app(SidangTaHistoryPresenter::class)->forExecution($registration, staff: true);
-        $rooms = Room::bookableClassrooms()->orderBy('room_code')->get();
+        $canReview = request()->user()->can('sidang_ta_registration_review');
+        $events = app(SidangTaHistoryPresenter::class)->forExecution($registration, staff: $canReview);
+        $rooms = $canReview ? Room::bookableClassrooms()->orderBy('room_code')->get() : collect();
         $preferredRoomId = $registration->roomSchedule?->preferred_room_id;
-        if ($preferredRoomId && ! $rooms->contains('id', $preferredRoomId)) {
+        if ($canReview && $preferredRoomId && ! $rooms->contains('id', $preferredRoomId)) {
             $preferred = Room::where('label', 'LAB')->where('status', 'Dapat Dipakai')->find($preferredRoomId);
             if ($preferred) {
                 $rooms->push($preferred);
             }
         }
-        $editRooms = $rooms->toBase();
-        $assignedRoom = $registration->roomSchedule?->booking?->room;
-        if ($assignedRoom && ! $editRooms->contains('id', $assignedRoom->id)) {
-            $editRooms = $editRooms->concat([$assignedRoom]);
-        }
+        $examiners = $canReview
+            ? Lecturer::whereNotNull('lecturer_code')->where('lecturer_code', '<>', '')->orderBy('lecturer_code')->pluck('name', 'lecturer_code')
+            : collect();
 
-        return view('sidang_ta_execution.admin.show', compact('registration', 'info', 'preview', 'rooms', 'editRooms', 'events'));
+        return view('sidang_ta_execution.admin.show', compact('registration', 'info', 'preview', 'rooms', 'examiners', 'events'));
     }
 
     public function preview(Request $request, SidangTaRegistration $sidang_ta_registration, SidangTaStaffScheduling $service, SidangTaExecutionInfoService $info)
@@ -96,6 +96,17 @@ class SidangTaExecutionController extends Controller
         return redirect()->route('admin.sidang-ta-execution.show', $sidang_ta_registration)->with('success', 'Jadwal sidang telah ditetapkan.');
     }
 
+    public function plottingRooms(Request $request, SidangTaRegistration $sidang_ta_registration, SidangTaStaffScheduling $service)
+    {
+        $slot = $request->validate([
+            'date' => ['required', 'date_format:Y-m-d'],
+            'start_time' => ['required', 'date_format:H:i'],
+            'end_time' => ['required', 'date_format:H:i', 'after:start_time'],
+        ]);
+
+        return response()->json($service->plottingRooms($request->user(), $sidang_ta_registration, $slot), headers: ['Cache-Control' => 'private, no-store']);
+    }
+
     public function outcome(Request $request, SidangTaRegistration $sidang_ta_registration, SidangTaExecutionOutcomeService $service)
     {
         $data = $request->validate(['status' => ['required', 'in:pending,passed,failed'], 'context_version' => ['required', 'integer', 'min:0'], 'notes' => ['nullable', 'string', 'max:2000']]);
@@ -115,6 +126,9 @@ class SidangTaExecutionController extends Controller
             'examiner_1_code' => ['present', 'nullable', 'string', 'max:255'],
             'examiner_2_code' => ['present', 'nullable', 'string', 'max:255'],
             'reason' => ['nullable', 'string', 'max:2000'],
+        ], [
+            'examiner_1_code.present' => 'Pilih kode Penguji 1 yang terdaftar atau kosongkan pilihannya.',
+            'examiner_2_code.present' => 'Pilih kode Penguji 2 yang terdaftar atau kosongkan pilihannya.',
         ]);
         $service->editPlotting($request->user(), $sidang_ta_registration, $data);
 

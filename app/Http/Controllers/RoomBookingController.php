@@ -27,6 +27,11 @@ use Illuminate\Validation\ValidationException;
 
 class RoomBookingController extends Controller
 {
+    private const REVIEW_FILTER_RULES = [
+        'room_code' => ['nullable', 'string', 'max:50'],
+        'date' => ['nullable', 'date_format:Y-m-d'],
+    ];
+
     private function isReviewer(User $user): bool
     {
         return $user->hasRole('Akademik') || $user->can('room_booking_review');
@@ -329,23 +334,19 @@ class RoomBookingController extends Controller
     public function review(Request $request, RoomBookingIdentity $identity)
     {
         abort_unless($this->isReviewer($request->user()), 403);
-        $data = $request->validate(['room_code' => ['nullable', 'string', 'max:50']]);
-        $roomCode = $data['room_code'] ?? '';
-        $bookings = $this->reviewBookings($roomCode)->awaitingUse()->paginate(20)->appends($data);
+        $filters = $request->validate(self::REVIEW_FILTER_RULES);
+        $bookings = $this->reviewBookings($filters)->awaitingUse()->paginate(20)->appends($filters);
 
-        return view('room-bookings.review', compact('bookings', 'identity', 'roomCode'));
+        return view('room-bookings.review', compact('bookings', 'identity', 'filters'));
     }
 
     public function reviewHistory(Request $request, RoomBookingIdentity $identity)
     {
         abort_unless($this->isReviewer($request->user()), 403);
-        $data = $request->validate([
+        $filters = $request->validate(self::REVIEW_FILTER_RULES + [
             'month' => ['nullable', 'date_format:Y-m'],
-            'room_code' => ['nullable', 'string', 'max:50'],
         ]);
-        $roomCode = $data['room_code'] ?? '';
         $current = now('Asia/Jakarta')->startOfMonth();
-        $month = $data['month'] ?? $current->format('Y-m');
         $earliestDate = Booking::min('start_date');
         $periodStart = AcademicPeriod::current()?->start_date?->toDateString();
         $first = Carbon::parse(min($earliestDate ?? $current->toDateString(), $periodStart ?? $current->toDateString()), 'Asia/Jakarta')->startOfMonth();
@@ -353,19 +354,24 @@ class RoomBookingController extends Controller
         for ($cursor = $current->copy(); $cursor->gte($first); $cursor->subMonthNoOverflow()) {
             $months[$cursor->format('Y-m')] = $cursor->locale('id')->translatedFormat('F Y');
         }
+        $dateMonth = substr($filters['date'] ?? '', 0, 7);
+        $month = $filters['month'] ?? (isset($months[$dateMonth]) ? $dateMonth : $current->format('Y-m'));
         abort_unless(isset($months[$month]), 404);
         $selected = Carbon::createFromFormat('!Y-m', $month, 'Asia/Jakarta');
-        $bookings = $this->reviewBookings($roomCode)
+        $bookings = $this->reviewBookings($filters)
             ->whereNot(fn ($query) => $query->awaitingUse())
             ->lastUseInMonth($selected->toDateString(), $selected->copy()->endOfMonth()->toDateString())
-            ->paginate(20)->appends(['month' => $month] + $data);
+            ->paginate(20)->appends(['month' => $month] + $filters);
 
-        return view('room-bookings.review', compact('bookings', 'identity', 'month', 'months', 'roomCode'));
+        return view('room-bookings.review', compact('bookings', 'identity', 'month', 'months', 'filters'));
     }
 
-    private function reviewBookings(string $roomCode): EloquentBuilder
+    private function reviewBookings(array $filters): EloquentBuilder
     {
-        $query = Booking::with(['room', 'user.unit', 'occurrences'])->latest()->orderByDesc('id');
+        $query = Booking::with(['room', 'user.unit', 'occurrences'])->latest()->orderByDesc('id')
+            ->when($filters['date'] ?? null, fn (EloquentBuilder $query, string $date) => $query
+                ->whereHas('occurrences', fn (EloquentBuilder $occurrences) => $occurrences->whereDate('usage_date', $date)));
+        $roomCode = $filters['room_code'] ?? '';
         if ($roomCode === '') {
             return $query;
         }

@@ -42,6 +42,7 @@ test('plotting editor appears on eligible staff detail with the imported values 
     $s = $this->s;
     $s['rooms']['lab']->update(['label' => 'LAB']);
     $s['rooms']['unknown']->update(['label' => 'LAB']);
+    Lecturer::create(['lecturer_code' => 'EX1', 'name' => 'Penguji Satu']);
     $s['registration']->roomSchedule()->create([
         'student_number' => $s['student']->student_number,
         'planning_source' => 'import',
@@ -57,9 +58,12 @@ test('plotting editor appears on eligible staff detail with the imported values 
     expect($editor->attr('action'))->toBe(route('admin.sidang-ta-execution.plotting', $s['registration']))
         ->and($editor->filter('input[name="date"]')->attr('value'))->toBe('2026-11-24')
         ->and($editor->filter('input[name="start_time"]')->attr('value'))->toBe('08:30')
-        ->and($editor->filter('select[name="room_id"] option[selected]')->attr('value'))->toBe((string) $s['rooms']['lab']->id)
-        ->and($editor->filter('select[name="room_id"] option[value="'.$s['rooms']['unknown']->id.'"]')->count())->toBe(0)
-        ->and($editor->filter('input[name="examiner_1_code"]')->attr('value'))->toBe('EX1');
+        ->and($editor->attr('x-data'))->toContain('sidang-ta-execution', 'plotting-rooms')
+        ->and($editor->filter('select[name="examiner_1_code"] option[selected]')->attr('value'))->toBe('EX1');
+
+    $roomOptions = route('admin.sidang-ta-execution.plotting-rooms', $s['registration']);
+    $this->getJson($roomOptions.'?date=2026-11-24&start_time=08:30&end_time=09:40')->assertOk()
+        ->assertJsonFragment(['id' => $s['rooms']['lab']->id])->assertJsonMissing(['id' => $s['rooms']['unknown']->id]);
 
     $this->actingAs($s['owner'])->get(route('sidang-ta-execution.show', $s['registration']))->assertOk()->assertDontSee('Edit Data');
     $s['settings']->update(['is_active' => false]);

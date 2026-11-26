@@ -28,9 +28,16 @@ class SidangTaBookingLifecycle
         $occurrences = $lockedBooking->occurrences;
         $completed = $lockedBooking->status === 'approved' && $occurrences->isNotEmpty()
             && $occurrences->every(fn ($o) => $o->usage_date->toDateString().' '.$o->end_time <= now('Asia/Jakarta')->format('Y-m-d H:i:s'));
+        $previousState = $context->state;
         $context->fill(['state' => match ($lockedBooking->status) {
             'pending' => 'pending_lecturer','approved' => $completed ? 'completed' : 'confirmed','rejected' => 'rejected',default => 'cancelled'
         }, 'active_student_number' => $booked && ! $completed ? $context->student_number : null, 'was_confirmed' => $context->was_confirmed || $lockedBooking->status === 'approved', 'lock_version' => $context->lock_version + 1])->save();
+        if ($context->state === 'cancelled' && $previousState !== 'cancelled') {
+            $context->executionLogs()->create([
+                'action' => 'cancelled', 'from_status' => $previousState, 'to_status' => $context->state,
+                'notes' => $note, 'performed_by' => $actor->id, 'performed_at' => now(),
+            ]);
+        }
         $lockedBooking->registration->logAction('schedule_updated', $lockedBooking->status, $lockedBooking->status, $note ?: 'Status peminjaman jadwal sidang diperbarui.', $actor->id);
     }
 

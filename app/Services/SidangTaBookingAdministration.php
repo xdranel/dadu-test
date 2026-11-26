@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\Lecturer;
 use App\Models\Room;
 use App\Models\RoomBookingRequest;
 use App\Models\SidangTaExecutionSetting;
@@ -160,11 +161,15 @@ class SidangTaBookingAdministration
             $slot = ['date' => $data['date'], 'start_time' => $data['start_time'], 'end_time' => $data['end_time'], 'room_id' => isset($data['room_id']) ? (int) $data['room_id'] : null];
             $preferred = ['date' => $c->preferred_date?->toDateString(), 'start_time' => substr((string) $c->preferred_start_time, 0, 5), 'end_time' => substr((string) $c->preferred_end_time, 0, 5), 'room_id' => $c->preferred_room_id];
             $current = $confirmed ? ['date' => $occurrence->usage_date->toDateString(), 'start_time' => substr($occurrence->start_time, 0, 5), 'end_time' => substr($occurrence->end_time, 0, 5), 'room_id' => $booking->room_id] : $preferred;
+            if ($confirmed && $slot['room_id'] === null && array_replace($slot, ['room_id' => $current['room_id']]) === $current) {
+                $slot['room_id'] = $current['room_id'];
+            }
+            $examinerCodes = $this->examinerCodes($data);
 
             if ($slot !== $current || ! $confirmed) {
                 app(SidangTaExecutionWindowService::class)->assertStaffSlot($s, $slot['date'], $slot['start_time'], $slot['end_time']);
                 $room = $slot['room_id'] ? Room::findOrFail($slot['room_id']) : null;
-                $importedLab = $c->planning_source === 'import' && $slot === $preferred && $room?->label === 'LAB' && $room->status === 'Dapat Dipakai';
+                $importedLab = $room?->label === 'LAB' && app(SidangTaStaffScheduling::class)->importedLab($c, $slot)?->id === $room->id;
                 if (($confirmed || $room) && ! $room?->isBookableClassroom() && ! $importedLab) {
                     throw ValidationException::withMessages(['room_id' => 'Pilih ruang kelas yang dapat dipakai. Penetapan LAB mengikuti tanggal dan jam dari impor Excel.']);
                 }
@@ -178,13 +183,12 @@ class SidangTaBookingAdministration
                     }
                     $this->moveBooking($actor, $booking, $s, $slot, $reason, $importedLab);
                     $c = $c->fresh();
+                } elseif ($room) {
+                    $this->validateSlot($s, $slot, staff: true, allowImportedLab: $importedLab);
                 }
             }
 
-            $participant = array_replace($c->participant_data ?? [], [
-                'examiner_1_code' => $data['examiner_1_code'] ?? '',
-                'examiner_2_code' => $data['examiner_2_code'] ?? '',
-            ]);
+            $participant = array_replace($c->participant_data ?? [], $examinerCodes);
             $c->fill(['participant_data' => $participant, 'preferred_date' => $slot['date'], 'preferred_start_time' => $slot['start_time'].':00',
                 'preferred_end_time' => $slot['end_time'].':00', 'preferred_room_id' => $slot['room_id'],
                 'planning_source' => $slot === $preferred ? $c->planning_source : 'system'])->save();
@@ -194,6 +198,25 @@ class SidangTaBookingAdministration
 
             return $c;
         }, plotting: true);
+    }
+
+    private function examinerCodes(array $data): array
+    {
+        $codes = ['examiner_1_code' => $data['examiner_1_code'] ?? '', 'examiner_2_code' => $data['examiner_2_code'] ?? ''];
+        $registered = Lecturer::whereIn('lecturer_code', array_filter($codes, fn ($code) => $code !== ''))
+            ->sharedLock()->pluck('lecturer_code');
+        $errors = [];
+        foreach ($codes as $field => $code) {
+            if ($code !== '' && ! $registered->containsStrict($code)) {
+                $number = $field === 'examiner_1_code' ? 1 : 2;
+                $errors[$field] = 'Pilih kode Penguji '.$number.' yang terdaftar di Data Akademik → Dosen.';
+            }
+        }
+        if ($errors !== []) {
+            throw ValidationException::withMessages($errors);
+        }
+
+        return $codes;
     }
 
     private function moveBooking(User $actor, RoomBookingRequest $booking, ?SidangTaExecutionSetting $setting, array $slot, string $reason, bool $allowImportedLab = false): void
