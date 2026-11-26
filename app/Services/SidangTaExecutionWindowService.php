@@ -17,11 +17,6 @@ use Illuminate\Validation\ValidationException;
 
 class SidangTaExecutionWindowService
 {
-    public function forStaffScheduling(SidangTaExecutionSetting $setting): SidangTaExecutionSetting
-    {
-        return (clone $setting)->forceFill(['duration_minutes' => 90, 'break_start_time' => null, 'break_end_time' => null]);
-    }
-
     public function windows(SidangTaExecutionSetting $s): array
     {
         $start = W::minutes($s->start_time);
@@ -32,10 +27,9 @@ class SidangTaExecutionWindowService
 
     public function assertSlot(SidangTaExecutionSetting $s, string $date, string $start, string $end, bool $enforceDuration = true): void
     {
-        $d = CarbonImmutable::parse($date, 'Asia/Jakarta');
         $a = W::minutes($start);
         $b = W::minutes($end, true);
-        $ok = $date >= $s->start_date->toDateString() && $date <= $s->end_date->toDateString() && in_array($d->dayOfWeekIso, array_map('intval', $s->allowed_weekdays), true) && $b > $a;
+        $ok = $this->includesDay($s, $date) && $b > $a;
         $fits = false;
         foreach ($this->windows($s) as $w) {
             if ($a >= $w['start'] && $b <= $w['end']) {
@@ -45,6 +39,25 @@ class SidangTaExecutionWindowService
         if (! $ok || ! $fits || ($enforceDuration && $b - $a !== $s->duration_minutes)) {
             throw ValidationException::withMessages(['schedule' => 'Jadwal di luar tanggal/hari/jam pelaksanaan atau melewati istirahat/durasi.']);
         }
+    }
+
+    public function assertStaffSlot(SidangTaExecutionSetting $setting, string $date, string $start, string $end): void
+    {
+        if (! $this->includesDay($setting, $date)) {
+            throw ValidationException::withMessages(['date' => 'Pilih tanggal dan hari dalam rentang pelaksanaan yang diaktifkan.']);
+        }
+
+        $startMinute = W::minutes($start);
+        $endMinute = W::minutes($end, true);
+        if ($startMinute < W::minutes($setting->start_time) || $endMinute > W::minutes($setting->end_time) || $startMinute >= $endMinute) {
+            throw ValidationException::withMessages(['end_time' => 'Jam mulai dan selesai harus berurutan dan berada dalam jam pelaksanaan.']);
+        }
+    }
+
+    private function includesDay(SidangTaExecutionSetting $setting, string $date): bool
+    {
+        return $date >= $setting->start_date->toDateString() && $date <= $setting->end_date->toDateString()
+            && in_array(CarbonImmutable::parse($date, 'Asia/Jakarta')->dayOfWeekIso, array_map('intval', $setting->allowed_weekdays), true);
     }
 
     public function save(User $actor, SidangTaPeriod $period, array $values, int $version): SidangTaExecutionSetting
@@ -65,7 +78,7 @@ class SidangTaExecutionWindowService
             if ($candidate->break_start_time && (W::minutes($candidate->break_start_time) < W::minutes($candidate->start_time) || W::minutes($candidate->break_end_time) > W::minutes($candidate->end_time))) {
                 throw ValidationException::withMessages(['break_start_time' => 'Istirahat harus berada dalam jam pelaksanaan.']);
             }
-            if (! collect($this->windows($candidate))->contains(fn ($w) => $candidate->duration_minutes <= $w['end'] - $w['start'])) {
+            if (isset($v['duration_minutes']) && ! collect($this->windows($candidate))->contains(fn ($w) => $candidate->duration_minutes <= $w['end'] - $w['start'])) {
                 throw ValidationException::withMessages(['duration_minutes' => 'Durasi harus muat tanpa melewati istirahat.']);
             }
             Room::orderBy('id')->lockForUpdate()->get();
@@ -73,7 +86,11 @@ class SidangTaExecutionWindowService
             foreach ($bookings as $b) {
                 foreach ($b->occurrences as $o) {
                     if ($o->usage_date->toDateString().' '.$o->end_time >= now()->format('Y-m-d H:i:s')) {
-                        $this->assertSlot($candidate, $o->usage_date->toDateString(), $o->start_time, $o->end_time, false);
+                        if (isset($v['duration_minutes'])) {
+                            $this->assertSlot($candidate, $o->usage_date->toDateString(), $o->start_time, $o->end_time, false);
+                        } else {
+                            $this->assertStaffSlot($candidate, $o->usage_date->toDateString(), $o->start_time, $o->end_time);
+                        }
                     }
                 }
             }

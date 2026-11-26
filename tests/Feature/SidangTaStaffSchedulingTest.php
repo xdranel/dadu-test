@@ -25,18 +25,23 @@ function staffSchedulingBlock(array $s, array $candidate): RoomBookingRequest
     return $b;
 }
 
-test('staff options prefer imported room and time but offer other free classroom slots including lunch', function () {
+test('staff searches the exact interval and recommends Gedung A before an imported Gedung B class', function () {
     $s = $this->s;
+    $s['rooms']['a']->update(['building' => 'TUS-GEDUNG A']);
+    $s['rooms']['b']->update(['building' => 'TUS-GEDUNG B']);
+    $s['rooms']['lab']->update(['label' => 'LAB']);
     $s['registration']->roomSchedule()->create(['student_number' => $s['student']->student_number,
-        'preferred_date' => '2026-11-23', 'preferred_start_time' => '12:00', 'preferred_room_id' => $s['rooms']['b']->id]);
-    $p = app(SidangTaStaffScheduling::class)->preview($s['reviewer'], $s['registration'], '2026-11-23');
-    expect($p['options'][0]['candidate']['room_id'])->toBe($s['rooms']['b']->id)
+        'preferred_date' => '2026-11-23', 'preferred_start_time' => '12:00', 'preferred_end_time' => '12:45', 'preferred_room_id' => $s['rooms']['b']->id]);
+    $p = app(SidangTaStaffScheduling::class)->preview($s['reviewer'], $s['registration'], '2026-11-23', '12:00', '12:45');
+    expect($p['options'][0]['candidate']['room_id'])->toBe($s['rooms']['a']->id)
         ->and(substr($p['options'][0]['candidate']['start_time'], 0, 5))->toBe('12:00')
         ->and($p['options'][0]['recommended'])->toBeTrue();
     expect(collect($p['options'])->pluck('candidate.room_id')->unique()->sort()->values()->all())
-        ->toBe(collect($s['rooms'])->pluck('id')->sort()->values()->all());
+        ->toBe(collect($s['rooms'])->except('lab')->pluck('id')->sort()->values()->all());
     foreach ($p['options'] as $option) {
-        expect($option['candidate']['duration_minutes'])->toBe(90);
+        expect($option['candidate']['start_time'])->toBe('12:00:00')
+            ->and($option['candidate']['end_time'])->toBe('12:45:00')
+            ->and($option['candidate']['duration_minutes'])->toBe(45);
     }
     expect(RoomBookingRequest::count())->toBe(0);
 });
@@ -44,7 +49,7 @@ test('staff options prefer imported room and time but offer other free classroom
 test('staff can choose a non recommended slot and it is immediately approved with a frozen info snapshot', function () {
     $s = $this->s;
     $service = app(SidangTaStaffScheduling::class);
-    $p = $service->preview($s['reviewer'], $s['registration'], '2026-11-23');
+    $p = $service->preview($s['reviewer'], $s['registration'], '2026-11-23', '12:00', '14:00');
     $selected = collect($p['options'])->first(fn ($o) => $o['candidate']['room_id'] === $s['rooms']['b']->id && str_starts_with($o['candidate']['start_time'], '12:00'));
     expect($selected)->not->toBeNull();
     $c = $service->confirm($s['reviewer'], $s['registration'], $selected['token']);
@@ -53,13 +58,13 @@ test('staff can choose a non recommended slot and it is immediately approved wit
     expect($s['registration']->fresh()->status)->toBe('approved');
 });
 
-test('staff can move an existing booking into an offered ninety minute slot on a legacy period', function () {
+test('staff can move an existing booking into an explicit interval on a legacy period', function () {
     $s = $this->s;
     $s['settings']->update(['duration_minutes' => 120, 'break_start_time' => '12:00', 'break_end_time' => '13:00']);
     $service = app(SidangTaStaffScheduling::class);
-    $original = $service->preview($s['reviewer'], $s['registration'], '2026-11-23')['options'][0];
+    $original = $service->preview($s['reviewer'], $s['registration'], '2026-11-23', '08:00', '09:30')['options'][0];
     $before = $service->confirm($s['reviewer'], $s['registration'], $original['token']);
-    $preview = $service->preview($s['reviewer'], $s['registration'], '2026-11-24');
+    $preview = $service->preview($s['reviewer'], $s['registration'], '2026-11-24', '12:00', '13:45');
     $replacement = collect($preview['options'])->first(fn ($option) => $option['candidate']['start_time'] === '12:00:00');
     expect($replacement)->not->toBeNull();
 
@@ -68,14 +73,51 @@ test('staff can move an existing booking into an offered ninety minute slot on a
     expect($after->booking->id)->toBe($before->booking->id)
         ->and($occurrence->usage_date->toDateString())->toBe('2026-11-24')
         ->and(substr($occurrence->start_time, 0, 5))->toBe('12:00')
-        ->and(substr($occurrence->end_time, 0, 5))->toBe('13:30')
+        ->and(substr($occurrence->end_time, 0, 5))->toBe('13:45')
         ->and($s['settings']->fresh()->duration_minutes)->toBe(120);
+});
+
+test('staff can assign a past imported lab only at the original slot and record the result', function () {
+    $s = $this->s;
+    $lab = $s['rooms']['lab'];
+    $lab->update(['label' => 'LAB']);
+    $s['registration']->roomSchedule()->create(['student_number' => $s['student']->student_number,
+        'planning_source' => 'import', 'preferred_date' => '2026-11-23',
+        'preferred_start_time' => '10:00:00', 'preferred_end_time' => '11:05:00', 'preferred_room_id' => $lab->id]);
+    $this->travelTo(Carbon::parse('2026-11-30 09:00:00', 'Asia/Jakarta'));
+    $service = app(SidangTaStaffScheduling::class);
+    expect(fn () => $service->preview($s['reviewer'], $s['registration'], '2026-11-23', '10:00', '11:30', true))->toThrow(ValidationException::class);
+    $normal = $service->preview($s['reviewer'], $s['registration'], '2026-11-23', '10:00', '11:05');
+    expect(collect($normal['options'])->pluck('candidate.room_id'))->not->toContain($lab->id);
+    $imported = $service->preview($s['reviewer'], $s['registration'], '2026-11-23', '10:00', '11:05', true);
+    expect($imported['options'])->toHaveCount(1)->and($imported['options'][0]['candidate']['room_id'])->toBe($lab->id);
+    $context = $service->confirm($s['reviewer'], $s['registration'], $imported['options'][0]['token']);
+    expect($context->state)->toBe('completed')->and($context->active_student_number)->toBeNull()
+        ->and($context->details_snapshot['room'])->toBe($lab->room_code);
+    $context = app(\App\Services\SidangTaExecutionOutcomeService::class)->set($s['reviewer'], $s['registration'], 'passed', $context->lock_version);
+    expect($context->result_status)->toBe('passed');
+});
+
+test('staff can search the past again to correct a confirmed room assignment', function () {
+    $s = $this->s;
+    $service = app(SidangTaStaffScheduling::class);
+    $original = $service->preview($s['reviewer'], $s['registration'], '2026-11-23', '08:00', '09:30');
+    $before = $service->confirm($s['reviewer'], $s['registration'], $original['options'][0]['token']);
+    $this->travelTo(Carbon::parse('2026-11-30 09:00:00', 'Asia/Jakarta'));
+
+    $search = $service->preview($s['reviewer'], $s['registration'], '2026-11-24', '10:15', '11:00');
+    $after = $service->confirm($s['reviewer'], $s['registration'], $search['options'][0]['token']);
+    expect($after->booking->id)->toBe($before->booking->id)
+        ->and($after->state)->toBe('completed')
+        ->and($after->details_snapshot['date'])->toBe('2026-11-24')
+        ->and($after->details_snapshot['start_time'])->toBe('10:15')
+        ->and($after->details_snapshot['end_time'])->toBe('11:00');
 });
 
 test('a room taken after preview rejects the chosen token without silently using another slot', function () {
     $s = $this->s;
     $service = app(SidangTaStaffScheduling::class);
-    $option = $service->preview($s['reviewer'], $s['registration'], '2026-11-23')['options'][0];
+    $option = $service->preview($s['reviewer'], $s['registration'], '2026-11-23', '08:00', '09:30')['options'][0];
     staffSchedulingBlock($s, $option['candidate']);
     expect(fn () => $service->confirm($s['reviewer'], $s['registration'], $option['token']))
         ->toThrow(HttpException::class);
@@ -85,9 +127,9 @@ test('a room taken after preview rejects the chosen token without silently using
 test('student and a different admin cannot reuse a scheduling token and changed settings invalidate it', function () {
     $s = $this->s;
     $service = app(SidangTaStaffScheduling::class);
-    expect(fn () => $service->preview($s['owner'], $s['registration'], '2026-11-23'))
+    expect(fn () => $service->preview($s['owner'], $s['registration'], '2026-11-23', '08:00', '09:30'))
         ->toThrow(HttpException::class);
-    $token = $service->preview($s['reviewer'], $s['registration'], '2026-11-23')['options'][0]['token'];
+    $token = $service->preview($s['reviewer'], $s['registration'], '2026-11-23', '08:00', '09:30')['options'][0]['token'];
     $other = User::factory()->create(['status' => 'active']);
     $other->givePermissionTo('sidang_ta_registration_review');
     expect(fn () => $service->confirm($other, $s['registration'], $token))->toThrow(HttpException::class);
@@ -99,7 +141,7 @@ test('student and a different admin cannot reuse a scheduling token and changed 
 test('inactive execution does not offer slots', function () {
     $s = $this->s;
     $s['settings']->update(['is_active' => false]);
-    expect(fn () => app(SidangTaStaffScheduling::class)->preview($s['reviewer'], $s['registration'], '2026-11-23'))
+    expect(fn () => app(SidangTaStaffScheduling::class)->preview($s['reviewer'], $s['registration'], '2026-11-23', '08:00', '09:30'))
         ->toThrow(ValidationException::class);
 });
 
@@ -119,7 +161,7 @@ test('a completed legacy execution can receive its late result and freeze histor
 
 test('legacy correction endpoint cannot move a schedule with a final result until the result is undone', function () {
     $s = $this->s; $staff = app(SidangTaStaffScheduling::class);
-    $token = $staff->preview($s['reviewer'], $s['registration'], '2026-11-23')['options'][0]['token'];
+    $token = $staff->preview($s['reviewer'], $s['registration'], '2026-11-23', '08:00', '09:30')['options'][0]['token'];
     $c = $staff->confirm($s['reviewer'], $s['registration'], $token);
     $c = app(\App\Services\SidangTaExecutionOutcomeService::class)->set($s['reviewer'], $s['registration'], 'passed', $c->lock_version);
     expect(fn () => app(\App\Services\SidangTaBookingAdministration::class)->reschedule($s['reviewer'], $s['registration'],
@@ -131,7 +173,7 @@ test('legacy correction endpoint cannot move a schedule with a final result unti
 
 test('final result protects both general room cancellation and approval withdrawal', function (string $operation) {
     $s = $this->s; $staff = app(SidangTaStaffScheduling::class);
-    $c = $staff->confirm($s['reviewer'], $s['registration'], $staff->preview($s['reviewer'], $s['registration'], '2026-11-23')['options'][0]['token']);
+    $c = $staff->confirm($s['reviewer'], $s['registration'], $staff->preview($s['reviewer'], $s['registration'], '2026-11-23', '08:00', '09:30')['options'][0]['token']);
     $c = app(\App\Services\SidangTaExecutionOutcomeService::class)->set($s['reviewer'], $s['registration'], 'passed', $c->lock_version);
     $action = $operation === 'room'
         ? fn () => app(\App\Services\RoomBookingTransitionService::class)->cancel($s['reviewer'], $c->booking, 'Koreksi')
@@ -144,7 +186,7 @@ test('completed execution admin detail preserves the actual room time and frozen
     $s = $this->s;
     \App\Models\StudentFinalProject::create(['student_number' => $s['student']->student_number, 'thesis_title_id' => 'Judul tetap 124']);
     $staff = app(SidangTaStaffScheduling::class);
-    $c = $staff->confirm($s['reviewer'], $s['registration'], $staff->preview($s['reviewer'], $s['registration'], '2026-11-23')['options'][0]['token']);
+    $c = $staff->confirm($s['reviewer'], $s['registration'], $staff->preview($s['reviewer'], $s['registration'], '2026-11-23', '08:00', '09:30')['options'][0]['token']);
     $c->update(['state' => 'completed', 'active_student_number' => null]);
     \App\Models\StudentFinalProject::where('student_number', $s['student']->student_number)->update(['thesis_title_id' => 'Judul berubah 124']);
     $this->travelTo(Carbon::parse('2026-11-24 09:00:00', 'Asia/Jakarta'));
@@ -155,7 +197,7 @@ test('completed execution admin detail preserves the actual room time and frozen
 test('cancelled execution is labelled cancelled and export does not report a currently assigned room', function () {
     $s = $this->s; $s['rooms']['a']->update(['room_code' => 'R-CANCELLED-998']);
     $staff = app(SidangTaStaffScheduling::class);
-    $option = collect($staff->preview($s['reviewer'], $s['registration'], '2026-11-23')['options'])
+    $option = collect($staff->preview($s['reviewer'], $s['registration'], '2026-11-23', '08:00', '09:30')['options'])
         ->first(fn ($o) => $o['candidate']['room_id'] === $s['rooms']['a']->id);
     $c = $staff->confirm($s['reviewer'], $s['registration'], $option['token']);
     app(\App\Services\SidangTaBookingAdministration::class)->cancel($s['reviewer'], $s['registration'], $c->lock_version, 'Pembatalan');
@@ -175,7 +217,7 @@ test('admin assignment resolves old lecturer contexts without deleting their boo
         'state' => $oldStatus === 'pending' ? 'pending_lecturer' : $oldStatus,
         'active_student_number' => $oldStatus === 'pending' ? $s['student']->student_number : null, 'was_confirmed' => false]);
     $staff = app(SidangTaStaffScheduling::class);
-    $option = collect($staff->preview($s['reviewer'], $s['registration'], '2026-11-23')['options'])
+    $option = collect($staff->preview($s['reviewer'], $s['registration'], '2026-11-23', '08:00', '09:30')['options'])
         ->first(fn ($o) => $o['candidate']['room_id'] === $s['rooms']['b']->id);
     $c = $staff->confirm($s['reviewer'], $s['registration'], $option['token']);
     expect($c->booking->status)->toBe('approved')->and($c->state)->toBe('confirmed')->and($c->was_confirmed)->toBeTrue();
@@ -193,7 +235,7 @@ test('TA reviewer cannot approve an ordinary pending lecturer booking without ro
     $actor = User::factory()->create(['status' => 'active']);
     $actor->givePermissionTo('sidang_ta_registration_review');
     $staff = app(SidangTaStaffScheduling::class);
-    $option = $staff->preview($actor, $s['registration'], '2026-11-23')['options'][0];
+    $option = $staff->preview($actor, $s['registration'], '2026-11-23', '08:00', '09:30')['options'][0];
     expect(fn () => $staff->confirm($actor, $s['registration'], $option['token']))->toThrow(HttpException::class);
     expect($old->fresh()->status)->toBe('pending')->and(RoomBookingRequest::count())->toBe(1);
 });

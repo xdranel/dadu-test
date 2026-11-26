@@ -44,6 +44,6 @@ class SidangTaBookingController extends Controller implements HasMiddleware
         $registration = $sidang_ta_registration;
         $service->confirm($request->user(), $registration, $request->validated('preview_token'));
 
-        return redirect()->route('sidang-ta-bookings.index', $registration)->with('success', 'Jadwal sidang dikonfirmasi. Hubungi SSC untuk perubahan.');
+        return redirect()->route('sidang-ta-bookings.index', $registration)->with('success', 'Jadwal sidang dikonfirmasi.');
     }
 }

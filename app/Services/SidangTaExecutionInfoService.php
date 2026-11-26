@@ -6,12 +6,13 @@ use App\Models\Lecturer;
 use App\Models\SidangTaRegistration;
 use App\Models\StudentFinalProject;
 use Carbon\Carbon;
+use Illuminate\Support\Arr;
 
 class SidangTaExecutionInfoService
 {
     public const RESULTS = ['pending' => 'Belum ada hasil', 'passed' => 'Lulus', 'failed' => 'Gagal'];
 
-    public function forRegistration(SidangTaRegistration $reg, bool $historical = false): array
+    public function forRegistration(SidangTaRegistration $reg, bool $historical = false, bool $refreshSchedule = false): array
     {
         $context = $reg->roomSchedule()->with(['booking.occurrences', 'booking.room'])->first();
         $result = $context?->result_status ?? 'pending';
@@ -19,7 +20,7 @@ class SidangTaExecutionInfoService
         $occurrence = $booking?->occurrences->first();
         $finished = in_array($context?->state, ['completed', 'cancelled', 'rejected'], true)
             || ($occurrence && $occurrence->usage_date->toDateString().' '.$occurrence->end_time <= now()->format('Y-m-d H:i:s'));
-        if (($historical || $finished) && is_array($context?->details_snapshot) && $context->details_snapshot !== []) {
+        if (! $refreshSchedule && ($historical || $finished) && is_array($context?->details_snapshot) && $context->details_snapshot !== []) {
             return array_replace($context->details_snapshot, ['result_status' => $result, 'result_label' => self::RESULTS[$result] ?? self::RESULTS['pending'], 'scheduling_state' => $context->state]);
         }
         $participant = $context?->participant_data ?? [];
@@ -54,11 +55,18 @@ class SidangTaExecutionInfoService
         ];
     }
 
-    public function capture(SidangTaRegistration $reg): void
+    public function capture(SidangTaRegistration $reg, bool $refreshSchedule = false, bool $preserveParticipant = false): void
     {
         $context = $reg->roomSchedule()->first();
         if ($context) {
-            $context->update(['details_snapshot' => $this->forRegistration($reg, $context->state === 'completed')]);
+            $snapshot = $this->forRegistration($reg, $context->state === 'completed', $refreshSchedule);
+            if ($preserveParticipant) {
+                $snapshot = array_replace($snapshot, Arr::only($context->details_snapshot ?? [], [
+                    'period', 'student_number', 'student_name', 'study_program', 'registration_status',
+                    'expertise_group', 'title', 'advisor_1_code', 'advisor_2_code',
+                ]));
+            }
+            $context->update(['details_snapshot' => $snapshot]);
         }
     }
 

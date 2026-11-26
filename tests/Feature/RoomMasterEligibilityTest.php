@@ -23,7 +23,7 @@ test('TA scheduling only offers usable rooms with a KELAS label', function () {
     $inactive = Room::create(['room_code' => 'AAA-INACTIVE', 'name' => 'KELAS NONAKTIF',
         'building' => 'Dummy', 'capacity' => 20, 'status' => 'Tidak Dapat Dipakai', 'label' => 'KELAS']);
     $before = Room::orderBy('id')->get()->mapWithKeys(fn ($r) => [$r->id => $r->status])->all();
-    $result = app(SidangTaStaffScheduling::class)->preview($s['reviewer'], $s['registration'], '2026-11-23');
+    $result = app(SidangTaStaffScheduling::class)->preview($s['reviewer'], $s['registration'], '2026-11-23', '08:00', '09:30');
     $ids = collect($result['options'])->pluck('candidate.room_id')->unique()->sort()->values()->all();
     expect($ids)->toBe([$s['rooms']['a']->id, $s['rooms']['b']->id])
         ->not->toContain($inactive->id);

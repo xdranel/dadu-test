@@ -132,8 +132,8 @@ class SidangTaPlottingImportService
                     $date = $this->date($values[10]);
                     $start = $this->time($values[11]);
                     $end = $this->time($values[12]);
-                    if (strtotime($end) - strtotime($start) !== 90 * 60) {
-                        $this->invalid('Durasi plotting harus 90 menit.');
+                    if ($end <= $start) {
+                        $this->invalid('Jam selesai plotting harus setelah jam mulai.');
                     }
                     $participant = [];
                     foreach ([2 => 'student_name', 5 => 'expertise_group', 6 => 'title', 7 => 'advisor_1_code', 8 => 'advisor_2_code', 14 => 'examiner_1_code', 15 => 'examiner_2_code'] as $index => $key) {
@@ -150,20 +150,10 @@ class SidangTaPlottingImportService
                         if ($context->was_confirmed || $context->booking || ! empty($context->details_snapshot)) {
                             return 'Jadwal yang sudah ditetapkan dipertahankan.';
                         }
-                        if ($setting && ($date < $setting->start_date->format('Y-m-d') || $date > $setting->end_date->format('Y-m-d'))) {
-                            $this->invalid('Tanggal plotting berada di luar rentang pelaksanaan periode.');
+                        if ($setting) {
+                            app(SidangTaExecutionWindowService::class)->assertStaffSlot($setting, $date, $start, $end);
                         }
-                        $room = null;
-                        if ($roomReference !== '') {
-                            $matches = Room::where('room_code', $roomReference)->get();
-                            if ($matches->isEmpty()) {
-                                $matches = Room::where('name', $roomReference)->get();
-                            }
-                            $room = $matches->count() === 1 ? $matches->first() : null;
-                            if (! $room?->isBookableClassroom()) {
-                                $this->invalid('Ruang plotting harus ruang kelas aktif yang valid.');
-                            }
-                        }
+                        $room = $roomReference !== '' ? $this->resolveRoom($roomReference) : null;
                         // MySQL may reorder JSON object keys. Compare typed values before Eloquent
                         // serializes JSON so an unchanged import cannot stale a preview token.
                         $previousParticipant = $context->participant_data ?? [];
@@ -207,6 +197,20 @@ class SidangTaPlottingImportService
         return mb_strtolower(trim(preg_replace('/\s+/u', ' ', $value)));
     }
 
+    private function resolveRoom(string $reference): Room
+    {
+        $codes = Room::where('room_code', $reference)->get();
+        $matchedByCode = $codes->isNotEmpty();
+        $matches = $matchedByCode ? $codes : Room::where('name', $reference)->get();
+        $room = $matches->count() === 1 ? $matches->first() : null;
+        $bookableLab = $matchedByCode && $room?->label === 'LAB' && $room->status === 'Dapat Dipakai';
+        if (! $room?->isBookableClassroom() && ! $bookableLab) {
+            $this->invalid('Pilih ruang kelas yang dapat dipakai atau masukkan kode LAB yang dapat dipakai.');
+        }
+
+        return $room;
+    }
+
     private function date(mixed $value): string
     {
         if ($value instanceof DateTimeInterface) {
@@ -226,7 +230,7 @@ class SidangTaPlottingImportService
                 return $date->format('Y-m-d');
             }
         }
-        $this->invalid('Tanggal plotting tidak valid.');
+        $this->invalid('Tanggal plotting tidak valid. Gunakan format dd/mm/yyyy.');
     }
 
     private function time(mixed $value): string

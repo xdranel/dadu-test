@@ -27,7 +27,6 @@
                     <p class="font-semibold">Booking ruangan tertaut akan ikut dibatalkan dan slotnya kembali tersedia.</p>
                     <p>Booking #{{ $linkedBooking->id }} · {{ $linkedBooking->room?->room_code }}</p>
                     @foreach($linkedBooking->occurrences as $occurrence)<p>{{ $occurrence->usage_date->format('d/m/Y') }} · {{ substr($occurrence->start_time,0,5) }}–{{ substr($occurrence->end_time,0,5) }} WIB</p>@endforeach
-                    <p>Penjadwalan pengganti harus ditangani SSC; riwayat tetap disimpan.</p>
                 </div>
             @endif
             <div class="flex flex-wrap justify-end gap-2">

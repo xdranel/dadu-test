@@ -38,19 +38,20 @@ class RoomBookingTransitionService
         }, 3);
     }
 
-    public function decide(User $actor, RoomBookingRequest $booking, string $decision, ?string $note): RoomBookingRequest
+    public function decide(User $actor, RoomBookingRequest $booking, string $decision, ?string $note, bool $allowImportedLab = false): RoomBookingRequest
     {
         abort_unless($actor->hasRole('Akademik') || $actor->can('room_booking_review'), 403);
         abort_unless(in_array($decision, ['approved', 'rejected'], true), 422);
 
-        return $this->inContext($booking, function ($locked) use ($actor, $decision, $note) {
+        return $this->inContext($booking, function ($locked) use ($actor, $decision, $note, $allowImportedLab) {
             if ($locked->sidang_ta_registration_id) {
                 app(SidangTaBookingAccess::class)->authorizeStaff($actor, $locked);
             }
             abort_unless($locked->status === 'pending', 422, 'Pengajuan bukan berstatus menunggu persetujuan.');
             if ($decision === 'approved') {
                 $room = Room::query()->whereKey($locked->room_id)->lockForUpdate()->first();
-                if (! $room?->isBookableClassroom()) {
+                $usableLab = $allowImportedLab && $locked->sidang_ta_registration_id && $room?->label === 'LAB' && $room->status === 'Dapat Dipakai';
+                if (! $room?->isBookableClassroom() && ! $usableLab) {
                     throw ValidationException::withMessages([
                         'availability' => 'Persetujuan memerlukan ruang berlabel KELAS dan berstatus Dapat Dipakai.',
                     ]);

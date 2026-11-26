@@ -11,9 +11,9 @@
 @elseif($c && ($c->mode==='lecturer' || $c->was_confirmed || $c->room_booking_request_id))
 @include('sidang_ta_registrations.partials.booking-card',['bookingRegistration'=>$registration])
 @elseif(!$isLatestApproved)
-<p class="campus-card p-5">Gunakan pengajuan disetujui terbaru pada halaman Pendaftaran Sidang TA. Hubungi SSC jika memerlukan bantuan.</p>
+<p class="campus-card p-5">Gunakan pengajuan disetujui terbaru pada halaman Pendaftaran Sidang TA.</p>
 @elseif(!$registration->period?->executionSetting)
-<p class="campus-card p-5">Jadwal pelaksanaan belum ditetapkan. Silakan hubungi SSC.</p>
+<p class="campus-card p-5">Jadwal pelaksanaan belum ditetapkan.</p>
 @else
 @php($s=$registration->period->executionSetting)
 <section class="campus-card space-y-4 p-5">
@@ -30,7 +30,7 @@
 <p class="text-lg font-semibold">{{ \Carbon\Carbon::parse($candidate['date'])->format('d/m/Y') }} · {{ substr($candidate['start_time'],0,5) }}–{{ substr($candidate['end_time'],0,5) }} WIB</p>
 <p>{{ $candidate['room_code'] }} · {{ $candidate['duration_minutes'] }} menit</p>
 <p class="rounded bg-amber-50 p-3 text-sm text-amber-800">Ketersediaan ruangan belum memastikan kehadiran pembimbing dan penguji. Pastikan kesediaan dosen sebelum konfirmasi.</p>
-<p class="text-sm text-slate-500">Hasil ini belum menahan ruangan. Konfirmasi untuk mengesahkan. Jika jadwal kurang sesuai, hubungi dosen dan SSC untuk pengaturan melalui peminjaman ruangan.</p>
+<p class="text-sm text-slate-500">Hasil ini belum menahan ruangan. Konfirmasi untuk mengesahkan.</p>
 <form method="POST" action="{{ route('sidang-ta-bookings.confirm',$registration) }}">@csrf<input type="hidden" name="preview_token" value="{{ $preview['preview_token'] }}"><button class="btn btn-primary">Konfirmasi jadwal</button></form>
 @else<p role="status" class="rounded bg-amber-50 p-3 text-amber-800">{{ $preview['reason'] }}</p>@endif
 </section>

@@ -17,7 +17,7 @@
 @if($c?->active_student_number)
 <form class="campus-card space-y-3 p-5" method="POST" action="{{ route('admin.sidang-ta-bookings.cancel',$registration) }}">@csrf<input type="hidden" name="context_version" value="{{ $c->lock_version }}"><h3 class="font-bold">Selesaikan penjadwalan yang menunggu</h3><label>Alasan <textarea required maxlength="2000" name="reason" class="campus-input"></textarea></label><button class="btn btn-secondary">Batalkan penjadwalan dosen</button></form>
 @endif
-@if($c?->was_confirmed)<form class="campus-card space-y-3 p-5" method="POST" action="{{ route('admin.sidang-ta-bookings.reschedule',$registration) }}">@csrf<input type="hidden" name="context_version" value="{{ $c->lock_version }}"><h3 class="font-bold">Jadwal pengganti melalui SSC</h3>
+@if($c?->was_confirmed)<form class="campus-card space-y-3 p-5" method="POST" action="{{ route('admin.sidang-ta-bookings.reschedule',$registration) }}">@csrf<input type="hidden" name="context_version" value="{{ $c->lock_version }}"><h3 class="font-bold">Jadwal pengganti</h3>
 <label>Tanggal <input type="date" name="date" required class="campus-input"></label><label>Ruang kelas <select name="room_id" required class="campus-select">@foreach($rooms as $room)<option value="{{ $room->id }}">{{ $room->room_code }} · {{ $room->building ?: 'Lokasi belum diisi' }} · Kapasitas {{ $room->capacity ?: '—' }}</option>@endforeach</select></label>
 <label>Jam mulai <input type="time" name="start_time" required class="campus-input"></label><label>Jam selesai <input type="time" name="end_time" required class="campus-input"></label><label>Alasan <textarea required maxlength="2000" name="reason" class="campus-input"></textarea></label><button class="btn btn-primary">Simpan perubahan jadwal</button>
 </form>@endif
@@ -30,11 +30,11 @@
 </form>
 @endif
 @else
-<form class="campus-card space-y-3 p-5" method="POST" action="{{ route('admin.sidang-ta-bookings.reschedule',$registration) }}">@csrf<input type="hidden" name="context_version" value="{{ $c->lock_version }}"><h3 class="font-bold">Pindahkan jadwal melalui SSC</h3>
+<form class="campus-card space-y-3 p-5" method="POST" action="{{ route('admin.sidang-ta-bookings.reschedule',$registration) }}">@csrf<input type="hidden" name="context_version" value="{{ $c->lock_version }}"><h3 class="font-bold">Pindahkan jadwal</h3>
 <label>Tanggal <input type="date" name="date" required class="campus-input"></label><label>Ruang kelas <select name="room_id" required class="campus-select">@foreach($rooms as $room)<option value="{{ $room->id }}">{{ $room->room_code }} · {{ $room->building ?: 'Lokasi belum diisi' }} · Kapasitas {{ $room->capacity ?: '—' }}</option>@endforeach</select></label>
 <label>Jam mulai <input type="time" name="start_time" required class="campus-input"></label><label>Jam selesai <input type="time" name="end_time" required class="campus-input"></label><label>Alasan <textarea required maxlength="2000" name="reason" class="campus-input"></textarea></label><button class="btn btn-primary">Simpan perubahan jadwal</button>
 </form>
-<form class="campus-card space-y-3 p-5" method="POST" action="{{ route('admin.sidang-ta-bookings.cancel',$registration) }}">@csrf<input type="hidden" name="context_version" value="{{ $c->lock_version }}"><h3 class="font-bold">Batalkan booking</h3><p class="text-sm">Ruangan akan kembali tersedia. Riwayat tetap tersimpan. Mahasiswa harus menghubungi SSC untuk penjadwalan pengganti.</p><label>Alasan <textarea required maxlength="2000" name="reason" class="campus-input"></textarea></label><button class="btn btn-secondary">Batalkan booking</button>
+<form class="campus-card space-y-3 p-5" method="POST" action="{{ route('admin.sidang-ta-bookings.cancel',$registration) }}">@csrf<input type="hidden" name="context_version" value="{{ $c->lock_version }}"><h3 class="font-bold">Batalkan booking</h3><p class="text-sm">Ruangan akan kembali tersedia. Riwayat tetap tersimpan.</p><label>Alasan <textarea required maxlength="2000" name="reason" class="campus-input"></textarea></label><button class="btn btn-secondary">Batalkan booking</button>
 </form>
 @endif</div>
 @endif

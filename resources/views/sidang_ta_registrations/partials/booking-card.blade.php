@@ -10,6 +10,6 @@ $stateLabels=['unassigned'=>'Belum dijadwalkan','awaiting_lecturer'=>'Menunggu b
 <p class="text-sm">Booking #{{ $b->id }} · {{ $b->room?->room_code }}</p>
 @foreach($b->occurrences as $o)<p class="text-sm">{{ $o->usage_date->format('d/m/Y') }} · {{ substr($o->start_time,0,5) }}–{{ substr($o->end_time,0,5) }} WIB</p>@endforeach
 @endif
-<p class="text-sm text-slate-500">Pilih tanggal untuk mencari ruang kelas dan jam paling awal yang tersedia. Sesudah konfirmasi, perubahan atau pembatalan dilakukan melalui SSC.</p>
+<p class="text-sm text-slate-500">Pilih tanggal untuk mencari ruang kelas dan jam paling awal yang tersedia.</p>
 <a class="btn btn-secondary" href="{{ route('sidang-ta-bookings.index',$bookingRegistration) }}">{{ $c && ($c->mode==='lecturer' || $c->was_confirmed) ? 'Lihat jadwal sidang' : 'Cari jadwal sidang' }}</a>
 </section>

@@ -37,6 +37,7 @@ class SidangTaHistoryPresenter
             $action = $log->action;
             $label = match ($action) {
                 'plotting_imported' => $staff ? 'Impor plotting' : 'Rencana jadwal disiapkan',
+                'plotting_updated' => 'Data plotting diperbarui',
                 'scheduled', 'confirmed' => 'Penetapan jadwal',
                 'rescheduled' => 'Perubahan jadwal',
                 'cancelled' => 'Pembatalan jadwal',

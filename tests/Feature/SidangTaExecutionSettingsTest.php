@@ -48,7 +48,7 @@ test('room edits save the label and can clear it without changing other details'
         ->assertSee('name="label"', false)->assertDontSee('igracias_aliases')->assertSee('LABEL DITULIS DENGAN HURUF BESAR');
     $this->put(route('rooms.update', $r), $data + ['label' => 'LAB'])->assertSessionHasNoErrors();
     expect($r->fresh()->label)->toBe('LAB');
-    $this->put(route('rooms.update', $r), $data + ['label' => 'AULA'])->assertSessionHasErrors('label');
+    $this->put(route('rooms.update', $r), $data + ['label' => 'GUDANG'])->assertSessionHasErrors('label');
     expect($r->fresh()->label)->toBe('LAB');
     $this->put(route('rooms.update', $r), $data + ['label' => ''])->assertSessionHasNoErrors();
     expect($r->fresh()->label)->toBeNull()->and($r->fresh()->only(array_keys($data)))->toBe($data);

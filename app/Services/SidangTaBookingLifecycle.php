@@ -21,13 +21,16 @@ class SidangTaBookingLifecycle
         if (! $context || $context->room_booking_request_id !== $lockedBooking->id) {
             return;
         }
-        $active = in_array($lockedBooking->status, ['pending', 'approved'], true);
-        if (! $active && ($context->result_status ?? 'pending') !== 'pending') {
+        $booked = in_array($lockedBooking->status, ['pending', 'approved'], true);
+        if (! $booked && ($context->result_status ?? 'pending') !== 'pending') {
             throw ValidationException::withMessages(['schedule' => 'Batalkan hasil sidang dahulu sebelum membatalkan jadwal.']);
         }
+        $occurrences = $lockedBooking->occurrences;
+        $completed = $lockedBooking->status === 'approved' && $occurrences->isNotEmpty()
+            && $occurrences->every(fn ($o) => $o->usage_date->toDateString().' '.$o->end_time <= now('Asia/Jakarta')->format('Y-m-d H:i:s'));
         $context->fill(['state' => match ($lockedBooking->status) {
-            'pending' => 'pending_lecturer','approved' => 'confirmed','rejected' => 'rejected',default => 'cancelled'
-        }, 'active_student_number' => $active ? $context->student_number : null, 'was_confirmed' => $context->was_confirmed || $lockedBooking->status === 'approved', 'lock_version' => $context->lock_version + 1])->save();
+            'pending' => 'pending_lecturer','approved' => $completed ? 'completed' : 'confirmed','rejected' => 'rejected',default => 'cancelled'
+        }, 'active_student_number' => $booked && ! $completed ? $context->student_number : null, 'was_confirmed' => $context->was_confirmed || $lockedBooking->status === 'approved', 'lock_version' => $context->lock_version + 1])->save();
         $lockedBooking->registration->logAction('schedule_updated', $lockedBooking->status, $lockedBooking->status, $note ?: 'Status peminjaman jadwal sidang diperbarui.', $actor->id);
     }
 
@@ -39,7 +42,7 @@ class SidangTaBookingLifecycle
         }
         $first = $booking->occurrences->sortBy(fn ($o) => $o->usage_date->toDateString().' '.$o->start_time)->first();
 
-        return $first && $first->usage_date->toDateString().' '.$first->start_time <= now()->format('Y-m-d H:i:s') ? 'Pelaksanaan sidang telah dimulai. Hubungi SSC untuk pemeriksaan jadwal.' : null;
+        return $first && $first->usage_date->toDateString().' '.$first->start_time <= now()->format('Y-m-d H:i:s') ? 'Pelaksanaan sidang telah dimulai.' : null;
     }
 
     public function cancelOnApprovalWithdrawal(SidangTaRegistration $lockedRegistration, User $actor): void
@@ -65,7 +68,7 @@ class SidangTaBookingLifecycle
         }
         $first = $booking->occurrences->sortBy(fn ($o) => $o->usage_date->toDateString().' '.$o->start_time)->first();
         if ($first && $first->usage_date->toDateString().' '.$first->start_time <= now()->format('Y-m-d H:i:s')) {
-            throw ValidationException::withMessages(['action' => 'Sidang telah dimulai. Hubungi SSC untuk pemeriksaan jadwal sebelum pembatalan persetujuan.']);
+            throw ValidationException::withMessages(['action' => 'Persetujuan pendaftaran tidak dapat dibatalkan setelah sidang dimulai.']);
         }
         $before = $booking->getRawOriginal();
         $from = $booking->status;

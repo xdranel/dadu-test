@@ -8,6 +8,7 @@ use App\Models\AcademicPeriod;
 use App\Models\Room;
 use App\Models\SidangTaPeriod;
 use App\Models\SidangTaRegistration;
+use App\Services\SidangTaBookingAdministration;
 use App\Services\SidangTaExecutionExport;
 use App\Services\SidangTaExecutionInfoService;
 use App\Services\SidangTaExecutionOutcomeService;
@@ -51,18 +52,35 @@ class SidangTaExecutionController extends Controller
 
     private function detail(SidangTaRegistration $registration, SidangTaExecutionInfoService $service, ?array $preview = null)
     {
-        $registration->load('period.executionSetting', 'roomSchedule.booking.occurrences');
+        $registration->load('period.executionSetting', 'roomSchedule.booking.occurrences', 'roomSchedule.booking.room');
         $info = $service->forRegistration($registration);
         $events = app(SidangTaHistoryPresenter::class)->forExecution($registration, staff: true);
         $rooms = Room::bookableClassrooms()->orderBy('room_code')->get();
+        $preferredRoomId = $registration->roomSchedule?->preferred_room_id;
+        if ($preferredRoomId && ! $rooms->contains('id', $preferredRoomId)) {
+            $preferred = Room::where('label', 'LAB')->where('status', 'Dapat Dipakai')->find($preferredRoomId);
+            if ($preferred) {
+                $rooms->push($preferred);
+            }
+        }
+        $editRooms = $rooms->toBase();
+        $assignedRoom = $registration->roomSchedule?->booking?->room;
+        if ($assignedRoom && ! $editRooms->contains('id', $assignedRoom->id)) {
+            $editRooms = $editRooms->concat([$assignedRoom]);
+        }
 
-        return view('sidang_ta_execution.admin.show', compact('registration', 'info', 'preview', 'rooms', 'events'));
+        return view('sidang_ta_execution.admin.show', compact('registration', 'info', 'preview', 'rooms', 'editRooms', 'events'));
     }
 
     public function preview(Request $request, SidangTaRegistration $sidang_ta_registration, SidangTaStaffScheduling $service, SidangTaExecutionInfoService $info)
     {
-        $data = $request->validate(['date' => ['required', 'date_format:Y-m-d']]);
-        $preview = $service->preview($request->user(), $sidang_ta_registration, $data['date']);
+        $data = $request->validate([
+            'date' => ['required', 'date_format:Y-m-d'],
+            'start_time' => ['required', 'date_format:H:i'],
+            'end_time' => ['required', 'date_format:H:i', 'after:start_time'],
+            'imported_lab' => ['sometimes', 'boolean'],
+        ]);
+        $preview = $service->preview($request->user(), $sidang_ta_registration, $data['date'], $data['start_time'], $data['end_time'], (bool) ($data['imported_lab'] ?? false));
         if ($request->expectsJson()) {
             return response()->json($preview);
         }
@@ -84,6 +102,23 @@ class SidangTaExecutionController extends Controller
         $service->set($request->user(), $sidang_ta_registration, $data['status'], (int) $data['context_version'], $data['notes'] ?? null);
 
         return redirect()->route('admin.sidang-ta-execution.show', $sidang_ta_registration)->with('success', 'Hasil sidang diperbarui.');
+    }
+
+    public function plotting(Request $request, SidangTaRegistration $sidang_ta_registration, SidangTaBookingAdministration $service)
+    {
+        $data = $request->validate([
+            'context_version' => ['required', 'integer', 'min:0'],
+            'date' => ['required', 'date_format:Y-m-d'],
+            'start_time' => ['required', 'date_format:H:i'],
+            'end_time' => ['required', 'date_format:H:i', 'after:start_time'],
+            'room_id' => ['nullable', 'integer', 'exists:rooms,id'],
+            'examiner_1_code' => ['present', 'nullable', 'string', 'max:255'],
+            'examiner_2_code' => ['present', 'nullable', 'string', 'max:255'],
+            'reason' => ['nullable', 'string', 'max:2000'],
+        ]);
+        $service->editPlotting($request->user(), $sidang_ta_registration, $data);
+
+        return redirect()->route('admin.sidang-ta-execution.show', $sidang_ta_registration)->with('success', 'Data plotting jadwal disimpan.');
     }
 
     public function import(Request $request, SidangTaPlottingImportService $service)
@@ -108,7 +143,7 @@ class SidangTaExecutionController extends Controller
 
     public function update(SaveSidangTaExecutionRequest $request, SidangTaPeriod $period, SidangTaExecutionWindowService $service)
     {
-        $data = array_merge($request->validated(), ['duration_minutes' => 90, 'break_start_time' => null, 'break_end_time' => null]);
+        $data = $request->validated() + ['break_start_time' => null, 'break_end_time' => null];
         $service->save($request->user(), $period, $data, (int) $data['lock_version']);
 
         return back()->with('success', 'Jadwal pelaksanaan Sidang TA disimpan.');

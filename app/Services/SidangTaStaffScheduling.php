@@ -10,9 +10,8 @@ use App\Models\SidangTaRegistration;
 use App\Models\SidangTaSchedule;
 use App\Models\User;
 use App\Support\RoomTimeWindows as W;
-use Carbon\CarbonImmutable;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Crypt;
-use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
 
 class SidangTaStaffScheduling
@@ -30,53 +29,49 @@ class SidangTaStaffScheduling
         }
     }
 
-    private function candidates(SidangTaExecutionSetting $s, ?SidangTaSchedule $c, string $date): array
+    private function candidates(SidangTaExecutionSetting $setting, ?SidangTaSchedule $context, array $slot, bool $importedLab): array
     {
-        Validator::make(['date' => $date], ['date' => ['required', 'date_format:Y-m-d']])->validate();
-        $day = CarbonImmutable::createFromFormat('!Y-m-d', $date, 'Asia/Jakarta');
-        if ($date < today('Asia/Jakarta')->toDateString() || $date < $s->start_date->toDateString()
-            || $date > $s->end_date->toDateString() || ! in_array($day->dayOfWeekIso, array_map('intval', $s->allowed_weekdays), true)) {
-            throw ValidationException::withMessages(['date' => 'Pilih tanggal yang tersedia dalam jadwal pelaksanaan aktif.']);
-        }
+        $date = $slot['date'];
+        $start = W::minutes($slot['start_time']);
+        $end = W::minutes($slot['end_time']);
+        app(SidangTaExecutionWindowService::class)->assertStaffSlot($setting, $date, $slot['start_time'], $slot['end_time']);
+        $rooms = $this->roomsForSearch($context, $slot, $importedLab);
         $availability = app(RoomAvailabilityService::class);
         if (! $availability->coverage($date, $date)['ready']) {
             return [];
         }
-        $booking = $c?->booking;
+        $booking = $context?->booking;
         $except = $booking && in_array($booking->status, ['pending', 'approved'], true) ? $booking->id : null;
         $busy = $except ? $availability->rangeExcept($date, $date, $except) : $availability->forRange($date, $date);
-        $duration = app(SidangTaExecutionWindowService::class)->forStaffScheduling($s)->duration_minutes;
-        $start = W::minutes($s->start_time);
-        $end = W::minutes($s->end_time);
-        $notBefore = $date === today('Asia/Jakarta')->toDateString() ? W::minutes(now('Asia/Jakarta')->format('H:i:s'), true) + 1 : 0;
-        $preferred = $c?->preferred_date?->format('Y-m-d') === $date ? $c?->preferred_start_time : null;
-        $slots = [];
-        foreach (Room::bookableClassrooms()->orderBy('room_code')->orderBy('id')->get() as $room) {
-            $occupied = $busy[$date][$room->id] ?? [];
-            $seeds = array_merge(range($start, $end, 30), array_column($occupied, 'end'), [$start, $notBefore]);
-            if ($preferred) {
-                $seeds[] = W::minutes($preferred);
-            }
-            foreach (array_unique($seeds) as $minute) {
-                if ($minute < max($start, $notBefore) || $minute + $duration > $end) {
-                    continue;
-                }
-                if (collect($occupied)->contains(fn ($b) => $b['start'] < $minute + $duration && $b['end'] > $minute)) {
-                    continue;
-                }
-                $slots[] = ['date' => $date, 'room_id' => $room->id, 'room_code' => $room->room_code,
-                    'room_name' => $room->name, 'start_time' => W::time($minute), 'end_time' => W::time($minute + $duration), 'duration_minutes' => $duration];
-            }
+
+        return $rooms->filter(fn (Room $room) => ! collect($busy[$date][$room->id] ?? [])
+            ->contains(fn ($interval) => $interval['start'] < $end && $interval['end'] > $start))
+            ->sortBy(fn (Room $room) => [
+                ! preg_match('/\bGEDUNG[\s-]+A\b/i', $room->building ?? ''),
+                $room->id !== (int) $context?->preferred_room_id,
+                $room->room_code,
+                $room->id,
+            ])
+            ->map(fn (Room $room) => [
+                'date' => $date, 'room_id' => $room->id, 'room_code' => $room->room_code, 'room_name' => $room->name,
+                'start_time' => W::time($start), 'end_time' => W::time($end), 'duration_minutes' => $end - $start,
+            ])->values()->all();
+    }
+
+    private function roomsForSearch(?SidangTaSchedule $context, array $slot, bool $importedLab): Collection
+    {
+        if (! $importedLab) {
+            return Room::bookableClassrooms()->get();
         }
-        $score = static function ($slot) use ($c, $preferred) {
-            $sameTime = $preferred && substr($slot['start_time'], 0, 5) === substr($preferred, 0, 5);
-            $sameRoom = $c?->preferred_room_id && (int) $c->preferred_room_id === $slot['room_id'];
 
-            return $sameTime && $sameRoom ? 0 : ($sameTime ? 1 : ($sameRoom ? 2 : 3));
-        };
-        usort($slots, fn ($a, $b) => [$score($a), $a['start_time'], $a['room_code'], $a['room_id']] <=> [$score($b), $b['start_time'], $b['room_code'], $b['room_id']]);
+        $room = Room::where('label', 'LAB')->where('status', 'Dapat Dipakai')->find($context?->preferred_room_id);
+        if (! $room || $context->planning_source !== 'import' || $context->preferred_date?->toDateString() !== $slot['date']
+            || substr((string) $context->preferred_start_time, 0, 5) !== $slot['start_time']
+            || substr((string) $context->preferred_end_time, 0, 5) !== $slot['end_time']) {
+            throw ValidationException::withMessages(['room_id' => 'Ruang LAB harus dapat dipakai dan menggunakan tanggal serta jam dari impor Excel.']);
+        }
 
-        return $slots;
+        return collect([$room]);
     }
 
     private function stamp(User $actor, SidangTaRegistration $r, ?SidangTaSchedule $c, SidangTaExecutionSetting $s, string $date): array
@@ -87,34 +82,31 @@ class SidangTaStaffScheduling
             'source' => app(RoomAvailabilityService::class)->coverage($date, $date)['source_versions']];
     }
 
-    public function preview(User $actor, SidangTaRegistration $registration, string $date): array
+    public function preview(User $actor, SidangTaRegistration $registration, string $date, string $startTime, string $endTime, bool $importedLab = false): array
     {
         app(SidangTaBookingAccess::class)->authorizeStaff($actor);
         $r = $registration->fresh(['period.executionSetting', 'roomSchedule.booking']);
         $c = $r->roomSchedule;
         $s = $r->period->executionSetting;
         $this->assertReady($r, $c, $s);
-        if ($c?->booking && in_array($c->booking->status, ['pending', 'approved'], true)
-            && $c->booking->occurrences->contains(fn ($o) => $o->usage_date->toDateString().' '.$o->start_time <= now('Asia/Jakarta')->format('Y-m-d H:i:s'))) {
-            throw ValidationException::withMessages(['schedule' => 'Sidang sudah dimulai. Jadwal historis dipertahankan.']);
-        }
+        $slot = ['date' => $date, 'start_time' => $startTime, 'end_time' => $endTime];
         $stamp = $this->stamp($actor, $r, $c, $s, $date);
         $options = [];
-        foreach ($this->candidates($s, $c, $date) as $i => $candidate) {
+        foreach ($this->candidates($s, $c, $slot, $importedLab) as $i => $candidate) {
             $options[] = ['candidate' => $candidate, 'recommended' => $i === 0,
-                'token' => Crypt::encryptString(json_encode(['stamp' => $stamp, 'candidate' => $candidate,
+                'token' => Crypt::encryptString(json_encode(['stamp' => $stamp, 'candidate' => $candidate, 'imported_lab' => $importedLab,
                     'expires' => now()->addMinutes(15)->timestamp], JSON_THROW_ON_ERROR))];
         }
 
-        return ['options' => $options, 'context_version' => $c?->lock_version ?? 0,
-            'reason' => $options ? null : $this->emptySearchReason($date)];
+        return ['options' => $options, 'slot' => $slot, 'context_version' => $c?->lock_version ?? 0,
+            'reason' => $options ? null : $this->emptySearchReason($date, $importedLab)];
     }
 
-    private function emptySearchReason(string $date): string
+    private function emptySearchReason(string $date, bool $importedLab): string
     {
         $reasons = [];
         $rooms = Room::bookableClassrooms();
-        if (! $rooms->exists()) {
+        if (! $importedLab && ! $rooms->exists()) {
             $reasons[] = 'Tidak ada ruang berlabel KELAS dan berstatus Dapat Dipakai. Periksa master ruang pada Data Akademik → Ruangan.';
         }
         if (! app(RoomAvailabilityService::class)->coverage($date, $date)['ready']) {
@@ -129,8 +121,9 @@ class SidangTaStaffScheduling
             }
         }
 
-        return $reasons ? implode(' ', $reasons)
-            : 'Tidak ada slot kosong 90 menit pada tanggal ini dalam jam pelaksanaan. Ruang kelas aktif sudah terpakai atau celah waktunya tidak cukup; periksa jadwal kuliah dan peminjaman pending/disetujui, atau pilih tanggal lain.';
+        return $reasons ? implode(' ', $reasons) : ($importedLab
+            ? 'LAB dari Excel sudah terpakai pada rentang jam yang dipilih.'
+            : 'Tidak ada ruang kelas yang tersedia pada rentang jam yang dipilih.');
     }
 
     public function confirm(User $actor, SidangTaRegistration $registration, string $token): SidangTaSchedule
@@ -139,7 +132,7 @@ class SidangTaStaffScheduling
         try {
             $data = json_decode(Crypt::decryptString($token), true, 512, JSON_THROW_ON_ERROR);
             if (! is_array($data['stamp'] ?? null) || ! is_array($data['candidate'] ?? null)
-                || ! is_int($data['expires'] ?? null) || $data['expires'] < now()->timestamp) {
+                || ! is_bool($data['imported_lab'] ?? null) || ! is_int($data['expires'] ?? null) || $data['expires'] < now()->timestamp) {
                 throw new \RuntimeException;
             }
         } catch (\Throwable) {
@@ -151,15 +144,15 @@ class SidangTaStaffScheduling
             $candidate = $data['candidate'];
             $actual = $this->stamp($actor, $r, $c->wasRecentlyCreated ? null : $c, $s, $candidate['date']);
             abort_unless($actual == $data['stamp'], 409, 'Pengajuan, sumber atau pengaturan berubah. Cari jadwal kembali.');
-            $available = collect($this->candidates($s, $c, $candidate['date']))->contains(fn ($option) => $option === $candidate);
+            $slot = ['date' => $candidate['date'], 'start_time' => substr($candidate['start_time'], 0, 5), 'end_time' => substr($candidate['end_time'], 0, 5)];
+            $importedLab = $data['imported_lab'];
+            $available = in_array($candidate, $this->candidates($s, $c, $slot, $importedLab), true);
             abort_unless($available, 409, 'Slot sudah berubah atau terpakai. Cari jadwal kembali.');
             $activeBooking = $c->booking && in_array($c->booking->status, ['pending', 'approved'], true);
             if ($c->was_confirmed || $activeBooking) {
-                $slot = ['date' => $candidate['date'], 'room_id' => $candidate['room_id'],
-                    'start_time' => substr($candidate['start_time'], 0, 5), 'end_time' => substr($candidate['end_time'], 0, 5)];
-                $c = app(SidangTaBookingAdministration::class)->reschedule($actor, $r, $slot, $c->lock_version, 'Penyesuaian plotting oleh admin.', useStaffWindow: true);
+                $c = app(SidangTaBookingAdministration::class)->reschedule($actor, $r, $slot + ['room_id' => $candidate['room_id']], $c->lock_version, 'Penyesuaian plotting oleh admin.', allowImportedLab: $importedLab, allowElapsedBooking: true);
                 if ($c->booking->status === 'pending') {
-                    app(RoomBookingTransitionService::class)->decide($actor, $c->booking, 'approved', 'Jadwal ditetapkan admin.');
+                    app(RoomBookingTransitionService::class)->decide($actor, $c->booking, 'approved', 'Jadwal ditetapkan admin.', allowImportedLab: $importedLab);
                     $c = $c->fresh();
                 }
             } else {
@@ -175,7 +168,10 @@ class SidangTaStaffScheduling
                 $c->fill(['room_booking_request_id' => $booking->id, 'active_student_number' => $r->student_number,
                     'mode' => 'automatic', 'state' => 'confirmed', 'was_confirmed' => true, 'lock_version' => $c->lock_version + 1])->save();
             }
-            app(SidangTaExecutionInfoService::class)->capture($r);
+            if ($candidate['date'].' '.$candidate['end_time'] <= now('Asia/Jakarta')->format('Y-m-d H:i:s')) {
+                $c->fill(['state' => 'completed', 'active_student_number' => null])->save();
+            }
+            app(SidangTaExecutionInfoService::class)->capture($r, refreshSchedule: true, preserveParticipant: true);
             $c->executionLogs()->create(['action' => 'scheduled', 'notes' => 'Jadwal ditetapkan admin.',
                 'data' => $candidate, 'performed_by' => $actor->id, 'performed_at' => now()]);
 

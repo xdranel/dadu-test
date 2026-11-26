@@ -5,6 +5,7 @@ use App\Http\Controllers\Admin\GradeAppealPeriodController;
 use App\Http\Controllers\Admin\GraduationPeriodController;
 use App\Http\Controllers\Admin\ModulePermissionController;
 use App\Http\Controllers\Admin\QueueHistoryController;
+use App\Http\Controllers\Admin\SidangTaExecutionBulkOutcomeController;
 use App\Http\Controllers\Admin\SidangTaExecutionController;
 use App\Http\Controllers\Admin\SidangTaFormGuideController;
 use App\Http\Controllers\Auth\ForgotPasswordController;
@@ -534,8 +535,9 @@ Route::middleware(['auth', 'password.changed'])->group(function () {
             Route::get('sidang-ta-execution/export', [SidangTaExecutionController::class, 'export'])->middleware('permission:sidang_ta_registration_review')->name('sidang-ta-execution.export');
             Route::get('sidang-ta-execution/template', [SidangTaExecutionController::class, 'plottingTemplate'])->middleware('permission:sidang_ta_registration_review')->name('sidang-ta-execution.template');
             Route::post('sidang-ta-execution/import', [SidangTaExecutionController::class, 'import'])->middleware('permission:sidang_ta_registration_review')->name('sidang-ta-execution.import');
+            Route::post('sidang-ta-execution/bulk-outcome', SidangTaExecutionBulkOutcomeController::class)->middleware('permission:sidang_ta_registration_review')->name('sidang-ta-execution.bulk-outcome');
             Route::get('sidang-ta-execution/{sidang_ta_registration}', [SidangTaExecutionController::class, 'show'])->whereUuid('sidang_ta_registration')->middleware('permission:sidang_ta_registration_review|sidang_ta_registration_view_program')->name('sidang-ta-execution.show');
-            foreach (['preview', 'confirm', 'outcome'] as $operation) {
+            foreach (['preview', 'confirm', 'outcome', 'plotting'] as $operation) {
                 Route::post('sidang-ta-execution/{sidang_ta_registration}/'.$operation, [SidangTaExecutionController::class, $operation])->whereUuid('sidang_ta_registration')->middleware('permission:sidang_ta_registration_review')->name('sidang-ta-execution.'.$operation);
             }
             Route::put('sidang-ta-execution/{period}', [SidangTaExecutionController::class, 'update'])->middleware('permission:sidang_ta_period_update')->name('sidang-ta-execution.update');

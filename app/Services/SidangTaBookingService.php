@@ -32,7 +32,7 @@ class SidangTaBookingService
             throw ValidationException::withMessages(['schedule' => 'Pendaftaran Sidang TA belum disetujui.']);
         }
         if ($c && ($c->mode !== 'automatic' || $c->was_confirmed || $c->room_booking_request_id)) {
-            throw ValidationException::withMessages(['schedule' => 'Jadwal sudah ditangani. Hubungi SSC untuk perubahan.']);
+            throw ValidationException::withMessages(['schedule' => 'Jadwal sudah ditetapkan.']);
         }
     }
 
@@ -74,7 +74,7 @@ class SidangTaBookingService
         $this->eligible($r, $c);
         $s = $r->period->executionSetting;
         if (! $s) {
-            throw ValidationException::withMessages(['date' => 'Jadwal pelaksanaan belum ditetapkan. Hubungi SSC.']);
+            throw ValidationException::withMessages(['date' => 'Jadwal pelaksanaan belum ditetapkan.']);
         }
         $candidate = $this->candidate($s, $date);
         $identity = app(SidangTaBookingIdentity::class)->forRegistration($r);
@@ -128,7 +128,7 @@ class SidangTaBookingService
 
                 continue;
             }
-            throw ValidationException::withMessages(['schedule' => 'Mahasiswa sudah memiliki jadwal/konteks aktif lain. Hubungi SSC.']);
+            throw ValidationException::withMessages(['schedule' => 'Mahasiswa sudah memiliki jadwal pelaksanaan aktif pada pengajuan lain.']);
         }
     }
 }

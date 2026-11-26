@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\SidangTaRegistration;
 use Closure;
+use DateTimeImmutable;
 use Illuminate\Support\Collection;
 use Illuminate\Validation\ValidationException;
 use OpenSpout\Common\Entity\Cell\StringCell;
@@ -30,7 +31,15 @@ class SidangTaExecutionExport
                 // Export assigned values only; an imported preference is not a booking.
                 $dto = app(SidangTaExecutionInfoService::class)->forRegistration($registration, true);
                 $assigned = $dto['is_confirmed'] && ! in_array($dto['scheduling_state'], ['cancelled', 'rejected'], true);
-                $writer->addRow($this->textRow([$dto['period'], $dto['student_number'], $dto['student_name'], $dto['study_program'], SidangTaReviewQuery::STATUSES[$dto['registration_status']] ?? $dto['registration_status'], $dto['expertise_group'], $dto['title'], $dto['advisor_1_code'], $dto['advisor_2_code'], $assigned ? $dto['weekday'] : null, $assigned ? $dto['date'] : null, $assigned ? $dto['start_time'] : null, $assigned ? $dto['end_time'] : null, $assigned ? $dto['room'] : null, $dto['examiner_1_code'], $dto['examiner_2_code']]));
+                $date = $assigned && $dto['date'] ? DateTimeImmutable::createFromFormat('!Y-m-d', $dto['date']) : null;
+                $writer->addRow($this->textRow([
+                    $dto['period'], $dto['student_number'], $dto['student_name'], $dto['study_program'],
+                    SidangTaReviewQuery::STATUSES[$dto['registration_status']] ?? $dto['registration_status'],
+                    $dto['expertise_group'], $dto['title'], $dto['advisor_1_code'], $dto['advisor_2_code'],
+                    $assigned ? $dto['weekday'] : null, $date ? $date->format('d/m/Y') : null,
+                    $assigned ? $dto['start_time'] : null, $assigned ? $dto['end_time'] : null,
+                    $assigned ? $dto['room'] : null, $dto['examiner_1_code'], $dto['examiner_2_code'],
+                ]));
             }
         });
     }
@@ -51,7 +60,7 @@ class SidangTaExecutionExport
             $writer->addRow($this->textRow([
                 'Contoh Periode Sidang TA', '0000000000', 'Mahasiswa Contoh', 'S1 Informatika',
                 'Disetujui', 'Contoh Kelompok Keahlian', 'Judul Tugas Akhir Contoh', 'PB1', 'PB2',
-                'Senin', '2026-11-23', '08:00', '09:30', '', 'PJ1', 'PJ2',
+                'Senin', '23/11/2026', '08:00', '09:30', '', 'PJ1', 'PJ2',
             ]));
         }, $options);
     }

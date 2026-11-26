@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Support\Arr;
 
 class SaveSidangTaExecutionRequest extends FormRequest
 {
@@ -20,11 +21,12 @@ class SaveSidangTaExecutionRequest extends FormRequest
             'allowed_weekdays' => ['required', 'array', 'min:1', 'max:7'], 'allowed_weekdays.*' => ['required', 'integer', 'between:1,7', 'distinct'],
             'start_time' => ['required', 'date_format:H:i'], 'end_time' => ['required', 'date_format:H:i', 'after:start_time'],
             'break_start_time' => ['nullable', 'required_with:break_end_time', 'date_format:H:i'], 'break_end_time' => ['nullable', 'required_with:break_start_time', 'date_format:H:i', 'after:break_start_time'],
-            'duration_minutes' => ['required', 'integer', 'min:1', 'max:900']];
+            'duration_minutes' => ['sometimes', 'required', 'integer', 'min:1', 'max:900']];
     }
 
     public function rules(): array
     {
-        return self::windowRules() + ['lock_version' => ['required', 'integer', 'min:0']];
+        return Arr::except(self::windowRules(), ['duration_minutes', 'break_start_time', 'break_end_time'])
+            + ['lock_version' => ['required', 'integer', 'min:0']];
     }
 }

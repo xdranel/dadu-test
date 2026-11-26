@@ -12,6 +12,7 @@ use OpenSpout\Common\Entity\Cell\DateTimeCell;
 use OpenSpout\Common\Entity\Cell\NumericCell;
 use OpenSpout\Common\Entity\Cell\StringCell;
 use OpenSpout\Common\Entity\Row;
+use OpenSpout\Reader\XLSX\Reader;
 use OpenSpout\Writer\XLSX\Writer;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 use Tests\Support\TaRoomScenario;
@@ -60,6 +61,46 @@ test('domain plotting serial dates and room preferences never reserve a room', f
     expect($context->preferred_date->format('Y-m-d'))->toBe('2026-11-23')->and(substr($context->preferred_start_time, 0, 5))->toBe('08:00')->and($context->preferred_room_id)->toBe($s['rooms']['a']->id)->and($context->room_booking_request_id)->toBeNull();
     expect(app(SidangTaExecutionInfoService::class)->forRegistration($s['registration'])['room'])->toBeNull();
     expect(RoomBookingRequest::count())->toBe(0);
+});
+
+test('domain plotting keeps exact short and long slots for an active lab specified by code', function () {
+    $s = $this->domainScenario;
+    $lab = $s['rooms']['lab'];
+    $lab->update(['label' => 'LAB']);
+    foreach (['08:45', '10:15'] as $end) {
+        $path = executionDomainFile([executionDomainRow($s, [10 => '23/11/2026', 11 => '08:00', 12 => $end, 13 => $lab->room_code])]);
+        try {
+            $result = app(SidangTaPlottingImportService::class)->import($s['reviewer'], $s['period'], $path);
+        } finally {
+            unlink($path);
+        }
+
+        expect($result['processed'])->toHaveCount(1)->and($result['errors'])->toBeEmpty();
+        $context = $s['registration']->roomSchedule()->firstOrFail();
+        expect($context->planning_source)->toBe('import')
+            ->and($context->preferred_date->format('Y-m-d'))->toBe('2026-11-23')
+            ->and($context->preferred_start_time)->toBe('08:00:00')
+            ->and($context->preferred_end_time)->toBe($end.':00')
+            ->and($context->preferred_room_id)->toBe($lab->id);
+        expect(RoomBookingRequest::count())->toBe(0);
+    }
+});
+
+test('domain plotting rejects labs by name and rejects inactive labs or aula by code', function () {
+    $s = $this->domainScenario;
+    $lab = $s['rooms']['lab'];
+    foreach ([['LAB', 'Dapat Dipakai', $lab->name], ['LAB', 'Tidak Dapat Dipakai', $lab->room_code], ['AULA', 'Dapat Dipakai', $lab->room_code]] as [$label, $status, $reference]) {
+        $lab->update(compact('label', 'status'));
+        $path = executionDomainFile([executionDomainRow($s, [13 => $reference])]);
+        try {
+            $result = app(SidangTaPlottingImportService::class)->import($s['reviewer'], $s['period'], $path);
+        } finally {
+            unlink($path);
+        }
+
+        expect($result['errors'])->toHaveCount(1)->and($result['processed'])->toBeEmpty();
+        expect($s['registration']->roomSchedule()->exists())->toBeFalse();
+    }
 });
 
 test('domain plotting rejects conflicting duplicates invalid rooms wrong periods and unapproved participants', function () {
@@ -128,6 +169,33 @@ test('domain execution export preserves leading zero text and never writes user 
     unlink($path);
 });
 
+test('domain plotting template and scheduled export use day month year dates', function () {
+    $s = $this->domainScenario;
+    executionDomainBooked($s);
+    $service = app(SidangTaExecutionExport::class);
+    foreach ([$service->downloadTemplate(), $service->download(collect([$s['registration']]))] as $response) {
+        $path = $response->getFile()->getPathname();
+        $reader = new Reader;
+        $reader->open($path);
+        $third = null;
+        try {
+            foreach ($reader->getSheetIterator() as $sheet) {
+                $rowNumber = 0;
+                foreach ($sheet->getRowIterator() as $row) {
+                    if (++$rowNumber === 3) {
+                        $third = $row->toArray();
+                        break 2;
+                    }
+                }
+            }
+        } finally {
+            $reader->close();
+            unlink($path);
+        }
+        expect($third[10] ?? null)->toBe('23/11/2026');
+    }
+});
+
 test('domain import requires reviewer permission and readable valid headers', function () {
     $s = $this->domainScenario;
     expect(fn () => app(SidangTaPlottingImportService::class)->import($s['owner'], $s['period'], '/missing.xlsx'))->toThrow(HttpException::class);
@@ -137,7 +205,7 @@ test('domain import requires reviewer permission and readable valid headers', fu
 
 test('domain plotting rejects formula cells and invalid dates without partial writes', function () {
     $s = $this->domainScenario;
-    foreach ([[6 => '=HYPERLINK("https://example.test","x")'], [10 => '2026-02-30'], [11 => '25:00'], [12 => '09:00']] as $override) {
+    foreach ([[6 => '=HYPERLINK("https://example.test","x")'], [10 => '2026-02-30'], [11 => '25:00'], [12 => '08:00'], [12 => '07:30']] as $override) {
         $path = executionDomainFile([executionDomainRow($s, $override)]);
         try {
             $result = app(SidangTaPlottingImportService::class)->import($s['reviewer'], $s['period'], $path);
