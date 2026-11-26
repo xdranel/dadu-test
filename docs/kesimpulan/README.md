@@ -135,3 +135,4 @@ Satu ringkasan per nomor progres; sub-checkpoint huruf digabung pada nomor utama
 - [135 — Dashboard dan Review Peminjaman Ruangan](135-dashboard-peminjaman-denah-ruangan.md)
 - [136 — Koreksi denah dan master ruangan](136-koreksi-denah-dan-master-ruangan.md)
 - [137 — Identitas dan riwayat Peminjaman Ruangan](137-identitas-dan-riwayat-peminjaman-ruangan.md)
+- [138 — Pengajuan ruangan berurutan dan berulang](138-pengajuan-ruangan-berurutan-dan-berulang.md)

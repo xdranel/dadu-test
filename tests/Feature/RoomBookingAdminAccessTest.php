@@ -37,7 +37,8 @@ test('authorized admin can submit an ordinary booking for review', function (str
     $actor = room127Admin($role);
     $this->actingAs($actor)->get(route('room-bookings.index'))->assertOk()
         ->assertSee('Pengajuan Peminjaman Ruangan')->assertSee('Daftar Peminjaman Saya');
-    $this->get(route('room-bookings.create'))->assertOk();
+    $this->get(route('room-bookings.create'))->assertOk()->assertSee('Panduan peminjaman')
+        ->assertSee('name="booking_mode"', false)->assertSee('name="weekdays[]"', false);
     $this->get(route('room-bookings.my'))->assertOk();
     $slot = ['start_at' => '2026-11-24T10:00', 'end_at' => '2026-11-24T11:00'];
     $this->postJson(route('room-bookings.availability'), $slot)->assertOk()->assertJsonFragment(['id' => $this->s['rooms']['a']->id]);

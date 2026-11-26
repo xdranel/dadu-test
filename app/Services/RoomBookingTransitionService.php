@@ -57,12 +57,11 @@ class RoomBookingTransitionService
                 }
 
                 $service = app(RoomAvailabilityService::class);
-                $first = $locked->occurrences->min('usage_date')?->toDateString();
-                $last = $locked->occurrences->max('usage_date')?->toDateString();
-                if (! $first || ! $last || ! $service->coverage($first, $last)['ready']) {
+                $dates = $locked->occurrences->map(fn ($occurrence) => $occurrence->usage_date->toDateString())->all();
+                if ($dates === [] || $service->missingCoverageDates($dates) !== []) {
                     throw ValidationException::withMessages(['availability' => 'Sumber jadwal semester belum lengkap atau occurrence belum tersedia.']);
                 }
-                $busy = $service->rangeExcept($first, $last, $locked->id);
+                $busy = $service->rangeExcept(min($dates), max($dates), $locked->id);
                 foreach ($locked->occurrences as $o) {
                     $date = $o->usage_date->toDateString();
                     foreach ($busy[$date][$locked->room_id] ?? [] as $slot) {

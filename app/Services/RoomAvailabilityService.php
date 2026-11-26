@@ -50,6 +50,17 @@ class RoomAvailabilityService
         return ['ready' => $missing === [], 'missing_dates' => $missing, 'source_versions' => $versions];
     }
 
+    public function missingCoverageDates(array $dates): array
+    {
+        if ($dates === []) {
+            return [];
+        }
+
+        $missing = $this->coverage(min($dates), max($dates))['missing_dates'];
+
+        return array_values(array_intersect($missing, $dates));
+    }
+
     public function busyIntervals(int $roomId, string $date, ?int $exceptBookingId = null): array
     {
         return $this->intervals($date, $date, $exceptBookingId)[$date][$roomId] ?? [];

@@ -1,7 +1,9 @@
 <?php
 
+use App\Models\AcademicPeriod;
 use App\Models\Room;
 use App\Models\RoomBookingRequest;
+use App\Models\RoomScheduleSource;
 use App\Models\RoomWeeklyPattern;
 use App\Models\SidangTaSchedule;
 use App\Models\User;
@@ -54,6 +56,58 @@ it('uses weekly occupancy and only offers labelled classrooms for ordinary booki
     $this->post(route('room-bookings.store'), $freeSlot + ['room_id' => $lab->id, 'purpose' => 'Lab'])->assertUnprocessable();
     expect(RoomBookingRequest::count())->toBe(0);
 });
+
+it('checks and reserves only selected recurring weekdays while consecutive mode checks every date', function () {
+    $room = $this->s['rooms']['a'];
+    $range = ['start_at' => '2026-11-23T08:30', 'end_at' => '2026-12-03T10:30'];
+    $dates = ['2026-11-24', '2026-11-26', '2026-12-01', '2026-12-03'];
+    $recurring = $range + ['booking_mode' => 'recurring', 'weekdays' => [2, 4]];
+
+    $this->actingAs($this->lecturer)->postJson(route('room-bookings.availability'), $range + ['booking_mode' => 'consecutive'])
+        ->assertOk()->assertJsonMissing(['id' => $room->id])->assertJsonCount(11, 'dates');
+    $this->postJson(route('room-bookings.availability'), $recurring)->assertOk()
+        ->assertJsonFragment(['id' => $room->id])->assertJsonPath('dates', $dates);
+    $this->post(route('room-bookings.store'), $recurring + ['room_id' => $room->id, 'purpose' => 'Kelas Selasa dan Kamis'])
+        ->assertSessionHasNoErrors()->assertRedirect(route('room-bookings.index'));
+    $booking = RoomBookingRequest::sole();
+    expect($booking->occurrences->map(fn ($usage) => $usage->usage_date->toDateString())->all())->toBe($dates);
+    $this->post(route('room-bookings.store'), $recurring + ['room_id' => $room->id, 'purpose' => 'Jadwal bentrok'])
+        ->assertSessionHasErrors('availability');
+    expect(RoomBookingRequest::count())->toBe(1);
+});
+
+it('allows recurring booking across semester boundaries and checks coverage of actual selected dates through approval', function () {
+    $this->s['academic']->update(['end_date' => '2027-01-26']);
+    $next = AcademicPeriod::create(['year' => '2026/2027', 'semester' => 2, 'label' => 'Genap',
+        'start_date' => '2027-02-01', 'end_date' => '2027-07-31', 'is_active' => false]);
+    $source = RoomScheduleSource::create(['academic_period_id' => $next->id, 'is_complete' => false,
+        'scope' => 'semester', 'fingerprint' => 'next-term', 'version' => 1]);
+    $recurring = ['start_at' => '2027-01-25T06:30', 'end_at' => '2027-02-01T07:30', 'booking_mode' => 'recurring', 'weekdays' => ['1']];
+    $data = $recurring + ['room_id' => $this->s['rooms']['b']->id, 'purpose' => 'Lintas semester'];
+
+    $this->actingAs($this->lecturer)->postJson(route('room-bookings.availability'), $recurring)
+        ->assertUnprocessable()->assertJsonValidationErrors('availability');
+    $this->post(route('room-bookings.store'), $data)->assertSessionHasErrors('availability');
+    expect(RoomBookingRequest::count())->toBe(0);
+    $source->update(['is_complete' => true]);
+    $this->postJson(route('room-bookings.availability'), $recurring)->assertOk()->assertJsonPath('dates', ['2027-01-25', '2027-02-01']);
+    $this->post(route('room-bookings.store'), $data)->assertSessionHasNoErrors()->assertRedirect(route('room-bookings.index'));
+    $booking = RoomBookingRequest::sole();
+    $this->actingAs($this->s['reviewer'])->post(route('admin.room-bookings.decision', $booking), ['decision' => 'approved'])->assertSessionHasNoErrors();
+    expect($booking->fresh()->status)->toBe('approved');
+});
+
+it('rejects missing recurring weekdays, unmatched weekdays and invalid date or time ranges', function () {
+    $range = ['start_at' => '2026-11-23T08:00', 'end_at' => '2026-11-23T09:00', 'booking_mode' => 'recurring'];
+    $this->actingAs($this->lecturer)->postJson(route('room-bookings.availability'), $range)->assertJsonValidationErrors('weekdays');
+    $this->postJson(route('room-bookings.availability'), $range + ['weekdays' => [2]])->assertJsonValidationErrors('weekdays');
+    $this->postJson(route('room-bookings.availability'), $range + ['weekdays' => [8]])->assertJsonValidationErrors('weekdays.0');
+    $this->postJson(route('room-bookings.availability'), $range + ['weekdays' => [1, 1]])->assertJsonValidationErrors('weekdays.0');
+    $this->postJson(route('room-bookings.availability'), ['end_at' => '2027-11-24T09:00', 'weekdays' => [1]] + $range)->assertJsonValidationErrors('end_at');
+    $this->postJson(route('room-bookings.availability'), ['end_at' => '2026-11-22T09:00', 'weekdays' => [1]] + $range)->assertJsonValidationErrors('end_at');
+    $this->postJson(route('room-bookings.availability'), ['end_at' => '2026-11-25T07:00', 'weekdays' => [1]] + $range)->assertJsonValidationErrors('start_time');
+});
+
 it('includes weekly classes in the daily calendar detail', function () {
     $this->actingAs($this->lecturer)->getJson(route('room-bookings.calendar.detail', ['date' => '2026-11-23']))->assertOk()->assertJsonCount(1, 'schedules')->assertJsonFragment(['start_time' => '08:30']);
 });

@@ -12,6 +12,7 @@ use App\Services\RoomAvailabilityService;
 use App\Services\RoomBookingTransitionService;
 use App\Support\RoomBookingAccess;
 use App\Support\RoomBookingIdentity;
+use App\Support\RoomBookingSchedule;
 use App\Support\RoomFloorPlan;
 use App\Support\RoomTimeWindows;
 use App\Support\WeeklyRoomScheduleNormalizer;
@@ -41,23 +42,32 @@ class RoomBookingController extends Controller
         return RoomScheduleSource::where('is_complete', true)->exists();
     }
 
-    private function validateBookingDateRange(string $startDate, string $endDate): ?string
+    private function ensureActiveSemester(RoomBookingSchedule $schedule): void
     {
-        $today = now('Asia/Jakarta')->toDateString();
-        if ($startDate < $today) {
-            return 'Tanggal peminjaman tidak boleh di masa lampau.';
+        if ($schedule->mode !== RoomBookingSchedule::CONSECUTIVE) {
+            return;
         }
 
         $activePeriod = AcademicPeriod::current();
         if ($activePeriod && $activePeriod->start_date && $activePeriod->end_date) {
             $periodStart = $activePeriod->start_date->toDateString();
             $periodEnd = $activePeriod->end_date->toDateString();
-            if ($startDate < $periodStart || $endDate > $periodEnd) {
-                return "Peminjaman hanya dapat diajukan dalam rentang semester aktif berjalan ({$activePeriod->label}: {$periodStart} s.d. {$periodEnd}).";
+            if ($schedule->firstDate() < $periodStart || $schedule->lastDate() > $periodEnd) {
+                throw ValidationException::withMessages([
+                    'start_at' => "Peminjaman berurutan hanya dapat diajukan dalam rentang semester aktif ({$activePeriod->label}: {$periodStart} s.d. {$periodEnd}).",
+                ]);
             }
         }
+    }
 
-        return null;
+    private function ensureScheduleCoverage(RoomAvailabilityService $availability, RoomBookingSchedule $schedule): void
+    {
+        $missing = $availability->missingCoverageDates($schedule->dates);
+        if ($missing !== []) {
+            throw ValidationException::withMessages([
+                'availability' => 'Sumber jadwal semester belum lengkap untuk tanggal '.$missing[0].'. Periksa sinkronisasi jadwal untuk tanggal yang dipilih.',
+            ]);
+        }
     }
 
     private function computeFreeSlots(array $bookedSlots, int $windowStartMin = 390, int $windowEndMin = 1290, int $minGapMin = 60): array
@@ -229,62 +239,26 @@ class RoomBookingController extends Controller
         return view('room-bookings.create', compact('rooms', 'hasImported'));
     }
 
-    public function checkAvailability(Request $request)
+    public function checkAvailability(Request $request, RoomAvailabilityService $availability)
     {
         abort_unless($this->canBorrow($request->user()) && $request->user()->can('room_booking_create'), 403);
         if (! $this->hasSuccessfulImport()) {
             return response()->json(['message' => 'Jadwal iGracias belum disinkronisasi.'], 422);
         }
-        $data = $request->validate([
-            'start_at' => ['required', 'date_format:Y-m-d\\TH:i'],
-            'end_at' => ['required', 'date_format:Y-m-d\\TH:i', 'after:start_at'],
-        ]);
-        $startAt = Carbon::createFromFormat('Y-m-d\\TH:i', $data['start_at']);
-        $endAt = Carbon::createFromFormat('Y-m-d\\TH:i', $data['end_at']);
-        $data = ['start_date' => $startAt->toDateString(), 'end_date' => $endAt->toDateString(), 'start_time' => $startAt->format('H:i'), 'end_time' => $endAt->format('H:i')];
-        if ($dateError = $this->validateBookingDateRange($data['start_date'], $data['end_date'])) {
-            return response()->json(['message' => $dateError], 422);
-        }
-        if ($data['start_time'] < '06:30' || $data['end_time'] > '21:30' || $data['start_time'] >= $data['end_time']) {
-            return response()->json(['message' => 'Jam penggunaan harus berada pada rentang 06.30–21.30 WIB.'], 422);
-        }
-        if (! app(RoomAvailabilityService::class)->coverage($data['start_date'], $data['end_date'])['ready']) {
-            throw ValidationException::withMessages(['availability' => 'Sumber jadwal semester belum lengkap untuk tanggal tersebut.']);
-        }
-        $dates = [];
-        for ($day = Carbon::parse($data['start_date']); $day->lte(Carbon::parse($data['end_date'])); $day->addDay()) {
-            $dates[] = $day->toDateString();
-        }
+        $input = $request->validate(RoomBookingSchedule::rules(), RoomBookingSchedule::messages());
+        $schedule = RoomBookingSchedule::fromValidated($input);
+        $this->ensureActiveSemester($schedule);
+        $this->ensureScheduleCoverage($availability, $schedule);
+
         $rooms = Room::bookableClassrooms()->orderBy('name')->get();
-        $busy = app(RoomAvailabilityService::class)->forRange($data['start_date'], $data['end_date']);
-        $available = $rooms->filter(function ($room) use ($dates, $data, $busy) {
-            foreach ($dates as $date) {
-                foreach ($busy[$date][$room->id] ?? [] as $slot) {
-                    if ($slot['start'] < RoomTimeWindows::minutes($data['end_time'], true) && $slot['end'] > RoomTimeWindows::minutes($data['start_time'])) {
-                        return false;
-                    }
-                }
-            }
+        $busy = $availability->forRange($schedule->firstDate(), $schedule->lastDate());
+        $available = $rooms->filter(fn ($room) => $schedule->firstConflict($busy, $room->id) === null)
+            ->values()->map(fn ($room) => ['id' => $room->id, 'name' => $room->name, 'code' => $room->room_code, 'building' => $room->building, 'capacity' => $room->capacity]);
 
-            return true;
-        })->values()->map(fn ($room) => ['id' => $room->id, 'name' => $room->name, 'code' => $room->room_code, 'building' => $room->building, 'capacity' => $room->capacity]);
-
-        return response()->json(['rooms' => $available]);
+        return response()->json(['rooms' => $available, 'dates' => $schedule->dates]);
     }
 
-    /** Half-open interval comparison: touching endpoints are allowed. */
-    private function conflicts(int $roomId, string $date, string $start, string $end, ?int $except = null): array
-    {
-        foreach (app(RoomAvailabilityService::class)->busyIntervals($roomId, $date, $except) as $slot) {
-            if ($slot['start'] < RoomTimeWindows::minutes($end, true) && $slot['end'] > RoomTimeWindows::minutes($start)) {
-                return ['Pemakaian ruang bentrok pada '.$date];
-            }
-        }
-
-        return [];
-    }
-
-    public function store(Request $request)
+    public function store(Request $request, RoomAvailabilityService $availability)
     {
         abort_unless($this->canBorrow($request->user()) && $request->user()->can('room_booking_create'), 403);
         if (! $this->hasSuccessfulImport()) {
@@ -293,55 +267,38 @@ class RoomBookingController extends Controller
             ]);
         }
 
-        $input = $request->validate([
-            'room_id' => ['required', 'exists:rooms,id'],
-            'start_at' => ['required', 'date_format:Y-m-d\\TH:i'],
-            'end_at' => ['required', 'date_format:Y-m-d\\TH:i', 'after:start_at'],
+        $input = $request->validate(RoomBookingSchedule::rules() + [
+            'room_id' => ['required', 'integer', 'exists:rooms,id'],
             'purpose' => ['required', 'string', 'max:255'],
+        ], RoomBookingSchedule::messages() + [
+            'room_id.required' => 'Pilih ruangan yang tersedia.',
+            'room_id.exists' => 'Ruangan yang dipilih tidak ditemukan.',
+            'purpose.required' => 'Isi keperluan peminjaman.',
+            'purpose.max' => 'Keperluan peminjaman maksimal 255 karakter.',
         ]);
-        $startAt = Carbon::createFromFormat('Y-m-d\\TH:i', $input['start_at']);
-        $endAt = Carbon::createFromFormat('Y-m-d\\TH:i', $input['end_at']);
+        $schedule = RoomBookingSchedule::fromValidated($input);
         $data = [
-            'type' => $startAt->isSameDay($endAt) ? 'single' : 'recurring',
-            'room_id' => $input['room_id'], 'start_date' => $startAt->toDateString(), 'end_date' => $endAt->toDateString(),
-            'start_time' => $startAt->format('H:i'), 'end_time' => $endAt->format('H:i'),
+            'type' => count($schedule->dates) === 1 ? 'single' : 'recurring',
+            'room_id' => $input['room_id'], 'start_date' => $schedule->firstDate(), 'end_date' => $schedule->lastDate(),
+            'start_time' => $schedule->startTime, 'end_time' => $schedule->endTime,
             'purpose' => $input['purpose'], 'participants' => 0,
         ];
-        if ($dateError = $this->validateBookingDateRange($data['start_date'], $data['end_date'])) {
-            return back()->withInput()->withErrors(['start_at' => $dateError]);
-        }
-        if ($data['start_time'] < '06:30' || $data['end_time'] > '21:30' || $data['start_time'] >= $data['end_time']) {
-            return back()->withInput()->withErrors(['start_time' => 'Jam peminjaman harus berada pada rentang 06.30–21.30 WIB.']);
-        }
 
-        if (! app(RoomAvailabilityService::class)->coverage($data['start_date'], $data['end_date'])['ready']) {
-            throw ValidationException::withMessages(['availability' => 'Sumber jadwal semester belum lengkap untuk tanggal tersebut.']);
-        }
-        $dates = [];
-        for ($day = Carbon::parse($data['start_date']); $day->lte(Carbon::parse($data['end_date'])); $day->addDay()) {
-            $dates[] = $day->toDateString();
-        }
-
-        DB::transaction(function () use ($data, $dates, $request) {
+        DB::transaction(function () use ($data, $schedule, $request, $availability) {
             AcademicPeriod::orderBy('id')->lockForUpdate()->get();
-            if (! app(RoomAvailabilityService::class)->coverage($data['start_date'], $data['end_date'])['ready']) {
-                throw ValidationException::withMessages(['availability' => 'Sumber jadwal berubah. Muat ulang.']);
-            }
+            $this->ensureActiveSemester($schedule);
+            $this->ensureScheduleCoverage($availability, $schedule);
             // Lock the room as the serialization point for all bookings and imports for it.
             $room = Room::query()->whereKey($data['room_id'])->lockForUpdate()->firstOrFail();
             abort_unless($room->isBookableClassroom(), 422, 'Peminjaman memerlukan ruang berlabel KELAS dan berstatus Dapat Dipakai.');
 
-            $busy = app(RoomAvailabilityService::class)->forRange($data['start_date'], $data['end_date']);
-            foreach ($dates as $date) {
-                foreach ($busy[$date][$room->id] ?? [] as $slot) {
-                    if ($slot['start'] < RoomTimeWindows::minutes($data['end_time'], true) && $slot['end'] > RoomTimeWindows::minutes($data['start_time'])) {
-                        throw ValidationException::withMessages(['availability' => 'Pemakaian ruang bentrok pada '.$date]);
-                    }
-                }
+            $busy = $availability->forRange($data['start_date'], $data['end_date']);
+            if ($date = $schedule->firstConflict($busy, $room->id)) {
+                throw ValidationException::withMessages(['availability' => 'Pemakaian ruang bentrok pada '.$date]);
             }
 
             $booking = Booking::create($data + ['user_id' => $request->user()->id, 'status' => 'pending']);
-            foreach ($dates as $date) {
+            foreach ($schedule->dates as $date) {
                 $booking->occurrences()->create([
                     'usage_date' => $date,
                     'start_time' => $data['start_time'],
