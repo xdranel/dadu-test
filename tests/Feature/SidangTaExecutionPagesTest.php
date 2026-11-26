@@ -38,13 +38,13 @@ test('student execution pages have identity cards and no scheduling controls', f
         ->assertSee(route('sidang-ta-execution.show', $s['registration']))
         ->assertDontSee('Tetapkan Jadwal')->assertDontSee('Cari ketersediaan');
     $this->get('/dashboard/sidang-ta-execution/'.$s['registration']->getRouteKey())->assertOk()
-        ->assertSee('Peserta TA')->assertSee($s['student']->student_number)->assertSee('Riwayat Status')->assertDontSee('ID Pengajuan');
+        ->assertSee('Peserta TA')->assertSee($s['student']->student_number)->assertDontSee('Riwayat Status')->assertDontSee('ID Pengajuan');
     $other = User::factory()->create(['status' => 'active']);
     $other->givePermissionTo('sidang_ta_registration_read');
     $this->actingAs($other)->get('/dashboard/sidang-ta-execution/'.$s['registration']->getRouteKey())->assertForbidden();
 });
 
-test('admin and student execution detail render the same timeline without exposing staff notes to students', function () {
+test('only admin execution detail renders the status timeline and staff notes', function () {
     $s = $this->s;
     $schedule = $s['registration']->roomSchedule()->create(['student_number' => $s['student']->student_number]);
     $schedule->executionLogs()->create([
@@ -60,7 +60,7 @@ test('admin and student execution detail render the same timeline without exposi
         ->assertOk()->assertSeeInOrder(['Riwayat Status', 'Perubahan hasil · Belum ada hasil → Lulus', 'Penetapan jadwal'])
         ->assertSee('Catatan internal hasil');
     $this->actingAs($s['owner'])->get(route('sidang-ta-execution.show', $s['registration']))
-        ->assertOk()->assertSeeInOrder(['Riwayat Status', 'Perubahan hasil · Lulus', 'Penetapan jadwal'])
+        ->assertOk()->assertSee('Info Sidang')->assertDontSee('Riwayat Status')->assertDontSee('Penetapan jadwal')
         ->assertDontSee('Catatan internal hasil')->assertDontSee('Catatan internal penetapan');
 });
 
