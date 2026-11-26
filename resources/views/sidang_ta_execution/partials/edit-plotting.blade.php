@@ -2,6 +2,7 @@
     $editingPlotting = old('editing_plotting') === '1';
     $assigned = $booking?->status === 'approved' && $currentOccurrence !== null;
     $plottingValue = fn (string $field, mixed $fallback) => $editingPlotting ? (is_scalar(old($field)) ? old($field) : null) : $fallback;
+    $taType = $plottingValue('ta_type', $info['ta_type'] ?? 'Individu');
     $selectedRoomId = $plottingValue('room_id', $assigned ? $booking->room_id : $context?->preferred_room_id);
     $assignedSlot = $assigned ? [
         'date' => $currentOccurrence->usage_date->toDateString(),
@@ -31,6 +32,12 @@
             </ul>
         @endif
 
+        <label class="campus-label">Tipe TA <span class="text-rose-600">*</span>
+            <select name="ta_type" required class="campus-select mt-1" x-on:change="loadRooms()">
+                <option value="Individu" @selected($taType !== 'Kelompok')>Individu</option>
+                <option value="Kelompok" @selected($taType === 'Kelompok')>Kelompok</option>
+            </select>
+        </label>
         <label class="campus-label">Tanggal <span class="text-rose-600">*</span>
             <input type="date" name="date" required min="{{ $minimumDate }}" max="{{ $maximumDate }}" class="campus-input mt-1" x-on:change="loadRooms()"
                    value="{{ $plottingValue('date', $assigned ? $currentOccurrence->usage_date->toDateString() : $context?->preferred_date?->toDateString()) }}">

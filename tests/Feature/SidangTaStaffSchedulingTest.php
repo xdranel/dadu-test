@@ -88,7 +88,9 @@ test('staff can assign a past imported lab only at the original slot and record 
     $service = app(SidangTaStaffScheduling::class);
     expect(fn () => $service->preview($s['reviewer'], $s['registration'], '2026-11-23', '10:00', '11:30', true))->toThrow(ValidationException::class);
     $normal = $service->preview($s['reviewer'], $s['registration'], '2026-11-23', '10:00', '11:05');
-    expect(collect($normal['options'])->pluck('candidate.room_id'))->not->toContain($lab->id);
+    expect(collect($normal['options'])->pluck('candidate.room_id'))->toContain($lab->id);
+    $differentSlot = $service->preview($s['reviewer'], $s['registration'], '2026-11-23', '10:00', '11:10');
+    expect(collect($differentSlot['options'])->pluck('candidate.room_id'))->not->toContain($lab->id);
     $imported = $service->preview($s['reviewer'], $s['registration'], '2026-11-23', '10:00', '11:05', true);
     expect($imported['options'])->toHaveCount(1)->and($imported['options'][0]['candidate']['room_id'])->toBe($lab->id);
     $context = $service->confirm($s['reviewer'], $s['registration'], $imported['options'][0]['token']);

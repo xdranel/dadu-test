@@ -113,7 +113,8 @@ test('plotting template has two valid headers and one example row that the uploa
         expect($rows)->toHaveCount(3)
             ->and($rows[0][0])->toBe('Peserta TA')->and($rows[0][9])->toBe('Plotting Jadwal')
             ->and($rows[1])->toBe(SidangTaPlottingImportService::HEADERS)
-            ->and($rows[2])->toHaveCount(16)->and($rows[2][1])->toBe('0000000000');
+            ->and($rows[2])->toHaveCount(17)->and($rows[2][1])->toBe('0000000000')
+            ->and($rows[1][16])->toBe('Tipe TA')->and($rows[2][16])->toBe('Individu');
 
         $s['period']->update(['name' => $rows[2][0]]);
         $s['registration']->update(['student_number' => $rows[2][1]]);

@@ -35,7 +35,8 @@ test('bookingui111_admin_management_cards_are_separate_from_review', function ()
     $s = $this->s;
     $this->actingAs($s['reviewer'])->get(route('admin.sidang-ta-registrations.index'))->assertOk()->assertDontSee('data-manage-ta-execution', false)->assertSee('Kelola Periode');
     $this->get(route('admin.sidang-ta-execution.index'))->assertOk()->assertSee('Kelola Pelaksanaan');
-    $this->get(route('admin.sidang-ta-execution.show', $s['registration']))->assertOk()->assertSee('Cari ketersediaan')->assertDontSee('Dijadwalkan melalui dosen');
+    $this->get(route('admin.sidang-ta-execution.show', $s['registration']))->assertOk()->assertSee('Cari ketersediaan')
+        ->assertSeeInOrder(['Plotting Jadwal', 'Tipe TA', 'Individu'])->assertDontSee('Dijadwalkan melalui dosen');
 });
 
 test('plotting editor appears on eligible staff detail with the imported values and room options', function () {
@@ -50,22 +51,28 @@ test('plotting editor appears on eligible staff detail with the imported values 
         'preferred_start_time' => '08:30',
         'preferred_end_time' => '09:40',
         'preferred_room_id' => $s['rooms']['lab']->id,
-        'participant_data' => ['examiner_1_code' => 'EX1'],
+        'participant_data' => ['examiner_1_code' => 'EX1', 'ta_type' => 'Kelompok'],
     ]);
     $adminDetail = route('admin.sidang-ta-execution.show', $s['registration']);
-    $response = $this->actingAs($s['reviewer'])->get($adminDetail)->assertOk()->assertSee('Edit Data');
+    $response = $this->actingAs($s['reviewer'])->get($adminDetail)->assertOk()
+        ->assertSee('Edit Data')->assertDontSee('Cek LAB dari Excel');
     $editor = (new Crawler($response->getContent()))->filter('form:has(input[name="editing_plotting"])');
     expect($editor->attr('action'))->toBe(route('admin.sidang-ta-execution.plotting', $s['registration']))
         ->and($editor->filter('input[name="date"]')->attr('value'))->toBe('2026-11-24')
         ->and($editor->filter('input[name="start_time"]')->attr('value'))->toBe('08:30')
         ->and($editor->attr('x-data'))->toContain('sidang-ta-execution', 'plotting-rooms')
+        ->and($editor->filter('select[name="ta_type"]')->attr('x-on:change'))->toBe('loadRooms()')
+        ->and($editor->filter('select[name="ta_type"] option[selected]')->attr('value'))->toBe('Kelompok')
         ->and($editor->filter('select[name="examiner_1_code"] option[selected]')->attr('value'))->toBe('EX1');
 
     $roomOptions = route('admin.sidang-ta-execution.plotting-rooms', $s['registration']);
-    $this->getJson($roomOptions.'?date=2026-11-24&start_time=08:30&end_time=09:40')->assertOk()
+    $this->getJson($roomOptions.'?date=2026-11-24&start_time=08:30&end_time=09:40&ta_type=Individu')->assertOk()
         ->assertJsonFragment(['id' => $s['rooms']['lab']->id])->assertJsonMissing(['id' => $s['rooms']['unknown']->id]);
+    $this->getJson($roomOptions.'?date=2026-11-24&start_time=08:30&end_time=09:40&ta_type=Kelompok')->assertOk()
+        ->assertJsonFragment(['id' => $s['rooms']['unknown']->id]);
 
-    $this->actingAs($s['owner'])->get(route('sidang-ta-execution.show', $s['registration']))->assertOk()->assertDontSee('Edit Data');
+    $this->actingAs($s['owner'])->get(route('sidang-ta-execution.show', $s['registration']))
+        ->assertOk()->assertSeeInOrder(['Plotting Jadwal', 'Tipe TA', 'Kelompok'])->assertDontSee('Edit Data');
     $s['settings']->update(['is_active' => false]);
     $this->actingAs($s['reviewer'])->get($adminDetail)->assertOk()->assertDontSee('Edit Data');
 });

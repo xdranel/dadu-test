@@ -1,7 +1,7 @@
 <x-app-layout><x-slot name="header">Review Pelaksanaan Sidang TA</x-slot>
 <div class="space-y-5">
 @include('sidang_ta_execution.partials.notices')
-@if($canReview && auth()->user()->can('sidang_ta_period_read'))<section class="campus-card space-y-3 p-5"><h2 class="font-bold">Pelaksanaan Sidang TA</h2><p class="text-sm text-slate-500">Atur periode pelaksanaan, hari dan jam pencarian ruang kelas.</p><a class="btn btn-secondary" href="{{ route('admin.sidang-ta-execution.settings') }}">Kelola Pelaksanaan</a></section>@endif
+@if($canReview && auth()->user()->can('sidang_ta_period_read'))<section class="campus-card space-y-3 p-5"><h2 class="font-bold">Pelaksanaan Sidang TA</h2><p class="text-sm text-slate-500">Atur periode, hari dan jam pencarian ruang sidang.</p><a class="btn btn-secondary" href="{{ route('admin.sidang-ta-execution.settings') }}">Kelola Pelaksanaan</a></section>@endif
 @php
     $statusLabels = \App\Services\SidangTaExecutionQuery::STATUSES;
 @endphp
@@ -71,7 +71,7 @@
                 <button type="submit" class="btn btn-primary">Impor plotting</button>
                 <a class="btn btn-secondary" href="{{ route('admin.sidang-ta-execution.template') }}">Unduh Template</a>
             </div>
-            <p class="text-xs text-slate-600 sm:col-span-full">Pertahankan dua baris header dan ganti baris contoh. Gunakan tanggal dd/mm/yyyy. Isi kode ruang jika kelas atau LAB sudah ditentukan.</p>
+            <p class="text-xs text-slate-600 sm:col-span-full">Gunakan tanggal dd/mm/yyyy. Tipe TA yang kosong dianggap Individu. Kode ruang yang tersedia langsung ditetapkan saat impor. Jika kode ruang kosong, baris tersimpan sebagai rencana plotting.</p>
         </form>
     </details>
 @endif

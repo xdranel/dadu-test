@@ -9,6 +9,7 @@ use App\Models\Lecturer;
 use App\Models\Room;
 use App\Models\SidangTaPeriod;
 use App\Models\SidangTaRegistration;
+use App\Models\SidangTaSchedule;
 use App\Services\SidangTaBookingAdministration;
 use App\Services\SidangTaExecutionExport;
 use App\Services\SidangTaExecutionInfoService;
@@ -18,8 +19,10 @@ use App\Services\SidangTaExecutionWindowService;
 use App\Services\SidangTaHistoryPresenter;
 use App\Services\SidangTaPlottingImportService;
 use App\Services\SidangTaProgramAccess;
+use App\Services\SidangTaSessionAvailability;
 use App\Services\SidangTaStaffScheduling;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 
 class SidangTaExecutionController extends Controller
 {
@@ -57,7 +60,7 @@ class SidangTaExecutionController extends Controller
         $info = $service->forRegistration($registration);
         $canReview = request()->user()->can('sidang_ta_registration_review');
         $events = app(SidangTaHistoryPresenter::class)->forExecution($registration, staff: $canReview);
-        $rooms = $canReview ? Room::bookableClassrooms()->orderBy('room_code')->get() : collect();
+        $rooms = $canReview ? app(SidangTaSessionAvailability::class)->eligibleRooms($registration->roomSchedule?->taType() ?? 'Individu')->sortBy('room_code') : collect();
         $preferredRoomId = $registration->roomSchedule?->preferred_room_id;
         if ($canReview && $preferredRoomId && ! $rooms->contains('id', $preferredRoomId)) {
             $preferred = Room::where('label', 'LAB')->where('status', 'Dapat Dipakai')->find($preferredRoomId);
@@ -102,6 +105,7 @@ class SidangTaExecutionController extends Controller
             'date' => ['required', 'date_format:Y-m-d'],
             'start_time' => ['required', 'date_format:H:i'],
             'end_time' => ['required', 'date_format:H:i', 'after:start_time'],
+            'ta_type' => ['sometimes', 'required', Rule::in(SidangTaSchedule::TA_TYPES)],
         ]);
 
         return response()->json($service->plottingRooms($request->user(), $sidang_ta_registration, $slot), headers: ['Cache-Control' => 'private, no-store']);
@@ -123,6 +127,7 @@ class SidangTaExecutionController extends Controller
             'start_time' => ['required', 'date_format:H:i'],
             'end_time' => ['required', 'date_format:H:i', 'after:start_time'],
             'room_id' => ['nullable', 'integer', 'exists:rooms,id'],
+            'ta_type' => ['sometimes', 'required', Rule::in(SidangTaSchedule::TA_TYPES)],
             'examiner_1_code' => ['present', 'nullable', 'string', 'max:255'],
             'examiner_2_code' => ['present', 'nullable', 'string', 'max:255'],
             'reason' => ['nullable', 'string', 'max:2000'],
@@ -142,7 +147,7 @@ class SidangTaExecutionController extends Controller
         $result = $service->import($request->user(), $period, $request->file('file')->getRealPath());
 
         return redirect()->route('admin.sidang-ta-execution.index', ['period' => $period->getRouteKey()])->with('import_result', $result)
-            ->with('success', 'Plotting diperiksa. Ruangan dipesan setelah jadwal ditetapkan.');
+            ->with('success', 'Pemeriksaan impor plotting selesai. Lihat hasil impor untuk rincian penetapan jadwal.');
     }
 
     public function export(Request $request, SidangTaExecutionQuery $query, SidangTaExecutionExport $export)

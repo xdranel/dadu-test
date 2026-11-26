@@ -29,12 +29,6 @@
             @php
                 $hasFinalOutcome = in_array($context?->result_status, ['passed', 'failed'], true);
                 $roomsById = $rooms->keyBy('id');
-                $importedLab = $roomsById->get($context?->preferred_room_id);
-                $canSearchImportedLab = $canChooseDate
-                    && $context?->planning_source === 'import'
-                    && $importedLab?->label === 'LAB'
-                    && $importedLab->status === 'Dapat Dipakai'
-                    && $context->preferred_date && $context->preferred_start_time && $context->preferred_end_time;
                 $initialDate = $preview['slot']['date'] ?? $context?->preferred_date?->format('Y-m-d') ?? $currentOccurrence?->usage_date?->format('Y-m-d');
                 $initialStartTime = substr($preview['slot']['start_time'] ?? $context?->preferred_start_time ?? $currentOccurrence?->start_time ?? '', 0, 5);
                 $initialEndTime = substr($preview['slot']['end_time'] ?? $context?->preferred_end_time ?? $currentOccurrence?->end_time ?? '', 0, 5);
@@ -43,7 +37,7 @@
             @if($registration->status === 'approved' && !$hasFinalOutcome)
                 <section class="campus-card space-y-4 p-5">
                     <h2 class="font-bold">{{ $context?->was_confirmed ? 'Cari jadwal pengganti' : 'Tetapkan jadwal sidang' }}</h2>
-                    <p class="text-sm text-slate-500">Cari ruang kelas yang tersedia pada tanggal dan jam yang dipilih. Semua jam menggunakan WIB.</p>
+                    <p class="text-sm text-slate-500">Cari ruang yang tersedia pada tanggal dan jam yang dipilih. Semua jam menggunakan WIB.</p>
                     <p class="text-xs text-slate-500">Ketersediaan ruangan belum memastikan kehadiran pembimbing dan penguji.</p>
 
                     <form method="POST" action="{{ route('admin.sidang-ta-execution.preview', $registration) }}">
@@ -73,18 +67,6 @@
                             Pencarian belum tersedia. Atur atau aktifkan rentang Pelaksanaan Sidang TA terlebih dahulu.
                         @endif
                     </p>
-
-                    @if($canSearchImportedLab)
-                        <form method="POST" action="{{ route('admin.sidang-ta-execution.preview', $registration) }}" class="flex flex-wrap items-center gap-3">
-                            @csrf
-                            <input type="hidden" name="imported_lab" value="1">
-                            <input type="hidden" name="date" value="{{ $context->preferred_date->format('Y-m-d') }}">
-                            <input type="hidden" name="start_time" value="{{ substr($context->preferred_start_time, 0, 5) }}">
-                            <input type="hidden" name="end_time" value="{{ substr($context->preferred_end_time, 0, 5) }}">
-                            <button class="btn btn-secondary">Cek LAB dari Excel</button>
-                            <p class="text-sm text-slate-600">{{ $importedLab->room_code }} · {{ $context->preferred_date->format('d/m/Y') }} · {{ substr($context->preferred_start_time, 0, 5) }}–{{ substr($context->preferred_end_time, 0, 5) }} WIB</p>
-                        </form>
-                    @endif
 
                     @if($preview !== null)
                         @if(count($preview['options']))

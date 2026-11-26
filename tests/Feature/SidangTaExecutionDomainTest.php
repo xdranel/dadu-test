@@ -22,13 +22,17 @@ beforeEach(function () {
     $this->domainScenario = TaRoomScenario::make();
 });
 
-function executionDomainFile(array $rows): string
+function executionDomainFile(array $rows, bool $withTaType = false): string
 {
     $path = tempnam(sys_get_temp_dir(), 'execution-domain-').'.xlsx';
     $writer = new Writer;
     $writer->openToFile($path);
     $writer->addRow(new Row(array_map(fn ($v) => new StringCell($v, null), ['Peserta TA', '', '', '', '', '', '', '', '', 'Plotting Jadwal'])));
-    $writer->addRow(new Row(array_map(fn ($v) => new StringCell($v, null), ['Periode Sidang TA', 'NIM', 'Nama Mahasiswa', 'Program Studi', 'Status Pengajuan', 'Kelompok Keahlian', 'Judul TA', 'Kode Dosen Pembimbing 1', 'Kode Dosen Pembimbing 2', 'Hari', 'Tanggal', 'Jam Mulai', 'Jam Selesai', "Ruang\n(diisi oleh AKD)", 'Kode Penguji 1', 'Kode Penguji 2'])));
+    $headers = ['Periode Sidang TA', 'NIM', 'Nama Mahasiswa', 'Program Studi', 'Status Pengajuan', 'Kelompok Keahlian', 'Judul TA', 'Kode Dosen Pembimbing 1', 'Kode Dosen Pembimbing 2', 'Hari', 'Tanggal', 'Jam Mulai', 'Jam Selesai', "Ruang\n(diisi oleh AKD)", 'Kode Penguji 1', 'Kode Penguji 2'];
+    if ($withTaType) {
+        $headers[] = 'Tipe TA';
+    }
+    $writer->addRow(new Row(array_map(fn ($v) => new StringCell($v, null), $headers)));
     foreach ($rows as $values) {
         $writer->addRow(new Row(array_map(fn ($v) => $v instanceof DateTimeInterface ? new DateTimeCell($v, null) : (is_float($v) || is_int($v) ? new NumericCell($v, null) : new StringCell((string) $v, null)), $values)));
     }
@@ -48,9 +52,9 @@ function executionDomainBooked(array $s)
     return $s['registration']->roomSchedule()->create(['student_number' => $s['student']->student_number, 'state' => 'confirmed', 'was_confirmed' => true, 'room_booking_request_id' => $booking->id]);
 }
 
-test('domain plotting serial dates and room preferences never reserve a room', function () {
+test('domain plotting serial dates without a room save only the preference', function () {
     $s = $this->domainScenario;
-    $path = executionDomainFile([executionDomainRow($s, [13 => 'A'])]);
+    $path = executionDomainFile([executionDomainRow($s)]);
     try {
         $result = app(SidangTaPlottingImportService::class)->import($s['reviewer'], $s['period'], $path);
     } finally {
@@ -58,32 +62,71 @@ test('domain plotting serial dates and room preferences never reserve a room', f
     }
     expect($result['processed'])->toHaveCount(1)->and($result['errors'])->toBeEmpty();
     $context = $s['registration']->roomSchedule()->firstOrFail();
-    expect($context->preferred_date->format('Y-m-d'))->toBe('2026-11-23')->and(substr($context->preferred_start_time, 0, 5))->toBe('08:00')->and($context->preferred_room_id)->toBe($s['rooms']['a']->id)->and($context->room_booking_request_id)->toBeNull();
+    expect($context->preferred_date->format('Y-m-d'))->toBe('2026-11-23')->and(substr($context->preferred_start_time, 0, 5))->toBe('08:00')->and($context->preferred_room_id)->toBeNull()->and($context->room_booking_request_id)->toBeNull();
     expect(app(SidangTaExecutionInfoService::class)->forRegistration($s['registration'])['room'])->toBeNull();
     expect(RoomBookingRequest::count())->toBe(0);
 });
 
-test('domain plotting keeps exact short and long slots for an active lab specified by code', function () {
+test('domain plotting books exact short and long slots for an active lab specified by code', function (string $end) {
     $s = $this->domainScenario;
     $lab = $s['rooms']['lab'];
     $lab->update(['label' => 'LAB']);
-    foreach (['08:45', '10:15'] as $end) {
-        $path = executionDomainFile([executionDomainRow($s, [10 => '23/11/2026', 11 => '08:00', 12 => $end, 13 => $lab->room_code])]);
+    $path = executionDomainFile([executionDomainRow($s, [10 => '23/11/2026', 11 => '08:00', 12 => $end, 13 => $lab->room_code, 16 => '  kELomPOK  '])], withTaType: true);
+    try {
+        $result = app(SidangTaPlottingImportService::class)->import($s['reviewer'], $s['period'], $path);
+    } finally {
+        unlink($path);
+    }
+
+    expect($result['processed'])->toHaveCount(1)->and($result['errors'])->toBeEmpty();
+    $context = $s['registration']->roomSchedule()->firstOrFail();
+    expect($context->planning_source)->toBe('import')
+        ->and($context->preferred_date->format('Y-m-d'))->toBe('2026-11-23')
+        ->and($context->preferred_start_time)->toBe('08:00:00')
+        ->and($context->preferred_end_time)->toBe($end.':00')
+        ->and($context->preferred_room_id)->toBe($lab->id)
+        ->and($context->participant_data['ta_type'])->toBe('Kelompok')
+        ->and($context->booking->room_id)->toBe($lab->id)
+        ->and($context->booking->occurrences()->sole()->end_time)->toBe($end.':00');
+})->with(['08:45', '10:15']);
+
+test('domain plotting retries an identical room preference when the imported slot becomes free', function () {
+    $s = $this->domainScenario;
+    $busy = RoomBookingRequest::create(['user_id' => $s['reviewer']->id, 'room_id' => $s['rooms']['a']->id, 'type' => 'single', 'start_date' => '2026-11-23', 'end_date' => '2026-11-23', 'start_time' => '08:00', 'end_time' => '09:30', 'purpose' => 'Sesi lain', 'participants' => 1, 'status' => 'approved']);
+    $busy->occurrences()->create(['usage_date' => '2026-11-23', 'start_time' => '08:00', 'end_time' => '09:30']);
+    $path = executionDomainFile([executionDomainRow($s, [13 => $s['rooms']['a']->room_code])]);
+    try {
+        $service = app(SidangTaPlottingImportService::class);
+        $first = $service->import($s['reviewer'], $s['period'], $path);
+        expect($first['errors'])->toHaveCount(1)->and($first['errors'][0]['message'])->toContain('Preferensi plotting disimpan');
+        $context = $s['registration']->roomSchedule()->firstOrFail();
+        expect($context->preferred_room_id)->toBe($s['rooms']['a']->id)->and($context->room_booking_request_id)->toBeNull();
+        $busy->update(['status' => 'cancelled']);
+
+        $second = $service->import($s['reviewer'], $s['period'], $path);
+        expect($second['processed'])->toHaveCount(1)->and($second['errors'])->toBeEmpty();
+        expect($context->fresh()->booking->room_id)->toBe($s['rooms']['a']->id);
+        $third = $service->import($s['reviewer'], $s['period'], $path);
+        expect($third['skipped'])->toHaveCount(1)->and(RoomBookingRequest::count())->toBe(2);
+    } finally {
+        unlink($path);
+    }
+});
+
+test('domain plotting defaults an empty TA type to individual and rejects other values', function () {
+    $s = $this->domainScenario;
+    $service = app(SidangTaPlottingImportService::class);
+    foreach (['Tim' => 'errors', ' ' => 'processed'] as $type => $group) {
+        $path = executionDomainFile([executionDomainRow($s, [16 => $type])], withTaType: true);
         try {
-            $result = app(SidangTaPlottingImportService::class)->import($s['reviewer'], $s['period'], $path);
+            $result = $service->import($s['reviewer'], $s['period'], $path);
         } finally {
             unlink($path);
         }
-
-        expect($result['processed'])->toHaveCount(1)->and($result['errors'])->toBeEmpty();
-        $context = $s['registration']->roomSchedule()->firstOrFail();
-        expect($context->planning_source)->toBe('import')
-            ->and($context->preferred_date->format('Y-m-d'))->toBe('2026-11-23')
-            ->and($context->preferred_start_time)->toBe('08:00:00')
-            ->and($context->preferred_end_time)->toBe($end.':00')
-            ->and($context->preferred_room_id)->toBe($lab->id);
-        expect(RoomBookingRequest::count())->toBe(0);
+        expect($result[$group])->toHaveCount(1);
     }
+
+    expect(app(SidangTaExecutionInfoService::class)->forRegistration($s['registration']->fresh())['ta_type'])->toBe('Individu');
 });
 
 test('domain plotting rejects labs by name and rejects inactive labs or aula by code', function () {
@@ -193,6 +236,7 @@ test('domain plotting template and scheduled export use day month year dates', f
             unlink($path);
         }
         expect($third[10] ?? null)->toBe('23/11/2026');
+        expect($third[16] ?? null)->toBe('Individu');
     }
 });
 

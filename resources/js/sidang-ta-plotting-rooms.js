@@ -14,6 +14,7 @@ export default function sidangTaPlottingRooms(endpoint, roomId, assignedSlot) {
             const slot = Object.fromEntries(['date', 'start_time', 'end_time'].map((field) => [
                 field, this.$el.elements.namedItem(field).value,
             ]));
+            const taType = this.$el.elements.namedItem('ta_type').value;
             const selectedRoom = this.roomId;
             this.rooms = [];
             this.keepAssignedRoom = assignedSlot !== null && Object.keys(slot).every((field) => slot[field] === assignedSlot[field]);
@@ -30,7 +31,7 @@ export default function sidangTaPlottingRooms(endpoint, roomId, assignedSlot) {
             this.message = 'Memeriksa ketersediaan ruang…';
 
             try {
-                const response = await fetch(`${endpoint}?${new URLSearchParams(slot)}`, {
+                const response = await fetch(`${endpoint}?${new URLSearchParams({...slot, ta_type: taType})}`, {
                     signal: request.signal,
                     headers: { Accept: 'application/json' },
                 });

@@ -6,6 +6,8 @@ use Illuminate\Database\Eloquent\Model;
 
 class SidangTaSchedule extends Model
 {
+    public const TA_TYPES = ['Individu', 'Kelompok'];
+
     protected $guarded = [];
 
     protected $attributes = ['mode' => 'automatic', 'state' => 'unassigned', 'was_confirmed' => false,
@@ -13,6 +15,11 @@ class SidangTaSchedule extends Model
 
     protected $casts = ['was_confirmed' => 'boolean', 'lock_version' => 'integer',
         'participant_data' => 'array', 'details_snapshot' => 'array', 'preferred_date' => 'date', 'result_at' => 'datetime'];
+
+    public function taType(): string
+    {
+        return ($this->participant_data['ta_type'] ?? null) === 'Kelompok' ? 'Kelompok' : 'Individu';
+    }
 
     public function executionLogs()
     {

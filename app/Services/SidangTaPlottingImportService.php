@@ -17,7 +17,9 @@ class SidangTaPlottingImportService
 {
     public const GROUP_HEADERS = [0 => 'Peserta TA', 9 => 'Plotting Jadwal'];
 
-    public const HEADERS = ['Periode Sidang TA', 'NIM', 'Nama Mahasiswa', 'Program Studi', 'Status Pengajuan', 'Kelompok Keahlian', 'Judul TA', 'Kode Dosen Pembimbing 1', 'Kode Dosen Pembimbing 2', 'Hari', 'Tanggal', 'Jam Mulai', 'Jam Selesai', "Ruang\n(diisi oleh AKD)", 'Kode Penguji 1', 'Kode Penguji 2'];
+    public const HEADERS = ['Periode Sidang TA', 'NIM', 'Nama Mahasiswa', 'Program Studi', 'Status Pengajuan', 'Kelompok Keahlian', 'Judul TA', 'Kode Dosen Pembimbing 1', 'Kode Dosen Pembimbing 2', 'Hari', 'Tanggal', 'Jam Mulai', 'Jam Selesai', "Ruang\n(diisi oleh AKD)", 'Kode Penguji 1', 'Kode Penguji 2', 'Tipe TA'];
+
+    private const LEGACY_COLUMN_COUNT = 16;
 
     public function import(User $actor, SidangTaPeriod $period, string $path): array
     {
@@ -35,6 +37,7 @@ class SidangTaPlottingImportService
             foreach ($reader->getSheetIterator() as $sheet) {
                 $hasSheet = true;
                 $number = 0;
+                $columnCount = count(self::HEADERS);
                 foreach ($sheet->getRowIterator() as $row) {
                     $number++;
                     // Duplicate detection needs the whole sheet; bound memory before retaining rows.
@@ -53,10 +56,11 @@ class SidangTaPlottingImportService
                         continue;
                     }
                     if ($number === 2) {
-                        if (count($values) !== count(self::HEADERS)) {
-                            $this->invalid('Template plotting harus memiliki 16 kolom.');
+                        $columnCount = count($values);
+                        if (! in_array($columnCount, [self::LEGACY_COLUMN_COUNT, count(self::HEADERS)], true)) {
+                            $this->invalid('Template plotting harus memiliki 16 atau 17 kolom.');
                         }
-                        foreach (self::HEADERS as $index => $header) {
+                        foreach (array_slice(self::HEADERS, 0, $columnCount) as $index => $header) {
                             if ($this->normalize((string) ($values[$index] ?? '')) !== $this->normalize($header)) {
                                 $this->invalid('Header plotting tidak sesuai pada kolom '.($index + 1).'.');
                             }
@@ -74,7 +78,7 @@ class SidangTaPlottingImportService
                             $unsafe = true;
                         }
                     }
-                    $rows[] = ['row' => $number, 'values' => array_pad($values, 16, null), 'unsafe' => $unsafe, 'wide' => count($values) > 16];
+                    $rows[] = ['row' => $number, 'values' => array_pad($values, count(self::HEADERS), null), 'unsafe' => $unsafe, 'wide' => count($values) > $columnCount];
                 }
                 if ($number < 2) {
                     $this->invalid('Dua baris header plotting diperlukan.');
@@ -142,13 +146,16 @@ class SidangTaPlottingImportService
                             $participant[$key] = $value;
                         }
                     }
+                    if ($taType = $this->taType($values[16])) {
+                        $participant['ta_type'] = $taType;
+                    }
                     $roomReference = $this->text($values[13]);
-                    $outcome = app(SidangTaBookingLock::class)->run($registration->id, [], function ($reg, $context, $setting) use ($actor, $period, $participant, $date, $start, $end, $roomReference) {
+                    [$group, $message] = app(SidangTaBookingLock::class)->run($registration->id, [], function ($reg, $context, $setting) use ($actor, $period, $participant, $date, $start, $end, $roomReference) {
                         if ($reg->sidang_ta_period_id !== $period->id || $reg->status !== 'approved') {
                             $this->invalid('Pengajuan atau periode berubah; impor ulang.');
                         }
                         if ($context->was_confirmed || $context->booking || ! empty($context->details_snapshot)) {
-                            return 'Jadwal yang sudah ditetapkan dipertahankan.';
+                            return ['skipped', 'Jadwal yang sudah ditetapkan dipertahankan.'];
                         }
                         if ($setting) {
                             app(SidangTaExecutionWindowService::class)->assertStaffSlot($setting, $date, $start, $end);
@@ -166,18 +173,32 @@ class SidangTaPlottingImportService
                             && $context->preferred_start_time === $start.':00'
                             && $context->preferred_end_time === $end.':00'
                             && ($context->preferred_room_id === null ? null : (int) $context->preferred_room_id) === $room?->id;
-                        if ($unchanged) {
-                            return 'Plotting identik sudah tersimpan.';
+                        if (! $unchanged) {
+                            $before = $context->getOriginal();
+                            $context->fill(['participant_data' => $participant, 'planning_source' => 'import', 'preferred_date' => $date, 'preferred_start_time' => $start.':00', 'preferred_end_time' => $end.':00', 'preferred_room_id' => $room?->id]);
+                            $context->lock_version++;
+                            $context->save();
+                            $context->executionLogs()->create(['action' => 'plotting_imported', 'from_status' => $context->state, 'to_status' => $context->state, 'notes' => 'Preferensi plotting disimpan dari Excel.', 'data' => ['previous' => array_intersect_key($before, array_flip(['participant_data', 'planning_source', 'preferred_date', 'preferred_start_time', 'preferred_end_time', 'preferred_room_id']))], 'performed_by' => $actor->id, 'performed_at' => now()]);
                         }
-                        $before = $context->getOriginal();
-                        $context->fill(['participant_data' => $participant, 'planning_source' => 'import', 'preferred_date' => $date, 'preferred_start_time' => $start.':00', 'preferred_end_time' => $end.':00', 'preferred_room_id' => $room?->id]);
-                        $context->lock_version++;
-                        $context->save();
-                        $context->executionLogs()->create(['action' => 'plotting_imported', 'from_status' => $context->state, 'to_status' => $context->state, 'notes' => 'Impor preferensi plotting; menunggu Tetapkan Jadwal.', 'data' => ['previous' => array_intersect_key($before, array_flip(['participant_data', 'planning_source', 'preferred_date', 'preferred_start_time', 'preferred_end_time', 'preferred_room_id']))], 'performed_by' => $actor->id, 'performed_at' => now()]);
+                        if (! $room) {
+                            return $unchanged
+                                ? ['skipped', 'Plotting identik sudah tersimpan.']
+                                : ['processed', 'Preferensi plotting disimpan; menunggu Tetapkan Jadwal.'];
+                        }
 
-                        return null;
+                        try {
+                            app(SidangTaStaffScheduling::class)->assignImported($actor, $reg, $context, $setting, $room, [
+                                'date' => $date, 'start_time' => $start, 'end_time' => $end,
+                            ]);
+                        } catch (ValidationException $e) {
+                            $reason = collect($e->errors())->flatten()->implode(' ');
+
+                            return ['errors', 'Preferensi plotting disimpan. Jadwal belum ditetapkan. '.$reason];
+                        }
+
+                        return ['processed', 'Jadwal plotting ditetapkan.'];
                     });
-                    $result[$outcome ? 'skipped' : 'processed'][] = $report + ['message' => $outcome ?? 'Preferensi plotting disimpan; menunggu Tetapkan Jadwal.'];
+                    $result[$group][] = $report + ['message' => $message];
                 } catch (ValidationException $e) {
                     $result['errors'][] = $report + ['message' => collect($e->errors())->flatten()->implode(' ')];
                 }
@@ -195,6 +216,16 @@ class SidangTaPlottingImportService
     private function normalize(string $value): string
     {
         return mb_strtolower(trim(preg_replace('/\s+/u', ' ', $value)));
+    }
+
+    private function taType(mixed $value): ?string
+    {
+        return match ($this->normalize($this->text($value))) {
+            '' => null,
+            'individu' => 'Individu',
+            'kelompok' => 'Kelompok',
+            default => $this->invalid('Tipe TA harus Individu atau Kelompok.'),
+        };
     }
 
     private function resolveRoom(string $reference): Room

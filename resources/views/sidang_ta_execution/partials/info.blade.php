@@ -24,6 +24,10 @@
                 @endif
             </div>
             <dl class="space-y-3 text-sm">
+            <div class="grid gap-1 sm:grid-cols-2">
+                <dt class="text-slate-500">Tipe TA</dt>
+                <dd class="font-medium text-slate-800">{{ $info['ta_type'] ?? 'Individu' }}</dd>
+            </div>
             @foreach(['weekday'=>'Hari','date'=>'Tanggal','start_time'=>'Jam Mulai (WIB)','end_time'=>'Jam Selesai (WIB)','examiner_1_code'=>'Kode Penguji 1','examiner_2_code'=>'Kode Penguji 2'] as $key=>$label)
                 <div class="grid gap-1 sm:grid-cols-2"><dt class="text-slate-500">{{ $label }}</dt><dd class="font-medium text-slate-800">{{ $info[$key] ?: '—' }}</dd></div>
             @endforeach

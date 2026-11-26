@@ -77,7 +77,7 @@ class RoomAvailabilityService
         return $this->intervals($from, $until);
     }
 
-    public function freeRooms(Collection $rooms, string $date, string $from, string $until, ?int $exceptBookingId = null): Collection
+    public function freeRooms(Collection $rooms, string $date, string $from, string $until, int|array|null $exceptBookingId = null): Collection
     {
         $busyByRoom = $this->intervals($date, $date, $exceptBookingId)[$date];
         $start = RoomTimeWindows::minutes($from);
@@ -122,7 +122,7 @@ class RoomAvailabilityService
         return array_values($out);
     }
 
-    private function intervals(string $from, string $until, ?int $exceptBookingId = null): array
+    private function intervals(string $from, string $until, int|array|null $exceptBookingId = null): array
     {
         $dates = $this->dates($from, $until);
         $out = array_fill_keys(array_keys($dates), []);
@@ -144,7 +144,7 @@ class RoomAvailabilityService
         }
         $internal = DB::table('room_booking_occurrences as o')->join('room_booking_requests as r', 'r.id', '=', 'o.request_id')
             ->whereIn('r.status', ['pending', 'approved'])->whereDate('o.usage_date', '>=', $from)->whereDate('o.usage_date', '<=', $until)
-            ->when($exceptBookingId, fn ($q) => $q->where('r.id', '!=', $exceptBookingId))->get(['o.usage_date', 'r.room_id', 'o.start_time', 'o.end_time']);
+            ->whereNotIn('r.id', (array) $exceptBookingId)->get(['o.usage_date', 'r.room_id', 'o.start_time', 'o.end_time']);
         foreach ($internal as $s) {
             $key = substr($s->usage_date,0,10);
             $append($out[$key],$s->room_id,$s->start_time,$s->end_time);

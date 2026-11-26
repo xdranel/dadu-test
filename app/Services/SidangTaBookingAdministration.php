@@ -9,7 +9,6 @@ use App\Models\SidangTaExecutionSetting;
 use App\Models\SidangTaRegistration;
 use App\Models\SidangTaSchedule;
 use App\Models\User;
-use App\Support\RoomTimeWindows as W;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
 
@@ -70,7 +69,7 @@ class SidangTaBookingAdministration
                 throw ValidationException::withMessages(['booking_id' => 'Pilih peminjaman dosen aktif, sekali pakai, satu tanggal, dan belum tertaut.']);
             }
             $o = $b->occurrences->first();
-            $this->validateSlot($s, ['date' => $o->usage_date->toDateString(), 'room_id' => $b->room_id, 'start_time' => substr($o->start_time, 0, 5), 'end_time' => substr($o->end_time, 0, 5)], $b->id);
+            $this->validateSlot($s, ['date' => $o->usage_date->toDateString(), 'room_id' => $b->room_id, 'start_time' => substr($o->start_time, 0, 5), 'end_time' => substr($o->end_time, 0, 5)], $b);
             app(SidangTaBookingService::class)->assertNoOtherActive($r, $c);
             $before = $b->getRawOriginal();
             $b->sidang_ta_registration_id = $r->id;
@@ -82,7 +81,7 @@ class SidangTaBookingAdministration
         });
     }
 
-    private function validateSlot(?SidangTaExecutionSetting $s, array $slot, ?int $except = null, bool $staff = false, bool $allowImportedLab = false): array
+    private function validateSlot(?SidangTaExecutionSetting $s, array $slot, ?RoomBookingRequest $booking = null, bool $staff = false, bool $allowImportedLab = false, ?SidangTaRegistration $registration = null, string $taType = 'Individu'): array
     {
         $v = Validator::make($slot, ['date' => ['required', 'date_format:Y-m-d'], 'room_id' => ['required', 'integer', 'exists:rooms,id'], 'start_time' => ['required', 'date_format:H:i'], 'end_time' => ['required', 'date_format:H:i', 'after:start_time']])->validate();
         $room = Room::findOrFail($v['room_id']);
@@ -103,10 +102,11 @@ class SidangTaBookingAdministration
         if (! $service->coverage($v['date'], $v['date'])['ready']) {
             throw ValidationException::withMessages(['date' => 'Sumber semester belum lengkap.']);
         }
-        foreach ($service->busyIntervals($room->id, $v['date'], $except) as $busy) {
-            if ($busy['start'] < W::minutes($v['end_time']) && $busy['end'] > W::minutes($v['start_time'])) {
-                throw ValidationException::withMessages(['room_id' => 'Ruangan bentrok pada waktu tersebut.']);
-            }
+        $available = $registration
+            ? app(SidangTaSessionAvailability::class)->freeRooms(collect([$room]), $registration, $taType, $v, $booking)
+            : $service->freeRooms(collect([$room]), $v['date'], $v['start_time'], $v['end_time'], $booking?->id);
+        if ($available->isEmpty()) {
+            throw ValidationException::withMessages(['room_id' => 'Ruangan bentrok pada waktu tersebut.']);
         }
 
         return $v;
@@ -120,7 +120,7 @@ class SidangTaBookingAdministration
                 if (! $c->was_confirmed) {
                     throw ValidationException::withMessages(['schedule' => 'Tidak ada booking untuk dipindahkan.']);
                 }
-                $v = $this->validateSlot($s, $slot, staff: true, allowImportedLab: $allowImportedLab);
+                $v = $this->validateSlot($s, $slot, staff: true, allowImportedLab: $allowImportedLab, registration: $r, taType: $c->taType());
                 app(SidangTaBookingService::class)->assertNoOtherActive($r, $c);
                 $replacement = RoomBookingRequest::create(['user_id' => $actor->id, 'room_id' => $v['room_id'], 'type' => 'single', 'start_date' => $v['date'], 'end_date' => $v['date'], 'start_time' => $v['start_time'], 'end_time' => $v['end_time'], 'purpose' => 'Pengganti Sidang TA #'.$r->id, 'participants' => 1, 'status' => 'approved', 'booking_origin' => 'sidang_ta', 'sidang_ta_registration_id' => $r->id]);
                 $replacement->occurrences()->create(['usage_date' => $v['date'], 'start_time' => $v['start_time'], 'end_time' => $v['end_time']]);
@@ -135,7 +135,7 @@ class SidangTaBookingAdministration
             } elseif ($slot['date'].' '.$slot['end_time'].':00' > now('Asia/Jakarta')->format('Y-m-d H:i:s')) {
                 app(SidangTaBookingService::class)->assertNoOtherActive($r, $c);
             }
-            $this->moveBooking($actor, $b, $s, $slot, $reason, $allowImportedLab);
+            $this->moveBooking($actor, $r, $c->taType(), $b, $s, $slot, $reason, $allowImportedLab);
 
             return $c->fresh();
         });
@@ -165,15 +165,19 @@ class SidangTaBookingAdministration
                 $slot['room_id'] = $current['room_id'];
             }
             $examinerCodes = $this->examinerCodes($data);
+            $previousType = $c->taType();
+            $taType = $data['ta_type'] ?? $previousType;
+            $slotChanged = $slot !== $current;
 
-            if ($slot !== $current || ! $confirmed) {
+            if ($slotChanged || ! $confirmed || $taType !== $previousType) {
                 app(SidangTaExecutionWindowService::class)->assertStaffSlot($s, $slot['date'], $slot['start_time'], $slot['end_time']);
                 $room = $slot['room_id'] ? Room::findOrFail($slot['room_id']) : null;
-                $importedLab = $room?->label === 'LAB' && app(SidangTaStaffScheduling::class)->importedLab($c, $slot)?->id === $room->id;
-                if (($confirmed || $room) && ! $room?->isBookableClassroom() && ! $importedLab) {
-                    throw ValidationException::withMessages(['room_id' => 'Pilih ruang kelas yang dapat dipakai. Penetapan LAB mengikuti tanggal dan jam dari impor Excel.']);
+                $allowLab = $room?->label === 'LAB' && ($taType === 'Kelompok' || ($confirmed && ! $slotChanged)
+                    || app(SidangTaStaffScheduling::class)->importedLab($c, $slot)?->id === $room->id);
+                if (($confirmed || $room) && ! $room?->isBookableClassroom() && ! $allowLab) {
+                    throw ValidationException::withMessages(['room_id' => 'Pilih ruang yang dapat dipakai. LAB untuk TA Individu mengikuti ruang dan jam dari Excel.']);
                 }
-                if ($confirmed) {
+                if ($confirmed && $slotChanged) {
                     if ($reason === '') {
                         throw ValidationException::withMessages(['reason' => 'Isi alasan perubahan tanggal, jam, atau ruang.']);
                     }
@@ -181,19 +185,22 @@ class SidangTaBookingAdministration
                     if ($slot['date'].' '.$slot['end_time'].':00' > now('Asia/Jakarta')->format('Y-m-d H:i:s')) {
                         app(SidangTaBookingService::class)->assertNoOtherActive($r, $c);
                     }
-                    $this->moveBooking($actor, $booking, $s, $slot, $reason, $importedLab);
+                    $this->moveBooking($actor, $r, $taType, $booking, $s, $slot, $reason, $allowLab);
                     $c = $c->fresh();
                 } elseif ($room) {
-                    $this->validateSlot($s, $slot, staff: true, allowImportedLab: $importedLab);
+                    $this->validateSlot($s, $slot, $confirmed ? $booking : null, staff: true, allowImportedLab: $allowLab, registration: $r, taType: $taType);
                 }
             }
 
             $participant = array_replace($c->participant_data ?? [], $examinerCodes);
+            if (isset($data['ta_type'])) {
+                $participant['ta_type'] = $taType;
+            }
             $c->fill(['participant_data' => $participant, 'preferred_date' => $slot['date'], 'preferred_start_time' => $slot['start_time'].':00',
                 'preferred_end_time' => $slot['end_time'].':00', 'preferred_room_id' => $slot['room_id'],
                 'planning_source' => $slot === $preferred ? $c->planning_source : 'system'])->save();
             $c->executionLogs()->create(['action' => 'plotting_updated', 'from_status' => $c->state, 'to_status' => $c->state,
-                'notes' => $reason ?: null, 'data' => ['previous' => $current, 'updated' => $slot, 'examiner_1_code' => $participant['examiner_1_code'], 'examiner_2_code' => $participant['examiner_2_code']],
+                'notes' => $reason ?: null, 'data' => ['previous' => $current + ['ta_type' => $previousType], 'updated' => $slot + ['ta_type' => $taType], 'examiner_1_code' => $participant['examiner_1_code'], 'examiner_2_code' => $participant['examiner_2_code']],
                 'performed_by' => $actor->id, 'performed_at' => now()]);
 
             return $c;
@@ -219,9 +226,9 @@ class SidangTaBookingAdministration
         return $codes;
     }
 
-    private function moveBooking(User $actor, RoomBookingRequest $booking, ?SidangTaExecutionSetting $setting, array $slot, string $reason, bool $allowImportedLab = false): void
+    private function moveBooking(User $actor, SidangTaRegistration $registration, string $taType, RoomBookingRequest $booking, ?SidangTaExecutionSetting $setting, array $slot, string $reason, bool $allowImportedLab): void
     {
-        $v = $this->validateSlot($setting, $slot, $booking->id, staff: true, allowImportedLab: $allowImportedLab);
+        $v = $this->validateSlot($setting, $slot, $booking, staff: true, allowImportedLab: $allowImportedLab, registration: $registration, taType: $taType);
         $before = $booking->getRawOriginal() + ['occurrences' => $booking->occurrences->toArray()];
         $booking->fill(['room_id' => $v['room_id'], 'start_date' => $v['date'], 'end_date' => $v['date'], 'start_time' => $v['start_time'], 'end_time' => $v['end_time']])->save();
         $booking->occurrences()->delete();

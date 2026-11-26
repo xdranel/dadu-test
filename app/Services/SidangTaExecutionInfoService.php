@@ -21,7 +21,7 @@ class SidangTaExecutionInfoService
         $finished = in_array($context?->state, ['completed', 'cancelled', 'rejected'], true)
             || ($occurrence && $occurrence->usage_date->toDateString().' '.$occurrence->end_time <= now()->format('Y-m-d H:i:s'));
         if (! $refreshSchedule && ($historical || $finished) && is_array($context?->details_snapshot) && $context->details_snapshot !== []) {
-            return array_replace($context->details_snapshot, ['result_status' => $result, 'result_label' => self::RESULTS[$result] ?? self::RESULTS['pending'], 'scheduling_state' => $context->state]);
+            return array_replace(['ta_type' => $context->taType()], $context->details_snapshot, ['result_status' => $result, 'result_label' => self::RESULTS[$result] ?? self::RESULTS['pending'], 'scheduling_state' => $context->state]);
         }
         $participant = $context?->participant_data ?? [];
         $academic = $reg->academic_snapshot ?? [];
@@ -42,6 +42,7 @@ class SidangTaExecutionInfoService
             'advisor_2_code' => $participant['advisor_2_code'] ?? $this->code($project?->advisor_2 ?? $academic['advisor_2'] ?? null),
             'examiner_1_code' => $participant['examiner_1_code'] ?? $this->code($project?->examiner_1 ?? $academic['examiner_1'] ?? null),
             'examiner_2_code' => $participant['examiner_2_code'] ?? $this->code($project?->examiner_2 ?? $academic['examiner_2'] ?? null),
+            'ta_type' => $context?->taType() ?? 'Individu',
             'weekday' => $date ? Carbon::parse($date)->locale('id')->translatedFormat('l') : null,
             'date' => $date,
             'start_time' => $this->time($confirmed ? $occurrence->start_time : $context?->preferred_start_time),

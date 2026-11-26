@@ -38,7 +38,7 @@ class SidangTaExecutionExport
                     $dto['expertise_group'], $dto['title'], $dto['advisor_1_code'], $dto['advisor_2_code'],
                     $assigned ? $dto['weekday'] : null, $date ? $date->format('d/m/Y') : null,
                     $assigned ? $dto['start_time'] : null, $assigned ? $dto['end_time'] : null,
-                    $assigned ? $dto['room'] : null, $dto['examiner_1_code'], $dto['examiner_2_code'],
+                    $assigned ? $dto['room'] : null, $dto['examiner_1_code'], $dto['examiner_2_code'], $dto['ta_type'] ?? 'Individu',
                 ]));
             }
         });
@@ -48,8 +48,8 @@ class SidangTaExecutionExport
     {
         $options = new Options;
         $options->mergeCells(0, 1, 8, 1);
-        $options->mergeCells(9, 1, 15, 1);
-        foreach ([26, 16, 26, 24, 19, 22, 40, 19, 19, 12, 16, 14, 14, 21, 17, 17] as $column => $width) {
+        $options->mergeCells(9, 1, 16, 1);
+        foreach ([26, 16, 26, 24, 19, 22, 40, 19, 19, 12, 16, 14, 14, 21, 17, 17, 16] as $column => $width) {
             $options->setColumnWidth($width, $column + 1);
         }
 
@@ -60,7 +60,7 @@ class SidangTaExecutionExport
             $writer->addRow($this->textRow([
                 'Contoh Periode Sidang TA', '0000000000', 'Mahasiswa Contoh', 'S1 Informatika',
                 'Disetujui', 'Contoh Kelompok Keahlian', 'Judul Tugas Akhir Contoh', 'PB1', 'PB2',
-                'Senin', '23/11/2026', '08:00', '09:30', '', 'PJ1', 'PJ2',
+                'Senin', '23/11/2026', '08:00', '09:30', '', 'PJ1', 'PJ2', 'Individu',
             ]));
         }, $options);
     }
